@@ -1,0 +1,40 @@
+{
+  "name": "socialpredict-contracts",
+  "version": "1.0.0",
+  "description": "Smart contracts for SocialPredict decentralized prediction market",
+  "main": "index.js",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "deploy:localhost": "hardhat run scripts/deploy.js --network localhost",
+    "deploy:goerli": "hardhat run scripts/deploy.js --network goerli",
+    "deploy:mainnet": "hardhat run scripts/deploy.js --network mainnet",
+    "deploy:polygon": "hardhat run scripts/deploy.js --network polygon",
+    "deploy:arbitrum": "hardhat run scripts/deploy.js --network arbitrum",
+    "verify": "hardhat verify",
+    "node": "hardhat node",
+    "console": "hardhat console"
+  },
+  "keywords": [
+    "prediction-market",
+    "defi",
+    "ethereum",
+    "smart-contracts",
+    "solidity"
+  ],
+  "author": "SocialPredict Team",
+  "license": "MIT",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^2.0.0",
+    "@openzeppelin/hardhat-upgrades": "^1.22.0",
+    "hardhat": "^2.14.0",
+    "hardhat-gas-reporter": "^1.0.8",
+    "solidity-coverage": "^0.8.2"
+  },
+  "dependencies": {
+    "@chainlink/contracts": "^0.6.1",
+    "@openzeppelin/contracts": "^4.8.0",
+    "@openzeppelin/contracts-upgradeable": "^4.8.0",
+    "dotenv": "^16.0.0"
+  }
+}
