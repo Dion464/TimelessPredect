@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useHistory } from 'react-router-dom';
 import PolymarketChart from '../../components/charts/PolymarketChart';
 import Web3TradingInterface from '../../components/trading/Web3TradingInterface';
@@ -29,10 +29,239 @@ const PolymarketStyleTrading = () => {
   const [noPriceHistory, setNoPriceHistory] = useState([]);
   const [recentTrades, setRecentTrades] = useState([]);
   const [orderBook, setOrderBook] = useState({ yes: [], no: [] });
+  const [uniqueTraders, setUniqueTraders] = useState(0);
+  const [liquidity, setLiquidity] = useState(0);
+  const refreshTriggerRef = useRef(0); // Force refresh counter
+
+  // These functions need to be defined before refreshAllData
+  const fetchRecentTrades = useCallback(async () => {
+    if (!contracts?.predictionMarket) return;
+    
+    try {
+      // Fetch real trades from the contract
+      const trades = await contracts.predictionMarket.getRecentTrades(marketId, 10);
+      
+      if (!trades || trades.length === 0) {
+        setRecentTrades([]);
+        return;
+      }
+      
+      // Convert trades to display format
+      const formattedTrades = trades.map(trade => {
+        const tradePrice = parseFloat(trade.price.toString()) / 100; // Convert from basis points to cents
+        const shares = parseFloat(ethers.utils.formatEther(trade.shares));
+        const timestamp = new Date(parseInt(trade.timestamp.toString()) * 1000);
+        
+        return {
+          side: trade.isYes ? 'yes' : 'no',
+          amount: shares.toFixed(4),
+          price: Math.round(tradePrice * 100), // Display in cents
+          timestamp: timestamp.toLocaleTimeString(),
+          date: timestamp.toLocaleString(),
+          trader: trade.trader
+        };
+      });
+      
+      // Sort by timestamp (most recent first)
+      formattedTrades.sort((a, b) => new Date(b.date) - new Date(a.date));
+      
+      setRecentTrades(formattedTrades);
+      console.log('✅ Loaded real trades from blockchain:', formattedTrades.length, 'trades');
+    } catch (error) {
+      console.error('Error fetching recent trades:', error);
+      // Fallback to empty array if function doesn't exist or errors
+      setRecentTrades([]);
+    }
+  }, [contracts?.predictionMarket, marketId]);
+
+  const fetchOrderBook = useCallback(async () => {
+    if (!contracts?.predictionMarket || !contracts?.pricingAMM) return;
+    
+    try {
+      // Get current prices from PricingAMM
+      const [yesPrice, noPrice] = await contracts.pricingAMM.calculatePrice(marketId);
+      const currentYesPrice = yesPrice.toNumber(); // Basis points (5000 = 50%)
+      const currentNoPrice = noPrice.toNumber();
+      
+      // Get market state from PricingAMM
+      const marketState = await contracts.pricingAMM.getMarketState(marketId);
+      const yesShares = parseFloat(ethers.utils.formatEther(marketState.yesShares));
+      const noShares = parseFloat(ethers.utils.formatEther(marketState.noShares));
+      
+      // Create order book based on actual market state
+      const yesOrders = [];
+      const noOrders = [];
+      
+      // Calculate order amounts based on actual shares
+      for (let i = 0; i < 5; i++) {
+        // YES orders: prices slightly below current (bids)
+        const priceOffset = i * 10; // 10 basis points = 0.1%
+        const yesPriceBasis = Math.max(100, currentYesPrice - priceOffset); // Min 1%
+        const yesPriceCents = Math.round(yesPriceBasis / 100); // Convert to cents
+        
+        // Amount based on YES shares available
+        const yesAmount = (yesShares * (currentYesPrice - priceOffset) / currentYesPrice) || 0;
+        
+        yesOrders.push({ 
+          price: yesPriceCents,
+          amount: yesAmount.toFixed(2)
+        });
+        
+        // NO orders: prices slightly below current (bids)
+        const noPriceBasis = Math.max(100, currentNoPrice - priceOffset);
+        const noPriceCents = Math.round(noPriceBasis / 100);
+        
+        // Amount based on NO shares available
+        const noAmount = (noShares * (currentNoPrice - priceOffset) / currentNoPrice) || 0;
+        
+        noOrders.push({ 
+          price: noPriceCents,
+          amount: noAmount.toFixed(2)
+        });
+      }
+      
+      setOrderBook({ yes: yesOrders, no: noOrders });
+      console.log('✅ Loaded real order book from market state');
+    } catch (error) {
+      console.error('Error fetching order book:', error);
+      setOrderBook({ yes: [], no: [] });
+    }
+  }, [contracts?.predictionMarket, contracts?.pricingAMM, marketId]);
+
+  const fetchUniqueTraders = useCallback(async () => {
+    if (!contracts?.predictionMarket) return;
+    
+    try {
+      // Fetch recent trades to count unique traders
+      const trades = await contracts.predictionMarket.getRecentTrades(marketId, 100);
+      
+      if (!trades || trades.length === 0) {
+        setUniqueTraders(0);
+        return;
+      }
+      
+      // Count unique trader addresses
+      const uniqueAddresses = new Set();
+      trades.forEach(trade => {
+        uniqueAddresses.add(trade.trader.toLowerCase());
+      });
+      
+      setUniqueTraders(uniqueAddresses.size);
+      console.log('✅ Counted unique traders:', uniqueAddresses.size);
+    } catch (error) {
+      console.error('Error fetching unique traders:', error);
+      setUniqueTraders(0);
+    }
+  }, [contracts?.predictionMarket, marketId]);
+
+  const fetchLiquidity = useCallback(async () => {
+    if (!contracts?.predictionMarket || !contracts?.pricingAMM) return;
+    
+    try {
+      // Get market state for liquidity info
+      const marketState = await contracts.pricingAMM.getMarketState(marketId);
+      const liquidity = parseFloat(ethers.utils.formatEther(marketState.liquidity || '0'));
+      
+      // Also get contract balance as additional liquidity measure
+      const provider = contracts.predictionMarket.provider;
+      const contractAddress = contracts.predictionMarket.address;
+      const contractBalance = await provider.getBalance(contractAddress);
+      const balanceEth = parseFloat(ethers.utils.formatEther(contractBalance));
+      
+      // Use the higher of the two, or AMM liquidity if available
+      const totalLiquidity = liquidity > 0 ? liquidity : balanceEth;
+      
+      setLiquidity(totalLiquidity);
+      console.log('✅ Fetched liquidity:', totalLiquidity.toFixed(4), 'ETH');
+    } catch (error) {
+      console.error('Error fetching liquidity:', error);
+      setLiquidity(0);
+    }
+  }, [contracts?.predictionMarket, contracts?.pricingAMM, marketId]);
+
+  const updatePriceHistory = useCallback(async () => {
+    if (!market || !contracts?.predictionMarket) return;
+    
+    try {
+      // Get current prices
+      const yesPrice = await contracts.predictionMarket.getCurrentPrice(marketId, true);
+      const noPrice = await contracts.predictionMarket.getCurrentPrice(marketId, false);
+      
+      const currentYesPrice = parseFloat(yesPrice.toString()) / 100; // Convert to cents, then to decimal
+      const currentNoPrice = parseFloat(noPrice.toString()) / 100;
+      
+      // Add new data point to history
+      const now = new Date();
+      const newYesPoint = {
+        price: currentYesPrice / 100, // Convert cents to decimal (50 -> 0.5)
+        timestamp: now.toISOString()
+      };
+      const newNoPoint = {
+        price: currentNoPrice / 100,
+        timestamp: now.toISOString()
+      };
+      
+      setYesPriceHistory(prev => {
+        const updated = [...prev, newYesPoint];
+        // Keep only last 100 points
+        return updated.slice(-100);
+      });
+      
+      setNoPriceHistory(prev => {
+        const updated = [...prev, newNoPoint];
+        // Keep only last 100 points
+        return updated.slice(-100);
+      });
+      
+      console.log('✅ Updated price history with new data point');
+    } catch (error) {
+      console.error('Error updating price history:', error);
+    }
+  }, [market, contracts?.predictionMarket, marketId]);
+
+  // Refresh function that can be called after trades
+  const refreshAllData = useCallback(async () => {
+    refreshTriggerRef.current += 1;
+    await fetchMarketData();
+    await fetchRecentTrades();
+    await fetchOrderBook();
+    await fetchUniqueTraders();
+    await fetchLiquidity();
+    await updatePriceHistory();
+  }, [marketId, contracts, isConnected, fetchRecentTrades, fetchOrderBook, fetchUniqueTraders, fetchLiquidity, updatePriceHistory]);
 
   useEffect(() => {
     fetchMarketData();
   }, [marketId, isConnected]);
+
+  // Set up event listeners for real-time updates
+  useEffect(() => {
+    if (!contracts?.predictionMarket || !marketId || !isConnected) return;
+
+    const contract = contracts.predictionMarket;
+    const filterPurchased = contract.filters.SharesPurchased(marketId, null);
+    const filterSold = contract.filters.SharesSold(marketId, null);
+
+    const handlePurchased = async (...args) => {
+      console.log('🟢 SharesPurchased event detected:', args);
+      // Refresh all data after a short delay to ensure blockchain state is updated
+      setTimeout(() => refreshAllData(), 2000);
+    };
+
+    const handleSold = async (...args) => {
+      console.log('🔴 SharesSold event detected:', args);
+      // Refresh all data after a short delay to ensure blockchain state is updated
+      setTimeout(() => refreshAllData(), 2000);
+    };
+
+    contract.on(filterPurchased, handlePurchased);
+    contract.on(filterSold, handleSold);
+
+    return () => {
+      contract.off(filterPurchased, handlePurchased);
+      contract.off(filterSold, handleSold);
+    };
+  }, [contracts?.predictionMarket, marketId, isConnected, refreshAllData]);
 
   // Real-time updates for price history and trades
   useEffect(() => {
@@ -81,9 +310,12 @@ const PolymarketStyleTrading = () => {
             return newHistory;
           });
 
-          // Update recent trades and order book with real data
+          // Update recent trades, order book, traders, and liquidity with real data
           await fetchRecentTrades();
           await fetchOrderBook();
+          await fetchUniqueTraders();
+          await fetchLiquidity();
+          await updatePriceHistory();
           
         } catch (error) {
           console.log('Error updating real-time data:', error);
@@ -123,7 +355,7 @@ const PolymarketStyleTrading = () => {
           yesLabel: "YES",
           noLabel: "NO",
           currentProbability: parseFloat(marketData.yesPrice) / 100, // Use LMSR price from marketData
-          totalVolume: parseFloat(marketData.totalVolume),
+          totalVolume: parseFloat(ethers.utils.formatEther(marketData.totalVolume)),
           totalBets: Math.floor(Math.random() * 100) + 25, // Generate realistic trader count
           yesPrice: parseFloat(marketData.yesPrice), // Use LMSR price from marketData
           noPrice: parseFloat(marketData.noPrice) // Use LMSR price from marketData
@@ -135,9 +367,11 @@ const PolymarketStyleTrading = () => {
         // Generate real price history based on current price
         await generateRealPriceHistory(processedMarketData.yesPrice, processedMarketData.noPrice);
         
-        // Generate recent trades and order book
+        // Fetch real data from blockchain
         await fetchRecentTrades();
         await fetchOrderBook();
+        await fetchUniqueTraders();
+        await fetchLiquidity();
         
       } catch (error) {
         console.error('❌ Failed to fetch market from blockchain:', error);
@@ -218,120 +452,6 @@ const PolymarketStyleTrading = () => {
     console.log('📊 NO final price:', (noHistory[noHistory.length - 1].price * 100).toFixed(1), '¢ (target:', currentNoPrice, '¢)');
   };
 
-  const fetchRecentTrades = async () => {
-    if (!contracts?.predictionMarket || !contracts?.pricingAMM) return;
-    
-    try {
-      // Get market data from the blockchain
-      const marketData = await contracts.predictionMarket.getMarket(marketId);
-      
-      // Calculate total volume from the market data
-      const totalVolume = parseFloat(ethers.utils.formatEther(marketData.totalVolume));
-      
-      // Get current prices from PricingAMM
-      const [yesPrice, noPrice] = await contracts.pricingAMM.calculatePrice(marketId);
-      const currentYesPrice = yesPrice.toNumber() / 100; // Convert to cents
-      const currentNoPrice = noPrice.toNumber() / 100; // Convert to cents
-      
-      // Get market state from PricingAMM
-      const marketState = await contracts.pricingAMM.getMarketState(marketId);
-      const yesShares = parseFloat(ethers.utils.formatEther(marketState.yesShares));
-      const noShares = parseFloat(ethers.utils.formatEther(marketState.noShares));
-      
-      // Create realistic trades based on actual market activity
-      const trades = [];
-      const numTrades = Math.min(Math.floor(totalVolume / 0.5), 10); // More volume = more trades
-      
-      for (let i = 0; i < numTrades; i++) {
-        const side = Math.random() > 0.5 ? 'yes' : 'no';
-        const basePrice = side === 'yes' ? currentYesPrice : currentNoPrice;
-        const priceVariation = (Math.random() - 0.5) * 0.04; // ±2% variation
-        const tradePrice = Math.max(1, Math.min(99, Math.round((basePrice + priceVariation) * 100))) / 100;
-        
-        // Amount based on market activity
-        const baseAmount = Math.random() * (totalVolume / 10) + 0.1;
-        const amount = Math.round(baseAmount * 100) / 100;
-        
-        // Recent timestamp
-        const hoursAgo = Math.random() * 24;
-        const timestamp = new Date(Date.now() - hoursAgo * 60 * 60 * 1000);
-        
-        trades.push({
-          side,
-          amount: amount.toFixed(2),
-          price: Math.round(tradePrice * 100),
-          timestamp: timestamp.toLocaleTimeString()
-        });
-      }
-      
-      // Sort by timestamp (most recent first)
-      trades.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-      
-      setRecentTrades(trades);
-      console.log('✅ Loaded dynamic recent trades:', trades.length, 'from market', marketId);
-    } catch (error) {
-      console.error('Error fetching recent trades:', error);
-      setRecentTrades([]);
-    }
-  };
-
-  const fetchOrderBook = async () => {
-    if (!contracts?.predictionMarket || !contracts?.pricingAMM) return;
-    
-    try {
-      // Get current market data from blockchain
-      const marketData = await contracts.predictionMarket.getMarket(marketId);
-      const totalVolume = parseFloat(ethers.utils.formatEther(marketData.totalVolume));
-      
-      // Get current prices from PricingAMM
-      const [yesPrice, noPrice] = await contracts.pricingAMM.calculatePrice(marketId);
-      const currentYesPrice = yesPrice.toNumber() / 100; // Convert to cents
-      const currentNoPrice = noPrice.toNumber() / 100; // Convert to cents
-      
-      // Get market state from PricingAMM
-      const marketState = await contracts.pricingAMM.getMarketState(marketId);
-      const yesShares = parseFloat(ethers.utils.formatEther(marketState.yesShares));
-      const noShares = parseFloat(ethers.utils.formatEther(marketState.noShares));
-      const liquidity = parseFloat(ethers.utils.formatEther(marketState.liquidity));
-      
-      // Create dynamic order book based on actual market state
-      const yesOrders = [];
-      const noOrders = [];
-      
-      // Calculate order book depth based on liquidity
-      const depthMultiplier = Math.max(1, liquidity / 10); // More liquidity = deeper order book
-      
-      // Generate YES orders (bids for YES shares) - descending prices
-      for (let i = 0; i < 5; i++) {
-        const priceOffset = i * 0.01; // 1 cent increments
-        const price = Math.max(1, Math.round((currentYesPrice - priceOffset) * 100));
-        
-        // Amount based on liquidity and market activity
-        const baseAmount = (Math.random() * 200 + 50) * depthMultiplier;
-        const amount = Math.round(baseAmount * 100) / 100;
-        
-        yesOrders.push({ price, amount });
-      }
-      
-      // Generate NO orders (bids for NO shares) - descending prices
-      for (let i = 0; i < 5; i++) {
-        const priceOffset = i * 0.01; // 1 cent increments
-        const price = Math.max(1, Math.round((currentNoPrice - priceOffset) * 100));
-        
-        // Amount based on liquidity and market activity
-        const baseAmount = (Math.random() * 250 + 60) * depthMultiplier;
-        const amount = Math.round(baseAmount * 100) / 100;
-        
-        noOrders.push({ price, amount });
-      }
-      
-      setOrderBook({ yes: yesOrders, no: noOrders });
-      console.log('✅ Loaded dynamic order book for market', marketId, 'with liquidity:', liquidity.toFixed(2), 'ETH');
-    } catch (error) {
-      console.error('Error fetching order book:', error);
-      setOrderBook({ yes: [], no: [] });
-    }
-  };
 
   const getTimeRemaining = (resolutionDate) => {
     if (!resolutionDate) return 'No end date';
@@ -381,51 +501,114 @@ const PolymarketStyleTrading = () => {
     );
   }
 
+  const getCategoryColor = (category) => {
+    const colors = {
+      'Technology': 'bg-blue-500',
+      'Crypto': 'bg-blue-600',
+      'Sports': 'bg-green-500',
+      'Politics': 'bg-red-500',
+      'Entertainment': 'bg-purple-500',
+      'Economics': 'bg-yellow-500',
+      'Science': 'bg-indigo-500',
+      'Medical': 'bg-teal-500',
+      'AI': 'bg-orange-500',
+      'Startups': 'bg-pink-500',
+      'default': 'bg-gray-500'
+    };
+    return colors[category] || colors.default;
+  };
+
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    const day = date.getDate();
+    const month = date.toLocaleString('default', { month: 'short' }).toUpperCase();
+    const year = date.getFullYear();
+    return `${day} ${month} ${year}`;
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 py-6">
-        {/* Header */}
-        <div className="mb-6">
-          <button
-            onClick={() => history.push('/markets')}
-            className="flex items-center text-gray-600 hover:text-gray-800 mb-4"
-          >
-            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-            Back to Markets
-          </button>
-          
-          <h1 className="text-3xl font-bold text-gray-900 mb-4">{market.questionTitle}</h1>
-          
-          <div className="flex items-center space-x-6 text-sm text-gray-600">
-            <div className="flex items-center">
-              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-              </svg>
-              {market.totalBets} traders
-            </div>
-            <div className="flex items-center">
-              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-              </svg>
-              ${market.totalVolume?.toLocaleString() || '0'} volume
-            </div>
-            <div className="flex items-center">
-              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              Ends {new Date(market.resolutionDateTime).toLocaleDateString()}
-            </div>
-          </div>
-        </div>
+        {/* Back Button */}
+        <button
+          onClick={() => history.push('/markets')}
+          className="flex items-center text-gray-600 hover:text-gray-800 mb-6"
+        >
+          <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+          Back to Markets
+        </button>
 
+        {/* Two Column Layout - Dribbble Style */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main Content */}
+          {/* Left Section - Market Info & Chart (2/3 width) */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Chart */}
-            <div className="bg-white rounded-lg p-6 border border-gray-200">
-              <h2 className="text-xl font-semibold mb-4">Price Chart</h2>
+            {/* Header with Category & Market Title */}
+            <div>
+              <div className="flex items-center gap-3 mb-4">
+                <span className={`px-3 py-1 rounded-full text-xs font-semibold text-white ${getCategoryColor(market.category)}`}>
+                  {market.category || 'General'}
+                </span>
+                <span className="px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
+                  ETH Market
+                </span>
+              </div>
+              <h1 className="text-3xl font-bold text-gray-900 mb-6 leading-tight">
+                {market.questionTitle}
+              </h1>
+
+              {/* Market Statistics Cards - Horizontal Row */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <div className="bg-white rounded-lg p-4 border border-gray-200">
+                  <div className="text-xs text-gray-500 mb-1">24hr Volume</div>
+                  <div className="text-lg font-bold text-gray-900">
+                    ${(market.totalVolume || 0).toFixed(2)}
+                  </div>
+                </div>
+                <div className="bg-white rounded-lg p-4 border border-gray-200">
+                  <div className="text-xs text-gray-500 mb-1">Total Volume</div>
+                  <div className="text-lg font-bold text-gray-900">
+                    ${(market.totalVolume || 0).toFixed(2)}
+                  </div>
+                </div>
+                <div className="bg-white rounded-lg p-4 border border-gray-200">
+                  <div className="text-xs text-gray-500 mb-1">Liquidity</div>
+                  <div className="text-lg font-bold text-gray-900">
+                    {liquidity > 0 ? `${liquidity.toFixed(2)} ETH` : '0 ETH'}
+                  </div>
+                </div>
+                <div className="bg-white rounded-lg p-4 border border-gray-200">
+                  <div className="text-xs text-gray-500 mb-1">Expires</div>
+                  <div className="text-lg font-bold text-gray-900">
+                    {formatDate(market.resolutionDateTime)}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Price Chart with Time Range Selector */}
+            <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
+              {/* Time Range Selector */}
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-gray-900">Market Context</h2>
+                <div className="flex gap-2">
+                  {['24hrs', '7d', '30d', 'All Time'].map((period) => (
+                    <button
+                      key={period}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        period === '7d'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      {period}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              
+              {/* Chart */}
               <PolymarketChart 
                 priceHistory={priceHistory}
                 yesPriceHistory={yesPriceHistory}
@@ -433,111 +616,40 @@ const PolymarketStyleTrading = () => {
                 currentYesPrice={market?.yesPrice || 50}
                 currentNoPrice={market?.noPrice || 50}
               />
-            </div>
 
-            {/* Trading Interface */}
-            <div className="bg-white rounded-lg p-6 border border-gray-200">
-              <Web3TradingInterface 
-                marketId={marketId}
-                market={market}
-              />
+              {/* Chart Legend - Current Prices */}
+              <div className="flex items-center gap-6 mt-4 pt-4 border-t border-gray-200">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                  <span className="text-sm font-medium text-gray-700">Yes</span>
+                  <span className="text-sm font-bold text-gray-900">
+                    ${(market?.yesPrice / 100 || 0.50).toFixed(2)}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                  <span className="text-sm font-medium text-gray-700">No</span>
+                  <span className="text-sm font-bold text-gray-900">
+                    ${(market?.noPrice / 100 || 0.50).toFixed(2)}
+                  </span>
+                </div>
+                <div className="ml-auto text-sm text-gray-500">
+                  Total Predictions <span className="font-semibold text-gray-900">{uniqueTraders || 0}</span>
+                </div>
+                <div className="text-sm text-gray-500">
+                  Community Prediction <span className="font-semibold text-gray-900">{Math.round((market?.yesPrice || 50) / 100)}%</span>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Sidebar */}
-          <div className="space-y-6">
-            {/* Market Stats */}
-            <div className="bg-white rounded-lg p-6 border border-gray-200">
-              <h3 className="text-lg font-semibold mb-4">Market Stats</h3>
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">24h Volume</span>
-                  <span className="font-medium">${(market.totalVolume || 0).toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Total Traders</span>
-                  <span className="font-medium">{recentTrades.length > 0 ? Math.floor(recentTrades.length * 2.5) : 0}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Created</span>
-                  <span className="font-medium">{new Date(market.createdAt).toLocaleDateString()}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Ends</span>
-                  <span className="font-medium">{new Date(market.resolutionDateTime).toLocaleDateString()}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Liquidity</span>
-                  <span className="font-medium">{orderBook.yes.length > 0 ? 
-                    `${((orderBook.yes[0]?.amount || 0) + (orderBook.no[0]?.amount || 0)).toFixed(2)} ETH` : 
-                    '0 ETH'
-                  }</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Recent Trades */}
-            <div className="bg-white rounded-lg p-6 border border-gray-200">
-              <h3 className="text-lg font-semibold mb-4">Recent Trades</h3>
-              {recentTrades.length > 0 ? (
-                <div className="space-y-2">
-                  {recentTrades.slice(0, 5).map((trade, index) => (
-                    <div key={index} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-b-0">
-                      <div className="flex items-center">
-                        <span className={`px-2 py-1 rounded text-xs font-medium ${
-                          trade.side === 'yes' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                        }`}>
-                          {trade.side.toUpperCase()}
-                        </span>
-                      </div>
-                      <div className="text-right">
-                        <div className="font-medium">${trade.amount}</div>
-                        <div className="text-sm text-gray-500">{trade.price}¢</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-gray-500 text-center py-4">No recent trades</p>
-              )}
-            </div>
-
-            {/* Order Book */}
-            <div className="bg-white rounded-lg p-6 border border-gray-200">
-              <h3 className="text-lg font-semibold mb-4">Order Book</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <h4 className="text-sm font-medium text-green-600 mb-2">Yes Orders</h4>
-                  {orderBook.yes.length > 0 ? (
-                    <div className="space-y-1">
-                      {orderBook.yes.slice(0, 5).map((order, index) => (
-                        <div key={index} className="flex justify-between text-sm">
-                          <span>{order.price}¢</span>
-                          <span>${order.amount}</span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-gray-400 text-sm">No orders</p>
-                  )}
-                </div>
-                <div>
-                  <h4 className="text-sm font-medium text-red-600 mb-2">No Orders</h4>
-                  {orderBook.no.length > 0 ? (
-                    <div className="space-y-1">
-                      {orderBook.no.slice(0, 5).map((order, index) => (
-                        <div key={index} className="flex justify-between text-sm">
-                          <span>{order.price}¢</span>
-                          <span>${order.amount}</span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-gray-400 text-sm">No orders</p>
-                  )}
-                </div>
-              </div>
-            </div>
+          {/* Right Section - Trading Interface (1/3 width) */}
+          <div className="lg:col-span-1">
+            <Web3TradingInterface 
+              marketId={marketId}
+              market={market}
+              onTradeComplete={refreshAllData}
+            />
           </div>
         </div>
       </div>

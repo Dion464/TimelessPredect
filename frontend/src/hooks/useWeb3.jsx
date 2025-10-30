@@ -1,9 +1,14 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { ethers } from 'ethers';
 import toast from 'react-hot-toast';
-import { CONTRACT_ADDRESS, CHAIN_ID, CONTRACT_ABI } from '../contracts/eth-config';
+import { PREDICTION_MARKET_ADDRESS, CHAIN_ID } from '../contracts/config';
 
-// Contract ABIs - using the ABI from deployed contract config
+// Debug log to verify import
+console.log('📍 Imported PREDICTION_MARKET_ADDRESS:', PREDICTION_MARKET_ADDRESS);
+console.log('📍 CHAIN_ID:', CHAIN_ID);
+
+// Use the ABI from eth-config as it has all the necessary functions
+import { CONTRACT_ABI } from '../contracts/eth-config';
 const ETH_PREDICTION_MARKET_ABI = CONTRACT_ABI;
 
 // PricingAMM ABI (simplified for price calculation)
@@ -17,12 +22,12 @@ const PRICING_AMM_ABI = [
 const CONTRACT_ADDRESSES = {
           // Local Hardhat
           1337: {
-            ETH_PREDICTION_MARKET: CONTRACT_ADDRESS, // Use deployed address from eth-config.js
+            ETH_PREDICTION_MARKET: PREDICTION_MARKET_ADDRESS, // Use deployed address from config.js
             PRICING_AMM: "0x0000000000000000000000000000000000000000", // Will be set dynamically
           },
           // Alternative Hardhat chain ID
           31337: {
-            ETH_PREDICTION_MARKET: CONTRACT_ADDRESS,
+            ETH_PREDICTION_MARKET: PREDICTION_MARKET_ADDRESS,
             PRICING_AMM: "0x0000000000000000000000000000000000000000", // Will be set dynamically
           },
   // Polygon Amoy Testnet (current official testnet)
@@ -103,6 +108,7 @@ export const Web3Provider = ({ children }) => {
       }
 
       console.log('Contract addresses for chain', chainId, ':', addresses);
+      console.log('🔍 Using PredictionMarket address:', addresses.ETH_PREDICTION_MARKET);
 
       if (!addresses.ETH_PREDICTION_MARKET) {
         throw new Error(`Prediction market address missing for chain ${chainId}`);
@@ -490,42 +496,109 @@ export const Web3Provider = ({ children }) => {
     }
   }, [contracts.predictionMarket, contracts.pricingAMM]);
 
-  // Create market
+  // Create market with improved error handling
   const createMarket = useCallback(async (question, description, category, endTime, resolutionTime) => {
     if (!contracts.predictionMarket || !signer) {
       throw new Error('Contracts not initialized');
+    }
+
+    // Check if wallet is ready
+    const walletReady = await isWalletReady();
+    if (!walletReady) {
+      throw new Error('Wallet not ready. Please check your MetaMask connection.');
     }
 
     try {
       const marketCreationFee = await contracts.predictionMarket.marketCreationFee();
       
       console.log('Creating market with fee:', ethers.utils.formatEther(marketCreationFee), 'ETH');
+      console.log('Parameters:', { question, category, endTime, resolutionTime });
       
-      const tx = await contracts.predictionMarket.createMarket(
-        question,
-        description,
-        category,
-        endTime,
-        resolutionTime,
-        {
-          value: marketCreationFee,
-          gasLimit: 1000000
-        }
-      );
+      // Try with gas estimation first
+      try {
+        const gasEstimate = await contracts.predictionMarket.estimateGas.createMarket(
+          question,
+          description,
+          category,
+          endTime,
+          resolutionTime,
+          {
+            value: marketCreationFee
+          }
+        );
+        console.log(`⛽ Gas estimate: ${gasEstimate.toString()}`);
 
-      console.log('Create market transaction sent:', tx.hash);
-      const receipt = await tx.wait();
-      console.log('Create market transaction confirmed:', receipt);
+        const tx = await contracts.predictionMarket.createMarket(
+          question,
+          description,
+          category,
+          endTime,
+          resolutionTime,
+          {
+            value: marketCreationFee,
+            gasLimit: gasEstimate.mul(120).div(100) // Add 20% buffer
+          }
+        );
 
-      // Update ETH balance
-      await updateEthBalance();
+        console.log('Create market transaction sent:', tx.hash);
+        const receipt = await tx.wait();
+        console.log('Create market transaction confirmed:', receipt);
 
-      return receipt;
+        // Update ETH balance
+        await updateEthBalance();
+
+        return receipt;
+      } catch (gasError) {
+        console.log(`⛽ Gas estimation failed, trying with fixed gas limit...`);
+        console.error('Gas estimation error:', gasError);
+        
+        // Fallback to fixed gas limit
+        const tx = await contracts.predictionMarket.createMarket(
+          question,
+          description,
+          category,
+          endTime,
+          resolutionTime,
+          {
+            value: marketCreationFee,
+            gasLimit: 2000000 // Higher fixed gas limit for market creation
+          }
+        );
+
+        console.log('Create market transaction sent (fixed gas):', tx.hash);
+        const receipt = await tx.wait();
+        console.log('Create market transaction confirmed (fixed gas):', receipt);
+
+        // Update ETH balance
+        await updateEthBalance();
+
+        return receipt;
+      }
     } catch (err) {
       console.error('Failed to create market:', err);
-      throw err;
+      
+      // Provide more helpful error messages
+      let errorMessage = 'Failed to create market';
+      
+      if (err.message) {
+        if (err.message.includes('Insufficient market creation fee')) {
+          errorMessage = 'Insufficient fee. Please ensure you have enough ETH.';
+        } else if (err.message.includes('End time must be in future')) {
+          errorMessage = 'End time must be in the future. Please check your dates.';
+        } else if (err.message.includes('Resolution time must be after end time')) {
+          errorMessage = 'Resolution time must be after end time.';
+        } else if (err.message.includes('user rejected')) {
+          errorMessage = 'Transaction was rejected. Please try again.';
+        } else if (err.message.includes('Internal JSON-RPC error')) {
+          errorMessage = 'Network error. Please check your connection and try again.';
+        } else {
+          errorMessage = err.message;
+        }
+      }
+      
+      throw new Error(errorMessage);
     }
-  }, [contracts.predictionMarket, signer, updateEthBalance]);
+  }, [contracts.predictionMarket, signer, updateEthBalance, isWalletReady]);
 
   // Claim winnings
   const claimWinnings = useCallback(async (marketId) => {

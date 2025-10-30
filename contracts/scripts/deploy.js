@@ -37,30 +37,20 @@ async function main() {
     console.log("Using USDC at:", usdcAddress);
   }
 
-  // Deploy PredictionMarket contract
-  console.log("\n📄 Deploying PredictionMarket...");
-  const PredictionMarket = await ethers.getContractFactory("PredictionMarket");
-  const predictionMarket = await PredictionMarket.deploy(usdcAddress);
-  await predictionMarket.deployed();
-  console.log("PredictionMarket deployed to:", predictionMarket.address);
-
-  // Deploy PredictionOracle contract
-  console.log("\n📄 Deploying PredictionOracle...");
-  const PredictionOracle = await ethers.getContractFactory("PredictionOracle");
-  const predictionOracle = await PredictionOracle.deploy(predictionMarket.address);
-  await predictionOracle.deployed();
-  console.log("PredictionOracle deployed to:", predictionOracle.address);
-
-  // Set up initial configuration
-  console.log("\n⚙️ Setting up initial configuration...");
+  // Deploy PredictionMarket contract (use ETHPredictionMarket for ETH-based markets)
+  console.log("\n📄 Deploying ETHPredictionMarket...");
+  const ETHPredictionMarket = await ethers.getContractFactory("ETHPredictionMarket");
   
-  // Set oracle as authorized in the prediction market
-  await predictionMarket.setAuthorizedOracle(predictionOracle.address, true);
-  console.log("✅ Oracle authorized in PredictionMarket");
+  // Deploy ETHPredictionMarket with market creation fee and platform fee
+  // marketCreationFee = 0.01 ETH, platformFeePercent = 200 basis points (2%)
+  const marketCreationFee = ethers.utils.parseEther("0.01");
+  const platformFeePercent = 200; // 2% in basis points
+  const predictionMarket = await ETHPredictionMarket.deploy(marketCreationFee, platformFeePercent);
+  await predictionMarket.deployed();
+  console.log("ETHPredictionMarket deployed to:", predictionMarket.address);
 
-  // Set deployer as authorized resolver in oracle
-  await predictionOracle.setAuthorizedResolver(deployer.address, true);
-  console.log("✅ Deployer set as authorized resolver");
+  // Note: ETHPredictionMarket doesn't use a separate oracle
+  // Resolution is done directly by calling resolveMarket function
 
   // Create deployment info
   const deploymentInfo = {
@@ -68,20 +58,16 @@ async function main() {
     chainId: network.chainId,
     deployer: deployer.address,
     timestamp: new Date().toISOString(),
-    contracts: {
-      PredictionMarket: {
-        address: predictionMarket.address,
-        constructorArgs: [usdcAddress],
+      contracts: {
+        ETHPredictionMarket: {
+          address: predictionMarket.address,
+          constructorArgs: [marketCreationFee.toString(), platformFeePercent],
+        },
+        USDC: {
+          address: usdcAddress,
+          isMock: network.chainId === 1337 || network.chainId === 5,
+        },
       },
-      PredictionOracle: {
-        address: predictionOracle.address,
-        constructorArgs: [predictionMarket.address],
-      },
-      USDC: {
-        address: usdcAddress,
-        isMock: network.chainId === 1337 || network.chainId === 5,
-      },
-    },
     configuration: {
       platformFee: "200", // 2%
       resolutionBond: ethers.utils.parseEther("100").toString(),
@@ -103,7 +89,6 @@ async function main() {
   // Generate frontend config
   const frontendConfig = {
     PREDICTION_MARKET_ADDRESS: predictionMarket.address,
-    PREDICTION_ORACLE_ADDRESS: predictionOracle.address,
     USDC_ADDRESS: usdcAddress,
     CHAIN_ID: network.chainId,
     NETWORK_NAME: network.name,
@@ -121,7 +106,6 @@ async function main() {
 export const CONTRACT_CONFIG = ${JSON.stringify(frontendConfig, null, 2)};
 
 export const PREDICTION_MARKET_ADDRESS = "${predictionMarket.address}";
-export const PREDICTION_ORACLE_ADDRESS = "${predictionOracle.address}";
 export const USDC_ADDRESS = "${usdcAddress}";
 export const CHAIN_ID = ${network.chainId};
 export const NETWORK_NAME = "${network.name}";
@@ -138,20 +122,16 @@ export const NETWORK_NAME = "${network.name}";
       {
         questionTitle: "Will Bitcoin reach $100,000 by end of 2024?",
         description: "This market resolves to YES if Bitcoin (BTC) reaches or exceeds $100,000 USD on any major exchange by December 31, 2024, 11:59 PM UTC.",
-        resolutionTime: Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60), // 30 days from now
-        finalResolutionTime: Math.floor(Date.now() / 1000) + (37 * 24 * 60 * 60), // 37 days from now
-        creatorFee: 100, // 1%
+        endTime: Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60), // 30 days from now
+        resolutionTime: Math.floor(Date.now() / 1000) + (37 * 24 * 60 * 60), // 37 days from now
         category: "Crypto",
-        oracle: predictionOracle.address,
       },
       {
         questionTitle: "Will the Lakers win the 2024 NBA Championship?",
         description: "This market resolves to YES if the Los Angeles Lakers win the 2024 NBA Championship.",
-        resolutionTime: Math.floor(Date.now() / 1000) + (60 * 24 * 60 * 60), // 60 days from now
-        finalResolutionTime: Math.floor(Date.now() / 1000) + (67 * 24 * 60 * 60), // 67 days from now
-        creatorFee: 50, // 0.5%
+        endTime: Math.floor(Date.now() / 1000) + (60 * 24 * 60 * 60), // 60 days from now
+        resolutionTime: Math.floor(Date.now() / 1000) + (67 * 24 * 60 * 60), // 67 days from now
         category: "Sports",
-        oracle: predictionOracle.address,
       },
     ];
 
@@ -160,11 +140,10 @@ export const NETWORK_NAME = "${network.name}";
       const tx = await predictionMarket.createMarket(
         market.questionTitle,
         market.description,
-        market.resolutionTime,
-        market.finalResolutionTime,
-        market.creatorFee,
         market.category,
-        market.oracle
+        market.endTime,
+        market.resolutionTime,
+        { value: marketCreationFee }
       );
       await tx.wait();
       console.log(`✅ Created sample market ${i + 1}: "${market.questionTitle}"`);
@@ -173,17 +152,10 @@ export const NETWORK_NAME = "${network.name}";
 
   console.log("\n🎉 Deployment completed successfully!");
   console.log("\n📋 Summary:");
-  console.log("- PredictionMarket:", predictionMarket.address);
-  console.log("- PredictionOracle:", predictionOracle.address);
+  console.log("- ETHPredictionMarket:", predictionMarket.address);
   console.log("- USDC Token:", usdcAddress);
   console.log("- Network:", network.name, `(Chain ID: ${network.chainId})`);
   console.log("- Deployer:", deployer.address);
-  
-  if (network.chainId !== 1337) {
-    console.log("\n🔍 Verify contracts with:");
-    console.log(`npx hardhat verify --network ${network.name} ${predictionMarket.address} ${usdcAddress}`);
-    console.log(`npx hardhat verify --network ${network.name} ${predictionOracle.address} ${predictionMarket.address}`);
-  }
 }
 
 main()

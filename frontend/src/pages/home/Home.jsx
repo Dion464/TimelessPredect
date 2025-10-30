@@ -3,7 +3,19 @@ import { useHistory } from 'react-router-dom';
 import { useWeb3 } from '../../hooks/useWeb3';
 import { ethers } from 'ethers';
 
-// Market Card Component
+// Helper function to format volume
+const formatVolumeDisplay = (volume) => {
+  if (!volume || volume === 0) return '0';
+  // If volume is extremely large (likely Wei that wasn't converted), convert it
+  if (volume > 1e12) {
+    const ethValue = volume / 1e18;
+    return `${ethValue.toFixed(2)} ETH`;
+  }
+  // Format with 2 decimal places for readability
+  return volume.toFixed(2);
+};
+
+// Market Card Component - Dribbble Style
 const MarketCard = ({ market }) => {
   const history = useHistory();
   const probability = market.currentProbability || market.initialProbability || 0.5;
@@ -19,13 +31,17 @@ const MarketCard = ({ market }) => {
 
   const getCategoryColor = (category) => {
     const colors = {
-      'Technology': 'bg-blue-500',
-      'Sports': 'bg-green-500',
-      'Politics': 'bg-red-500',
-      'Entertainment': 'bg-purple-500',
-      'Economics': 'bg-yellow-500',
-      'Science': 'bg-indigo-500',
-      'default': 'bg-gray-500'
+      'Technology': 'bg-blue-500 text-white',
+      'Crypto': 'bg-blue-600 text-white',
+      'Sports': 'bg-green-500 text-white',
+      'Politics': 'bg-red-500 text-white',
+      'Entertainment': 'bg-purple-500 text-white',
+      'Economics': 'bg-yellow-500 text-white',
+      'Science': 'bg-indigo-500 text-white',
+      'Medical': 'bg-teal-500 text-white',
+      'AI': 'bg-orange-500 text-white',
+      'Startups': 'bg-pink-500 text-white',
+      'default': 'bg-gray-500 text-white'
     };
     return colors[category] || colors.default;
   };
@@ -48,72 +64,80 @@ const MarketCard = ({ market }) => {
   return (
     <div 
       onClick={handleCardClick}
-      className="bg-gray-800 rounded-lg p-6 hover:bg-gray-750 transition-all duration-200 cursor-pointer border border-gray-700 hover:border-gray-600"
+      className="bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-md hover:border-gray-300 transition-all duration-200 cursor-pointer overflow-hidden"
     >
-      {/* Category Badge */}
-      <div className="flex items-center justify-between mb-3">
-        <span className={`px-2 py-1 rounded-full text-xs font-medium text-white ${getCategoryColor(market.category)}`}>
-          {market.category || 'General'}
-        </span>
-        <span className="text-xs text-gray-400">
-          {getTimeRemaining(market.resolutionDateTime)}
-        </span>
-      </div>
-
-      {/* Question */}
-      <h3 className="text-white font-medium mb-4 line-clamp-2 leading-snug">
-        {market.questionTitle}
-      </h3>
-
-      {/* Probability Display */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center space-x-2">
-          <div className="flex items-center space-x-1">
-            <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-            <span className="text-sm text-gray-300">{market.yesLabel || 'Yes'}</span>
-          </div>
-          <span className="text-2xl font-bold text-green-400">
-            {yesPrice}¢
+      {/* Header with Category Badge and Time */}
+      <div className="p-5 pb-4">
+        <div className="flex items-center justify-between mb-3">
+          <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getCategoryColor(market.category)}`}>
+            {market.category || 'General'}
+          </span>
+          <span className="text-xs font-medium text-gray-500">
+            {getTimeRemaining(market.resolutionDateTime)}
           </span>
         </div>
-        <div className="flex items-center space-x-2">
-          <span className="text-2xl font-bold text-red-400">
-            {noPrice}¢
-          </span>
-          <div className="flex items-center space-x-1">
-            <span className="text-sm text-gray-300">{market.noLabel || 'No'}</span>
-            <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+
+        {/* Question */}
+        <h3 className="text-gray-900 font-semibold mb-4 line-clamp-2 leading-snug text-base">
+          {market.questionTitle}
+        </h3>
+
+        {/* Price Display - More Prominent */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-1.5">
+              <div className="w-2.5 h-2.5 bg-green-500 rounded-full"></div>
+              <span className="text-sm font-medium text-gray-600">{market.yesLabel || 'YES'}</span>
+            </div>
+            <span className="text-2xl font-bold text-green-600">
+              {yesPrice}¢
+            </span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <span className="text-2xl font-bold text-red-600">
+              {noPrice}¢
+            </span>
+            <div className="flex items-center space-x-1.5">
+              <span className="text-sm font-medium text-gray-600">{market.noLabel || 'NO'}</span>
+              <div className="w-2.5 h-2.5 bg-red-500 rounded-full"></div>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Progress Bar */}
-      <div className="w-full bg-gray-700 rounded-full h-2 mb-3">
-        <div 
-          className="bg-green-500 h-2 rounded-full transition-all duration-300"
-          style={{ width: `${yesPrice}%` }}
-        ></div>
-      </div>
+        {/* Progress Bar - Enhanced */}
+        <div className="w-full bg-gray-100 rounded-full h-2.5 mb-4 overflow-hidden relative">
+          <div 
+            className="bg-gradient-to-r from-green-500 to-green-600 h-2.5 rounded-l-full transition-all duration-300 absolute left-0 top-0"
+            style={{ width: `${yesPrice}%` }}
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"></div>
+          </div>
+          <div 
+            className="bg-gradient-to-r from-red-500 to-red-600 h-2.5 rounded-r-full transition-all duration-300 absolute right-0 top-0"
+            style={{ width: `${noPrice}%` }}
+          ></div>
+        </div>
 
-      {/* Volume/Activity */}
-      <div className="flex items-center justify-between text-xs text-gray-400">
-        <span>Volume: ${market.totalVolume || 0}</span>
-        <span>{market.totalBets || 0} traders</span>
+        {/* Volume/Activity */}
+        <div className="flex items-center justify-between text-xs text-gray-500 pt-2 border-t border-gray-100">
+          <span className="font-medium">Volume: <span className="text-gray-900">${formatVolumeDisplay(market.totalVolume)}</span></span>
+          <span className="font-medium">{market.totalBets || 0} traders</span>
+        </div>
       </div>
     </div>
   );
 };
 
-// Category Filter Component
+// Category Filter Component - Dribbble Style
 const CategoryFilter = ({ categories, selectedCategory, onCategoryChange }) => {
   return (
     <div className="flex flex-wrap gap-2 mb-6">
       <button
         onClick={() => onCategoryChange('All')}
-        className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+        className={`px-5 py-2.5 rounded-full text-sm font-semibold transition-all duration-200 ${
           selectedCategory === 'All' 
-            ? 'bg-blue-600 text-white' 
-            : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+            ? 'bg-blue-600 text-white shadow-md' 
+            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
         }`}
       >
         All
@@ -122,10 +146,10 @@ const CategoryFilter = ({ categories, selectedCategory, onCategoryChange }) => {
         <button
           key={category}
           onClick={() => onCategoryChange(category)}
-          className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+          className={`px-5 py-2.5 rounded-full text-sm font-semibold transition-all duration-200 ${
             selectedCategory === category 
-              ? 'bg-blue-600 text-white' 
-              : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+              ? 'bg-blue-600 text-white shadow-md' 
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
           }`}
         >
           {category}
@@ -210,7 +234,7 @@ function Home() {
               yesPrice: marketData.yesPrice,
               noPrice: marketData.noPrice,
               initialProbability: 0.5,
-              totalVolume: parseFloat(marketData.totalVolume),
+              totalVolume: parseFloat(ethers.utils.formatEther(marketData.totalVolume)),
               totalBets: 0 // We'd need to track this separately
             };
           } catch (error) {
@@ -243,11 +267,11 @@ function Home() {
 
   if (loading) {
     return (
-      <div className='min-h-screen bg-gray-900 text-white'>
+      <div className='min-h-screen bg-gray-50'>
         <div className='max-w-7xl mx-auto px-4 py-8'>
-          <div className='text-center'>
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-            <p className='text-lg text-gray-300'>Loading markets from blockchain...</p>
+          <div className='text-center py-16'>
+            <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-200 border-t-blue-600 mx-auto mb-4"></div>
+            <p className='text-lg font-medium text-gray-600'>Loading markets from blockchain...</p>
           </div>
         </div>
       </div>
@@ -257,9 +281,9 @@ function Home() {
   return (
     <div className='min-h-screen bg-gray-50'>
       <div className='max-w-7xl mx-auto px-4 py-8'>
-        {/* Header */}
+        {/* Header - Dribbble Style */}
         <div className="mb-8">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between mb-6">
             <div>
               <h1 className="text-4xl font-bold mb-2 text-gray-900">Prediction Markets</h1>
               <p className="text-gray-600 text-lg">
@@ -267,30 +291,31 @@ function Home() {
               </p>
             </div>
             
-            {/* Wallet Status */}
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2 text-sm text-gray-500">
-                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+            {/* Wallet Status - Enhanced */}
+            <div className="flex items-center space-x-3">
+              <div className="flex items-center space-x-2 text-sm font-medium text-gray-600 bg-white px-3 py-2 rounded-lg border border-gray-200">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
                 <span>Live Data</span>
               </div>
               
-              <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-1">
-                <span className="text-sm text-blue-800">{networkName || 'Not Connected'}</span>
-              </div>
-              
               {isConnected ? (
-                <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-2">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <span className="text-sm text-green-800">
-                      {account?.slice(0, 6)}...{account?.slice(-4)}
-                    </span>
+                <>
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2">
+                    <span className="text-sm font-medium text-blue-800">{networkName || 'Network'}</span>
                   </div>
-                </div>
+                  <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-2">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                      <span className="text-sm font-medium text-green-800">
+                        {account?.slice(0, 6)}...{account?.slice(-4)}
+                      </span>
+                    </div>
+                  </div>
+                </>
               ) : (
                 <button
                   onClick={connectWallet}
-                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                  className="bg-blue-600 text-white px-5 py-2.5 rounded-lg hover:bg-blue-700 transition-all duration-200 font-medium shadow-md hover:shadow-lg"
                 >
                   Connect Wallet
                 </button>
@@ -299,27 +324,27 @@ function Home() {
           </div>
         </div>
 
-        {/* Stats Bar */}
+        {/* Stats Bar - Enhanced Dribbble Style */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <div className="bg-white rounded-lg p-4 border border-gray-200">
-            <div className="text-2xl font-bold text-blue-600">{markets.length}</div>
-            <div className="text-sm text-gray-600">Active Markets</div>
+          <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+            <div className="text-3xl font-bold text-blue-600 mb-1">{markets.length}</div>
+            <div className="text-sm font-medium text-gray-600">Active Markets</div>
           </div>
-          <div className="bg-white rounded-lg p-4 border border-gray-200">
-            <div className="text-2xl font-bold text-green-600">
-              ${markets.reduce((sum, m) => sum + (m.totalVolume || 0), 0).toLocaleString()}
+          <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+            <div className="text-3xl font-bold text-green-600 mb-1">
+              ${formatVolumeDisplay(markets.reduce((sum, m) => sum + (m.totalVolume || 0), 0))}
             </div>
-            <div className="text-sm text-gray-600">Total Volume</div>
+            <div className="text-sm font-medium text-gray-600">Total Volume</div>
           </div>
-          <div className="bg-white rounded-lg p-4 border border-gray-200">
-            <div className="text-2xl font-bold text-purple-600">
+          <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+            <div className="text-3xl font-bold text-purple-600 mb-1">
               {markets.reduce((sum, m) => sum + (m.totalBets || 0), 0)}
             </div>
-            <div className="text-sm text-gray-600">Total Trades</div>
+            <div className="text-sm font-medium text-gray-600">Total Trades</div>
           </div>
-          <div className="bg-white rounded-lg p-4 border border-gray-200">
-            <div className="text-2xl font-bold text-yellow-600">{categories.length}</div>
-            <div className="text-sm text-gray-600">Categories</div>
+          <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+            <div className="text-3xl font-bold text-yellow-600 mb-1">{categories.length}</div>
+            <div className="text-sm font-medium text-gray-600">Categories</div>
           </div>
         </div>
 
@@ -330,10 +355,16 @@ function Home() {
           onCategoryChange={setSelectedCategory}
         />
 
-        {/* Markets Grid */}
+        {/* Markets Grid - Enhanced Spacing */}
         {filteredMarkets.length === 0 ? (
-          <div className='text-center py-12'>
-            <p className='text-xl text-gray-600'>No markets found in this category.</p>
+          <div className='text-center py-16 bg-white rounded-xl border border-gray-200'>
+            <div className="text-gray-400 mb-4">
+              <svg className="mx-auto h-16 w-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            </div>
+            <p className='text-xl font-semibold text-gray-700 mb-2'>No markets found</p>
+            <p className='text-gray-500'>Try selecting a different category.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -343,14 +374,14 @@ function Home() {
           </div>
         )}
 
-        {/* View All Button */}
+        {/* View All Button - Enhanced */}
         {filteredMarkets.length > 12 && (
-          <div className="text-center mt-8">
+          <div className="text-center mt-10">
             <button 
               onClick={() => window.location.href = '/markets'}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-lg font-medium transition-colors"
+              className="bg-blue-600 hover:bg-blue-700 text-white px-10 py-3.5 rounded-lg font-semibold transition-all duration-200 shadow-md hover:shadow-lg"
             >
-              View All Markets
+              See all markets
             </button>
           </div>
         )}

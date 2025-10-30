@@ -7,6 +7,9 @@ export default defineConfig(() => {
       host: '127.0.0.1', // Use explicit localhost
       port: 3000,
       strictPort: false, // Allow port fallback
+      open: true, // Auto-open browser
+      // open: '/markets', // Optional: open to specific path
+      // To specify browser, use: open: 'chrome' or 'firefox' or 'safari' or path
       proxy: {
         '/v0': {
           target: 'http://localhost:8080',

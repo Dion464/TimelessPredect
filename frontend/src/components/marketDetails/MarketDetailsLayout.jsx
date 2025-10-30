@@ -29,6 +29,18 @@ function MarketDetailsTable({
 
   const toggleBetModal = () => setShowBetModal(prev => !prev);
 
+  // Format volume to be human-readable
+  const formatVolume = (volume) => {
+    if (!volume || volume === 0) return '0';
+    // If volume is extremely large (likely Wei that wasn't converted), convert it
+    if (volume > 1e12) {
+      const ethValue = volume / 1e18;
+      return `${ethValue.toFixed(2)} ETH`;
+    }
+    // Format with commas for readability
+    return volume.toLocaleString();
+  };
+
   const handleTransactionSuccess = () => {
     setShowBetModal(false);  // Close modal
     if (refetchData) {
@@ -111,7 +123,7 @@ function MarketDetailsTable({
           { label: 'Users', value: `${numUsers}`, icon: '👤' },
           { 
             label: 'Volume', 
-            value: `${Math.round(totalVolume)}`,
+            value: formatVolume(totalVolume),
             icon: '📊' 
           },
           { label: 'Comments', value: '0', icon: '💬' },

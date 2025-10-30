@@ -3,7 +3,7 @@ import { useWeb3 } from '../../hooks/useWeb3';
 import { ethers } from 'ethers';
 import toast from 'react-hot-toast';
 
-const Web3TradingInterface = ({ marketId, market }) => {
+const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
   // Add error handling for Web3 context
   let web3Context;
   try {
@@ -87,61 +87,84 @@ const Web3TradingInterface = ({ marketId, market }) => {
 
   // Calculate estimated shares using AMM logic
   const calculateEstimatedShares = useCallback(async () => {
-    if (!contracts.pricingAMM || !tradeAmount || parseFloat(tradeAmount) <= 0) {
+    if (!contracts.pricingAMM || !contracts.predictionMarket || !tradeAmount || parseFloat(tradeAmount) <= 0) {
       setEstimatedShares('0');
       return;
     }
 
     try {
-      // Get current market data to calculate shares using LMSR
+      // First, sync AMM state with current market state (same as contract does)
       const market = await contracts.predictionMarket.getMarket(marketId);
       const yesShares = market.totalYesShares;
       const noShares = market.totalNoShares;
       
-      const investmentAmount = parseFloat(tradeAmount);
+      // Update AMM state before calculating (this syncs the internal state)
+      // Note: updateMarketState is not a view function, so we can't call it directly
+      // Instead, we'll use the market's current state directly in our calculation
       
-      // LMSR calculation: Use PricingAMM to calculate shares
+      const investmentAmount = parseFloat(tradeAmount);
       let estimatedShares;
       
       if (activeTab === 'buy') {
-        // Calculate shares using LMSR pricing
+        // Calculate shares using LMSR pricing from AMM
         try {
-          if (!contracts.pricingAMM) {
-            throw new Error('PricingAMM contract not available');
+          // Get current price from AMM (in basis points: 5000 = 50%)
+          const [yesPriceBasis, noPriceBasis] = await contracts.pricingAMM.calculatePrice(marketId);
+          const currentPriceBasis = tradeSide === 'yes' ? yesPriceBasis.toNumber() : noPriceBasis.toNumber();
+          
+          // Convert price from basis points to decimal (5000 -> 0.5)
+          const currentPriceDecimal = currentPriceBasis / 10000;
+          
+          // Calculate shares: investmentAmount / price_in_decimal
+          // At 50% (0.5), 0.1 ETH buys 0.1 / 0.5 = 0.2 shares
+          if (currentPriceDecimal > 0 && currentPriceDecimal <= 1) {
+            estimatedShares = investmentAmount / currentPriceDecimal;
+            // Apply 2% fee (same as contract)
+            estimatedShares = estimatedShares * 0.98;
+          } else {
+            // Fallback: use 1:1 if price is invalid
+            estimatedShares = investmentAmount;
           }
-          const sharesToGive = await contracts.pricingAMM.calculateSharesToGive(
-            marketId, 
-            tradeSide === 'yes', 
-            ethers.utils.parseEther(tradeAmount.toString())
-          );
-          estimatedShares = parseFloat(ethers.utils.formatEther(sharesToGive));
         } catch (error) {
-          console.error('Failed to calculate shares with LMSR:', error);
-          // Fallback: simple calculation based on price
-          estimatedShares = investmentAmount; // 1:1 ratio for now
+          console.error('Failed to calculate shares with AMM:', error);
+          // Fallback: use price from marketData if available
+          const fallbackYesPrice = marketData?.yesPrice || market?.yesPrice || 50;
+          const fallbackNoPrice = marketData?.noPrice || market?.noPrice || 50;
+          const currentPrice = tradeSide === 'yes' ? parseFloat(fallbackYesPrice) : parseFloat(fallbackNoPrice);
+          // Price is in cents, convert to decimal (50 -> 0.5)
+          const priceDecimal = currentPrice / 100;
+          if (priceDecimal > 0 && priceDecimal <= 1) {
+            estimatedShares = investmentAmount / priceDecimal;
+            estimatedShares = estimatedShares * 0.98; // Apply 2% fee
+          } else {
+            estimatedShares = investmentAmount; // 1:1 fallback
+          }
         }
       } else {
-        // For selling, use 1:1 ratio for now
-        estimatedShares = investmentAmount;
+        // For selling, use current price to calculate payout
+        const fallbackYesPrice = marketData?.yesPrice || market?.yesPrice || 50;
+        const fallbackNoPrice = marketData?.noPrice || market?.noPrice || 50;
+        const currentPrice = tradeSide === 'yes' ? parseFloat(fallbackYesPrice) : parseFloat(fallbackNoPrice);
+        const priceDecimal = currentPrice / 100; // Convert cents to decimal
+        if (priceDecimal > 0 && priceDecimal <= 1) {
+          estimatedShares = parseFloat(tradeAmount) * priceDecimal * 0.98; // Apply 2% fee
+        } else {
+          estimatedShares = parseFloat(tradeAmount); // 1:1 fallback
+        }
+      }
+      
+      // Ensure minimum of 0.0001 shares
+      if (estimatedShares < 0.0001) {
+        estimatedShares = 0.0001;
       }
       
       setEstimatedShares(estimatedShares.toFixed(4));
     } catch (err) {
       console.error('Failed to calculate shares:', err);
-      // Fallback: simple calculation based on price
-      const currentPrice = tradeSide === 'yes' ? parseFloat(yesPrice) : parseFloat(noPrice);
-      
-      // Prevent division by zero and handle very small prices
-      if (currentPrice <= 0 || currentPrice < 0.001) {
-        // If price is too small, use 1:1 ratio (1 ETH = 1 share)
-        const estimatedShares = parseFloat(tradeAmount);
-        setEstimatedShares(estimatedShares.toFixed(4));
-      } else {
-        const estimatedShares = parseFloat(tradeAmount) / currentPrice;
-        setEstimatedShares(estimatedShares.toFixed(4));
-      }
+      // Final fallback: very simple calculation
+      setEstimatedShares(parseFloat(tradeAmount).toFixed(4));
     }
-  }, [contracts.predictionMarket, marketId, tradeAmount, tradeSide, market, marketData]);
+  }, [contracts.predictionMarket, contracts.pricingAMM, marketId, tradeAmount, tradeSide, activeTab, marketData, market]);
 
   useEffect(() => {
     fetchData();
@@ -168,6 +191,10 @@ const Web3TradingInterface = ({ marketId, market }) => {
       await buyShares(marketId, tradeSide === 'yes', tradeAmount);
       setTradeAmount('');
       await fetchData(); // Refresh data
+      // Call the refresh callback to update chart and all data
+      if (onTradeComplete) {
+        setTimeout(() => onTradeComplete(), 2000); // Wait for blockchain confirmation
+      }
       toast.success('✅ Shares purchased successfully!');
     } catch (err) {
       console.error('Buy failed:', err);
@@ -195,6 +222,10 @@ const Web3TradingInterface = ({ marketId, market }) => {
       await sellShares(marketId, tradeSide === 'yes', tradeAmount);
       setTradeAmount('');
       await fetchData(); // Refresh data
+      // Call the refresh callback to update chart and all data
+      if (onTradeComplete) {
+        setTimeout(() => onTradeComplete(), 2000); // Wait for blockchain confirmation
+      }
       toast.success('✅ Shares sold successfully!');
     } catch (err) {
       console.error('Sell failed:', err);
@@ -248,153 +279,229 @@ const Web3TradingInterface = ({ marketId, market }) => {
     } : null
   });
 
-  return (
-    <div className="bg-white rounded-lg border border-gray-200 p-6">
-      <h2 className="text-lg font-semibold mb-4">Trade with ETH</h2>
+  // Calculate estimated values for display (Dribbble style)
+  const estimatedAveragePrice = parseFloat(tradeAmount) > 0 && parseFloat(estimatedShares) > 0
+    ? (parseFloat(tradeAmount) / parseFloat(estimatedShares)).toFixed(2)
+    : '0.00';
+  
+  const estimatedProfit = activeTab === 'buy' && parseFloat(tradeAmount) > 0
+    ? (parseFloat(estimatedShares) * (currentPrice / 100) - parseFloat(tradeAmount)).toFixed(2)
+    : '0.00';
+  
+  const estimatedFees = parseFloat(tradeAmount) > 0
+    ? (parseFloat(tradeAmount) * 0.02).toFixed(2) // 2% fee
+    : '0.00';
+  
+  const maxROI = activeTab === 'buy' && parseFloat(tradeAmount) > 0
+    ? ((parseFloat(estimatedShares) * 1.0 - parseFloat(tradeAmount)) / parseFloat(tradeAmount) * 100).toFixed(2)
+    : '0.00';
 
-      {/* Tab Navigation */}
-      <div className="flex mb-6 bg-gray-100 rounded-lg p-1">
+  const ratePerShare = parseFloat(tradeAmount) > 0 && parseFloat(estimatedShares) > 0
+    ? (parseFloat(tradeAmount) / parseFloat(estimatedShares)).toFixed(2)
+    : (currentPrice / 100).toFixed(2);
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
+      {/* Buy/Sell Tabs - Dribbble Style */}
+      <div className="flex border-b border-gray-200">
         <button
           onClick={() => setActiveTab('buy')}
-          className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+          className={`flex-1 py-4 px-6 text-sm font-semibold transition-colors ${
             activeTab === 'buy'
-              ? 'bg-white text-gray-900 shadow-sm'
+              ? 'text-blue-600 border-b-2 border-blue-600'
               : 'text-gray-600 hover:text-gray-900'
           }`}
         >
-          Buy Shares
+          Buy
         </button>
         <button
           onClick={() => setActiveTab('sell')}
-          className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+          className={`flex-1 py-4 px-6 text-sm font-semibold transition-colors ${
             activeTab === 'sell'
-              ? 'bg-white text-gray-900 shadow-sm'
+              ? 'text-blue-600 border-b-2 border-blue-600'
               : 'text-gray-600 hover:text-gray-900'
           }`}
         >
-          Sell Shares
+          Sell
         </button>
       </div>
 
-      {/* Side Selection */}
-      <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Choose Side
-        </label>
-        <div className="grid grid-cols-2 gap-2">
+      <div className="p-6 space-y-6">
+        {/* Current Market Prices - Dribbble Style (Clickable) */}
+        <div className="grid grid-cols-2 gap-3">
           <button
             onClick={() => setTradeSide('yes')}
-            className={`p-3 rounded-lg border-2 transition-colors ${
-              tradeSide === 'yes'
-                ? 'border-green-500 bg-green-50 text-green-700'
-                : 'border-gray-200 hover:border-green-300'
+            className={`p-4 rounded-lg text-left transition-all ${
+              tradeSide === 'yes' 
+                ? 'bg-green-50 border-2 border-green-300' 
+                : 'bg-gray-50 hover:bg-gray-100'
             }`}
           >
-            <div className="font-medium">YES</div>
-            <div className="text-sm">{parseFloat(yesPrice).toFixed(0)}¢</div>
+            <div className="text-xs text-gray-600 mb-1">Yes</div>
+            <div className="text-xl font-bold text-green-600">
+              ${(yesPrice / 100).toFixed(2)}
+            </div>
           </button>
           <button
             onClick={() => setTradeSide('no')}
-            className={`p-3 rounded-lg border-2 transition-colors ${
-              tradeSide === 'no'
-                ? 'border-red-500 bg-red-50 text-red-700'
-                : 'border-gray-200 hover:border-red-300'
+            className={`p-4 rounded-lg text-left transition-all ${
+              tradeSide === 'no' 
+                ? 'bg-red-50 border-2 border-red-300' 
+                : 'bg-gray-50 hover:bg-gray-100'
             }`}
           >
-            <div className="font-medium">NO</div>
-            <div className="text-sm">{parseFloat(noPrice).toFixed(0)}¢</div>
+            <div className="text-xs text-gray-600 mb-1">No</div>
+            <div className="text-xl font-bold text-red-600">
+              ${(noPrice / 100).toFixed(2)}
+            </div>
+          </button>
+        </div>
+
+        {/* Side Selection - Hidden, controlled by clicking price boxes */}
+        <div className="hidden">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Choose Side
+          </label>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={() => setTradeSide('yes')}
+              className={`p-3 rounded-lg border-2 transition-colors ${
+                tradeSide === 'yes'
+                  ? 'border-green-500 bg-green-50'
+                  : 'border-gray-200'
+              }`}
+            >
+              <div className="font-medium">YES</div>
+            </button>
+            <button
+              onClick={() => setTradeSide('no')}
+              className={`p-3 rounded-lg border-2 transition-colors ${
+                tradeSide === 'no'
+                  ? 'border-red-500 bg-red-50'
+                  : 'border-gray-200'
+              }`}
+            >
+              <div className="font-medium">NO</div>
+            </button>
+          </div>
+        </div>
+
+        {/* Amount Input - Dribbble Style */}
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-sm font-medium text-gray-700">Amount</label>
+            <span className="text-sm text-gray-500">
+              Balance: <span className="font-semibold text-gray-900">
+                {activeTab === 'buy' ? `${parseFloat(ethBalance).toFixed(4)} ETH` : `${parseFloat(tradeSide === 'yes' ? position.yesShares : position.noShares).toFixed(2)} shares`}
+              </span>
+            </span>
+          </div>
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <span className="text-green-600 font-semibold">ETH</span>
+            </div>
+            <input
+              type="number"
+              step="0.001"
+              min="0"
+              value={tradeAmount}
+              onChange={(e) => setTradeAmount(e.target.value)}
+              placeholder="0.00"
+              className="w-full pl-12 pr-16 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+            <button
+              onClick={() => {
+                if (activeTab === 'buy') {
+                  setTradeAmount(parseFloat(ethBalance).toFixed(4));
+                } else {
+                  const available = tradeSide === 'yes' ? position.yesShares : position.noShares;
+                  setTradeAmount(parseFloat(available).toFixed(2));
+                }
+              }}
+              className="absolute inset-y-0 right-0 pr-3 flex items-center text-blue-600 hover:text-blue-700 font-medium text-sm"
+            >
+              Max
+            </button>
+          </div>
+          {activeTab === 'buy' && parseFloat(tradeAmount) > 0 && (
+            <div className="mt-2 text-xs text-gray-500">
+              Rate: <span className="font-semibold">{ratePerShare} ETH = 1 Share</span>
+            </div>
+          )}
+        </div>
+
+        {/* Estimated Trade Details - Dribbble Style */}
+        {activeTab === 'buy' && parseFloat(tradeAmount) > 0 && (
+          <div className="space-y-3 pt-4 border-t border-gray-200">
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600">Average Price</span>
+              <span className="font-semibold text-gray-900">${estimatedAveragePrice}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600">Estimated Shares</span>
+              <span className="font-semibold text-gray-900">{parseFloat(estimatedShares).toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600">Estimated Profit</span>
+              <span className="font-semibold text-gray-900">${estimatedProfit}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600">Estimated Fees</span>
+              <span className="font-semibold text-gray-900">${estimatedFees}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600">Max Return on Investment</span>
+              <span className="font-semibold text-gray-900">${maxROI}%</span>
+            </div>
+          </div>
+        )}
+
+        {/* Buy/Sell Button - Dribbble Style */}
+        <button
+          onClick={activeTab === 'buy' ? handleBuy : handleSell}
+          disabled={loading || !tradeAmount || parseFloat(tradeAmount) <= 0}
+          className={`w-full py-4 px-6 rounded-lg font-semibold text-white transition-all duration-200 ${
+            loading || !tradeAmount || parseFloat(tradeAmount) <= 0
+              ? 'bg-gray-300 cursor-not-allowed'
+              : activeTab === 'buy'
+              ? 'bg-blue-600 hover:bg-blue-700 shadow-md hover:shadow-lg'
+              : 'bg-red-600 hover:bg-red-700 shadow-md hover:shadow-lg'
+          }`}
+        >
+          {loading ? (
+            <div className="flex items-center justify-center">
+              <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent mr-2"></div>
+              Processing...
+            </div>
+          ) : (
+            activeTab === 'buy' ? 'Buy' : 'Sell'
+          )}
+        </button>
+
+        {/* My Signals - Dribbble Style */}
+        <div className="pt-6 border-t border-gray-200">
+          <h3 className="text-sm font-semibold text-gray-900 mb-2">My Signals</h3>
+          <p className="text-sm text-gray-500">You have no available forecast.</p>
+        </div>
+
+        {/* Join Community - Dribbble Style */}
+        <div className="pt-6 border-t border-gray-200">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+              <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <h3 className="text-sm font-semibold text-gray-900">Join Community</h3>
+              <p className="text-xs text-gray-500">Be part of a great community</p>
+            </div>
+          </div>
+          <button className="w-full mt-3 py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors">
+            Join
           </button>
         </div>
       </div>
-
-      {/* Amount Input */}
-      <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          {activeTab === 'buy' ? 'ETH Amount' : 'Shares to Sell'}
-        </label>
-        <div className="relative">
-          <input
-            type="number"
-            step="0.001"
-            min="0"
-            value={tradeAmount}
-            onChange={(e) => setTradeAmount(e.target.value)}
-            placeholder={activeTab === 'buy' ? '0.1' : '10'}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-          <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-            <span className="text-gray-500 text-sm">
-              {activeTab === 'buy' ? 'ETH' : 'shares'}
-            </span>
-          </div>
-        </div>
-        {activeTab === 'buy' && (
-          <div className="mt-1 text-xs text-gray-500">
-            Available: {parseFloat(ethBalance).toFixed(4)} ETH
-          </div>
-        )}
-        {activeTab === 'sell' && (
-          <div className="mt-1 text-xs text-gray-500">
-            Available: {parseFloat(tradeSide === 'yes' ? position.yesShares : position.noShares).toFixed(2)} {tradeSide.toUpperCase()} shares
-          </div>
-        )}
-      </div>
-
-      {/* Estimated Shares */}
-      {activeTab === 'buy' && parseFloat(estimatedShares) > 0 && (
-        <div className="mb-4 p-3 bg-blue-50 rounded-lg">
-          <div className="text-sm text-blue-700">
-            Estimated shares: <span className="font-medium">{parseFloat(estimatedShares).toFixed(2)}</span>
-          </div>
-        </div>
-      )}
-
-      {/* Error Display */}
-
-      {/* Action Button */}
-      <button
-        onClick={activeTab === 'buy' ? handleBuy : handleSell}
-        disabled={loading || !tradeAmount || parseFloat(tradeAmount) <= 0}
-        className={`w-full py-3 px-4 rounded-lg font-medium transition-colors ${
-          loading || !tradeAmount || parseFloat(tradeAmount) <= 0
-            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-            : activeTab === 'buy'
-            ? tradeSide === 'yes'
-              ? 'bg-green-600 hover:bg-green-700 text-white'
-              : 'bg-red-600 hover:bg-red-700 text-white'
-            : 'bg-blue-600 hover:bg-blue-700 text-white'
-        }`}
-      >
-        {loading ? (
-          <div className="flex items-center justify-center">
-            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-            Processing...
-          </div>
-        ) : (
-          `${activeTab === 'buy' ? 'Buy' : 'Sell'} ${tradeSide.toUpperCase()} Shares`
-        )}
-      </button>
-
-      {/* Position Summary */}
-      {(parseFloat(position.yesShares) > 0 || parseFloat(position.noShares) > 0) && (
-        <div className="mt-6 pt-4 border-t border-gray-200">
-          <h3 className="text-sm font-medium text-gray-700 mb-2">Your Position</h3>
-          <div className="space-y-1 text-sm">
-            <div className="flex justify-between">
-              <span>YES shares:</span>
-              <span className="font-medium">{parseFloat(position.yesShares).toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>NO shares:</span>
-              <span className="font-medium">{parseFloat(position.noShares).toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between text-gray-600">
-              <span>Total invested:</span>
-              <span>{parseFloat(position.totalInvested).toFixed(4)} ETH</span>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

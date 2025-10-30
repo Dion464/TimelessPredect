@@ -6,7 +6,7 @@ import toast from 'react-hot-toast';
 
 const MarketCreation = () => {
   const history = useHistory();
-  const { createMarket, isConnected, connectWallet } = useWeb3();
+  const { createMarket, isConnected, connectWallet, provider } = useWeb3();
   const { isLoggedIn } = useAuth();
   
   const [formData, setFormData] = useState({
@@ -77,8 +77,17 @@ const MarketCreation = () => {
   };
 
   const calculateTimestamps = () => {
-    const endDateTime = new Date(`${formData.endDate}T${formData.endTime}`);
-    const resolutionDateTime = new Date(`${formData.resolutionDate}T${formData.resolutionTime}`);
+    // Use UTC to avoid timezone issues
+    const endDateTime = new Date(`${formData.endDate}T${formData.endTime}:00`);
+    const resolutionDateTime = new Date(`${formData.resolutionDate}T${formData.resolutionTime}:00`);
+    
+    // Validate dates are valid
+    if (isNaN(endDateTime.getTime())) {
+      throw new Error('Invalid end date/time format');
+    }
+    if (isNaN(resolutionDateTime.getTime())) {
+      throw new Error('Invalid resolution date/time format');
+    }
     
     return {
       endTime: Math.floor(endDateTime.getTime() / 1000),
@@ -105,16 +114,62 @@ const MarketCreation = () => {
       return;
     }
 
-    const { endTime, resolutionTime } = calculateTimestamps();
-    const now = Math.floor(Date.now() / 1000);
+    let endTime, resolutionTime;
+    try {
+      const timestamps = calculateTimestamps();
+      endTime = timestamps.endTime;
+      resolutionTime = timestamps.resolutionTime;
+    } catch (error) {
+      toast.error(error.message || 'Invalid date/time format');
+      return;
+    }
 
-    if (endTime <= now) {
-      toast.error('End time must be in the future');
+    // Get current blockchain time instead of browser time
+    let blockchainTime;
+    try {
+      if (provider) {
+        const block = await provider.getBlock('latest');
+        blockchainTime = block.timestamp;
+      } else {
+        // Fallback to browser time if no provider
+        blockchainTime = Math.floor(Date.now() / 1000);
+      }
+    } catch (error) {
+      console.warn('Could not get blockchain time, using browser time:', error);
+      blockchainTime = Math.floor(Date.now() / 1000);
+    }
+
+    // Add 2 minute buffer to account for transaction processing time
+    const minEndTime = blockchainTime + 120; // 2 minutes buffer
+    const minResolutionTime = blockchainTime + 180; // 3 minutes minimum
+
+    // Additional validation with detailed logging
+    console.log('📅 Date Validation:');
+    console.log('  End date/time:', formData.endDate, formData.endTime);
+    console.log('  Resolution date/time:', formData.resolutionDate, formData.resolutionTime);
+    console.log('  End timestamp:', endTime, new Date(endTime * 1000).toLocaleString());
+    console.log('  Resolution timestamp:', resolutionTime, new Date(resolutionTime * 1000).toLocaleString());
+    console.log('  Blockchain timestamp:', blockchainTime, new Date(blockchainTime * 1000).toLocaleString());
+    console.log('  Minimum end time (with buffer):', minEndTime, new Date(minEndTime * 1000).toLocaleString());
+    console.log('  End time is future:', endTime > minEndTime);
+    console.log('  Resolution after end:', resolutionTime > endTime);
+
+    if (endTime <= minEndTime) {
+      const secondsUntilEnd = endTime - minEndTime;
+      toast.error(`End time must be at least 2 minutes in the future. Please select a later date/time.`);
+      console.error(`End time ${endTime} is not at least 2 minutes after blockchain time ${minEndTime}`);
       return;
     }
 
     if (resolutionTime <= endTime) {
-      toast.error('Resolution time must be after end time');
+      const secondsBetween = endTime - resolutionTime;
+      toast.error(`Resolution time must be after end time. (Currently ${-secondsBetween} seconds before end)`);
+      return;
+    }
+
+    // Validate timestamps are valid numbers
+    if (isNaN(endTime) || isNaN(resolutionTime)) {
+      toast.error('Invalid date/time format. Please check your input.');
       return;
     }
 
@@ -123,9 +178,15 @@ const MarketCreation = () => {
     try {
       toast.loading('Creating market...');
       
+      console.log('🚀 Attempting to create market with:');
+      console.log('  Question:', formData.question);
+      console.log('  Category:', formData.category);
+      console.log('  End time:', endTime, new Date(endTime * 1000).toLocaleString());
+      console.log('  Resolution time:', resolutionTime, new Date(resolutionTime * 1000).toLocaleString());
+      
       const receipt = await createMarket(
         formData.question,
-        formData.description,
+        formData.description || '',
         formData.category,
         endTime,
         resolutionTime
@@ -148,8 +209,17 @@ const MarketCreation = () => {
       // The new market ID would be in the events
       history.push('/markets');
     } catch (error) {
-      console.error('Error creating market:', error);
-      toast.error(error.message || 'Failed to create market');
+      console.error('❌ Error creating market:', error);
+      console.error('Error details:', {
+        message: error.message,
+        code: error.code,
+        data: error.data,
+        reason: error.reason
+      });
+      
+      // Show user-friendly error message
+      const errorMessage = error.message || 'Failed to create market';
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
       toast.dismiss();

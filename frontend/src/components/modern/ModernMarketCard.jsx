@@ -1,6 +1,18 @@
 import React, { useState } from 'react';
 import { useHistory } from 'react-router-dom';
 
+// Helper function to format volume
+const formatVolumeDisplay = (volume) => {
+  if (!volume || volume === 0) return '0.00';
+  // If volume is extremely large (likely Wei that wasn't converted), convert it
+  if (volume > 1e12) {
+    const ethValue = volume / 1e18;
+    return `${ethValue.toFixed(2)} ETH`;
+  }
+  // Format with 2 decimal places for readability
+  return volume.toFixed(2);
+};
+
 const ModernMarketCard = ({ market, showBuyButtons = false, onBuy }) => {
   const history = useHistory();
   const [hoveredSide, setHoveredSide] = useState(null);
@@ -133,7 +145,7 @@ const ModernMarketCard = ({ market, showBuyButtons = false, onBuy }) => {
 
         {/* Volume Info */}
         <div className="flex items-center justify-between mt-3 text-xs text-gray-500">
-          <span>${market.totalVolume || 0} vol</span>
+          <span>${formatVolumeDisplay(market.totalVolume)} vol</span>
           <span>{market.totalBets || 0} traders</span>
         </div>
       </div>
