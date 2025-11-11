@@ -2,12 +2,14 @@ import React, { useState } from 'react';
 import { useHistory } from 'react-router-dom';
 import { useWeb3 } from '../../hooks/useWeb3';
 import { useAuth } from '../../helpers/AuthContent';
+import { getCurrencySymbol } from '../../utils/currency';
 import toast from 'react-hot-toast';
 
 const MarketCreation = () => {
   const history = useHistory();
-  const { createMarket, isConnected, connectWallet, provider } = useWeb3();
+  const { createMarket, isConnected, connectWallet, provider, chainId } = useWeb3();
   const { isLoggedIn } = useAuth();
+  const currencySymbol = getCurrencySymbol(chainId);
   
   const [formData, setFormData] = useState({
     question: '',
@@ -16,11 +18,15 @@ const MarketCreation = () => {
     endDate: '',
     endTime: '',
     resolutionDate: '',
-    resolutionTime: ''
+    resolutionTime: '',
+    imageUrl: ''
   });
 
   const [isLoading, setIsLoading] = useState(false);
   const [estimatedFee, setEstimatedFee] = useState('0.001');
+  const [imagePreview, setImagePreview] = useState(null);
+  const [imageFile, setImageFile] = useState(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   const handleLogout = () => {
     localStorage.removeItem('isAdminLoggedIn');
@@ -33,12 +39,15 @@ const MarketCreation = () => {
   const categories = [
     { value: 'general', label: 'General' },
     { value: 'sports', label: 'Sports' },
-    { value: 'politics', label: 'Politics' },
+    { value: 'technology', label: 'Technology' },
     { value: 'crypto', label: 'Crypto' },
     { value: 'entertainment', label: 'Entertainment' },
-    { value: 'technology', label: 'Technology' },
+    { value: 'politics', label: 'Politics' },
     { value: 'economics', label: 'Economics' },
-    { value: 'science', label: 'Science' }
+    { value: 'science', label: 'Science' },
+    { value: 'medical', label: 'Medical' },
+    { value: 'ai', label: 'AI' },
+    { value: 'startups', label: 'Startups' }
   ];
 
   // Check admin access
@@ -73,6 +82,77 @@ const MarketCreation = () => {
     setFormData(prev => ({
       ...prev,
       [name]: value
+    }));
+  };
+
+  const handleImageChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image size must be less than 5MB');
+      return;
+    }
+
+    setImageFile(file);
+    setUploadingImage(true);
+
+    try {
+      // Create preview
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result);
+      };
+      reader.readAsDataURL(file);
+
+      // Upload to a free image hosting service (using base64 for now, can be replaced with imgbb/cloudinary)
+      // For production, you'd want to upload to IPFS, Cloudinary, or similar
+      const reader2 = new FileReader();
+      reader2.onloadend = async () => {
+        const base64Image = reader2.result;
+        
+        // Option 1: Use base64 directly (stored in description)
+        // Option 2: Upload to imgbb.com (free service)
+        try {
+          // Using imgbb API (you'll need to get a free API key from imgbb.com)
+          // For now, we'll use base64 and store it
+          setFormData(prev => ({
+            ...prev,
+            imageUrl: base64Image
+          }));
+          toast.success('Image loaded successfully');
+        } catch (error) {
+          console.error('Error uploading image:', error);
+          // Fallback to base64
+          setFormData(prev => ({
+            ...prev,
+            imageUrl: base64Image
+          }));
+          toast.success('Image loaded (using local storage)');
+        }
+        setUploadingImage(false);
+      };
+      reader2.readAsDataURL(file);
+    } catch (error) {
+      console.error('Error processing image:', error);
+      toast.error('Failed to process image');
+      setUploadingImage(false);
+    }
+  };
+
+  const removeImage = () => {
+    setImageFile(null);
+    setImagePreview(null);
+    setFormData(prev => ({
+      ...prev,
+      imageUrl: ''
     }));
   };
 
@@ -192,6 +272,33 @@ const MarketCreation = () => {
         resolutionTime
       );
 
+      // Store image URL mapping if image was uploaded
+      if (formData.imageUrl) {
+        // Extract market ID from events (same pattern as scripts)
+        let marketId = null;
+        
+        if (receipt.events) {
+          const marketCreatedEvent = receipt.events.find(e => e.event === 'MarketCreated');
+          if (marketCreatedEvent && marketCreatedEvent.args) {
+            marketId = marketCreatedEvent.args.marketId?.toString() || 
+                       marketCreatedEvent.args[0]?.toString();
+          }
+        }
+        
+        if (marketId) {
+          // Store image URL in localStorage with market ID as key
+          const marketImages = JSON.parse(localStorage.getItem('marketImages') || '{}');
+          marketImages[marketId] = formData.imageUrl;
+          localStorage.setItem('marketImages', JSON.stringify(marketImages));
+          console.log('✅ Stored image for market:', marketId);
+          toast.success(`Image saved for market #${marketId}`);
+        } else {
+          console.warn('⚠️ Could not extract market ID from transaction receipt');
+          console.log('Receipt events:', receipt.events);
+          toast('Image uploaded but market ID not found. Image will use category-based placeholder.');
+        }
+      }
+
       toast.success('Market created successfully!');
       
       // Reset form
@@ -202,8 +309,11 @@ const MarketCreation = () => {
         endDate: '',
         endTime: '',
         resolutionDate: '',
-        resolutionTime: ''
+        resolutionTime: '',
+        imageUrl: ''
       });
+      setImagePreview(null);
+      setImageFile(null);
 
       // Redirect to markets or new market
       // The new market ID would be in the events
@@ -233,7 +343,7 @@ const MarketCreation = () => {
         <div className="mb-8 flex items-center justify-between">
           <div>
             <h1 className="text-display-sm font-semibold text-gray-900 mb-2">Create New Market</h1>
-            <p className="text-lg text-gray-600">Create a prediction market for users to trade on</p>
+            <p className="text-lg text-gray-600">Create a market for users to trade on</p>
           </div>
           <button
             onClick={handleLogout}
@@ -299,6 +409,63 @@ const MarketCreation = () => {
                 placeholder="Provide additional context about the market..."
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-none"
               />
+            </div>
+
+            {/* Market Image */}
+            <div>
+              <label htmlFor="image" className="block text-sm font-medium text-gray-700 mb-2">
+                Market Image
+              </label>
+              <div className="space-y-4">
+                {imagePreview ? (
+                  <div className="relative">
+                    <div className="relative w-full h-48 rounded-lg overflow-hidden border-2 border-gray-300">
+                      <img
+                        src={imagePreview}
+                        alt="Market preview"
+                        className="w-full h-full object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={removeImage}
+                        className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-2 hover:bg-red-600 transition-colors"
+                        title="Remove image"
+                      >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                    <p className="mt-2 text-sm text-gray-500">Image preview</p>
+                  </div>
+                ) : (
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-400 transition-colors">
+                    <input
+                      type="file"
+                      id="image"
+                      name="image"
+                      accept="image/*"
+                      onChange={handleImageChange}
+                      className="hidden"
+                    />
+                    <label
+                      htmlFor="image"
+                      className="cursor-pointer flex flex-col items-center"
+                    >
+                      <svg className="w-12 h-12 text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      <span className="text-sm font-medium text-gray-700">
+                        {uploadingImage ? 'Uploading...' : 'Click to upload image'}
+                      </span>
+                      <span className="text-xs text-gray-500 mt-1">
+                        PNG, JPG, GIF up to 5MB
+                      </span>
+                    </label>
+                  </div>
+                )}
+              </div>
+              <p className="mt-1 text-sm text-gray-500">Add an image to make your market stand out (like Polymarket)</p>
             </div>
 
             {/* Category */}
@@ -402,11 +569,11 @@ const MarketCreation = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-700">Estimated Creation Fee</p>
-                  <p className="text-xs text-gray-500">In ETH</p>
+                  <p className="text-xs text-gray-500">In {currencySymbol}</p>
                 </div>
                 <div className="text-right">
                   <p className="text-2xl font-bold text-gray-900">{estimatedFee}</p>
-                  <p className="text-xs text-gray-500">ETH</p>
+                  <p className="text-xs text-gray-500">{currencySymbol}</p>
                 </div>
               </div>
             </div>
@@ -450,7 +617,7 @@ const MarketCreation = () => {
             </li>
             <li className="flex items-start">
               <span className="mr-2">•</span>
-              <span>Ensure you have sufficient ETH to cover the creation fee</span>
+              <span>Ensure you have sufficient {currencySymbol} to cover the creation fee</span>
             </li>
             <li className="flex items-start">
               <span className="mr-2">•</span>

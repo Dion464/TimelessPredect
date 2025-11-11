@@ -1,0 +1,83 @@
+// Prisma schema matched with the functions we call in the chain  
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Trade {
+  id            BigInt   @id @default(autoincrement()) @map("id")
+  txHash        String   @map("tx_hash")
+  logIndex      Int      @map("log_index")
+  marketId      BigInt   @map("market_id")
+  trader        String   @map("trader")
+  isYes         Boolean  @map("is_yes")
+  sharesWei     String   @map("shares_wei")
+  priceBps      Int      @map("price_bps")
+  costWei       String   @map("cost_wei")
+  tradeType     String?  @map("trade_type")
+  blockNumber   BigInt   @map("block_number")
+  blockTime     DateTime @map("block_time")
+
+  @@index([marketId, blockNumber], map: "trades_market_idx")
+  @@index([trader], map: "trades_trader_idx")
+  @@unique([txHash, logIndex])
+  @@map("trades")
+}
+
+model Market {
+  marketId          BigInt  @id @map("market_id")
+  question          String? @map("question")
+  description       String? @map("description")
+  category          String? @map("category")
+  endTime           DateTime? @map("end_time")
+  resolutionTime    DateTime? @map("resolution_time")
+  resolved          Boolean @default(false) @map("resolved")
+  outcome           Int?    @map("outcome")
+  totalYesSharesWei String  @default("0") @map("total_yes_shares_wei")
+  totalNoSharesWei  String  @default("0") @map("total_no_shares_wei")
+  totalVolumeWei    String  @default("0") @map("total_volume_wei")
+  creator           String?  @map("creator")
+  lastYesPriceBps   Int?     @map("last_yes_price_bps")
+  lastNoPriceBps    Int?     @map("last_no_price_bps")
+  lastTradeBlock    BigInt?  @map("last_trade_block_number")
+  lastTradeTxHash   String?  @map("last_trade_tx_hash")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+  priceSnapshots    PriceSnapshot[]
+
+  @@map("markets")
+}
+
+model Position {
+  userAddress      String  @map("user_address")
+  marketId         BigInt  @map("market_id")
+  yesSharesWei     String  @default("0") @map("yes_shares_wei")
+  noSharesWei      String  @default("0") @map("no_shares_wei")
+  totalInvestedWei String  @default("0") @map("total_invested_wei")
+  updatedAt        DateTime @default(now()) @map("updated_at")
+
+  @@id([userAddress, marketId])
+  @@map("positions")
+}
+
+model PriceSnapshot {
+  marketId      BigInt   @map("market_id")
+  intervalStart DateTime @map("interval_start")
+  yesPriceBps   Int      @map("yes_price_bps")
+  noPriceBps    Int      @map("no_price_bps")
+  tradeCount    Int      @default(0) @map("trade_count")
+  totalVolumeWei String  @default("0") @map("total_volume_wei")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  market Market @relation(fields: [marketId], references: [marketId], onDelete: Cascade)
+
+  @@id([marketId, intervalStart])
+  @@map("price_snapshots")
+  @@index([intervalStart], map: "price_snapshots_interval_idx")
+}

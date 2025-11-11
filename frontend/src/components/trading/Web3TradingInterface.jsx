@@ -1,7 +1,19 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useWeb3 } from '../../hooks/useWeb3';
+import { getCurrencySymbol } from '../../utils/currency';
+import { centsToTCENT } from '../../utils/priceFormatter';
 import { ethers } from 'ethers';
 import toast from 'react-hot-toast';
+import { 
+  createOrderWithDefaults, 
+  signOrder, 
+  validateOrder, 
+  centsToTicks,
+  ticksToCents
+} from '../../utils/eip712';
+
+const EXCHANGE_CONTRACT = import.meta.env.VITE_EXCHANGE_CONTRACT_ADDRESS || '0x0000000000000000000000000000000000000000';
+const API_BASE = import.meta.env.VITE_API_BASE_URL || window.location.origin;
 
 const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
   // Add error handling for Web3 context
@@ -18,6 +30,8 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
       sellShares: null,
       getUserPosition: null,
       getMarketData: null,
+      getUserLimitOrders: null,
+      signer: null,
       ethBalance: '0',
     };
   }
@@ -30,16 +44,24 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
     sellShares,
     getUserPosition,
     getMarketData,
+    getUserLimitOrders,
+    signer,
     ethBalance,
+    chainId
   } = web3Context;
+  
+  const currencySymbol = getCurrencySymbol(chainId);
 
   const [activeTab, setActiveTab] = useState('buy');
   const [tradeAmount, setTradeAmount] = useState('0.1');
   const [tradeSide, setTradeSide] = useState('yes');
+  const [orderType, setOrderType] = useState('market'); // 'market' or 'limit'
+  const [limitPrice, setLimitPrice] = useState('');
   const [position, setPosition] = useState({ yesShares: '0', noShares: '0', totalInvested: '0' });
   const [marketData, setMarketData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [estimatedShares, setEstimatedShares] = useState('0');
+  const [openOrders, setOpenOrders] = useState([]);
 
   // Fetch market data and user position
   const fetchData = useCallback(async () => {
@@ -58,7 +80,7 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
     }
   }, [isConnected, contracts.predictionMarket, marketId, getMarketData, getUserPosition]);
 
-  // Real-time price updates
+  // Real-time price updates - only update if price actually changed
   useEffect(() => {
     if (!isConnected || !contracts.predictionMarket || !marketId) return;
 
@@ -67,19 +89,27 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
         const yesPrice = await contracts.predictionMarket.getCurrentPrice(marketId, true);
         const noPrice = await contracts.predictionMarket.getCurrentPrice(marketId, false);
         
-        // Convert basis points to cents (5000 -> 50¢)
-        setMarketData(prev => ({
-          ...prev,
-          yesPrice: parseFloat(yesPrice.toString()) / 100,
-          noPrice: parseFloat(noPrice.toString()) / 100
-        }));
+        const yesPriceCents = parseFloat(yesPrice.toString()) / 100;
+        const noPriceCents = parseFloat(noPrice.toString()) / 100;
+        
+        // Only update state if prices actually changed
+        setMarketData(prev => {
+          if (prev?.yesPrice === yesPriceCents && prev?.noPrice === noPriceCents) {
+            return prev; // No change, don't update
+          }
+          return {
+            ...prev,
+            yesPrice: yesPriceCents,
+            noPrice: noPriceCents
+          };
+        });
       } catch (err) {
         console.log('Failed to update prices:', err.message);
       }
     };
 
-    // Update prices every 3 seconds
-    const interval = setInterval(updatePrices, 3000);
+    // Update prices every 30 seconds (reduced from 10 seconds)
+    const interval = setInterval(updatePrices, 30000);
     updatePrices(); // Initial update
 
     return () => clearInterval(interval);
@@ -166,13 +196,47 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
     }
   }, [contracts.predictionMarket, contracts.pricingAMM, marketId, tradeAmount, tradeSide, activeTab, marketData, market]);
 
+  // Fetch market data and user position - only refresh if data actually changed
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    if (!isConnected || !contracts.predictionMarket || !marketId) return;
+
+    fetchData(); // Initial fetch
+    
+    // Only refresh data every 60 seconds instead of 30 seconds
+    const interval = setInterval(() => {
+      if (isConnected && contracts.predictionMarket && marketId) {
+        fetchData();
+      }
+    }, 60000); // 60 seconds
+    return () => clearInterval(interval);
+  }, [isConnected, contracts.predictionMarket, marketId, fetchData]);
 
   useEffect(() => {
+    // Only calculate when tradeAmount or tradeSide changes, not on every calculateEstimatedShares change
+    if (tradeAmount && parseFloat(tradeAmount) > 0) {
     calculateEstimatedShares();
-  }, [calculateEstimatedShares]);
+    }
+  }, [tradeAmount, tradeSide, activeTab, orderType, marketData?.yesPrice, marketData?.noPrice]); // Added price dependencies instead of callback
+
+  // Fetch open orders
+  const fetchOpenOrders = useCallback(async () => {
+    if (!isConnected || !getUserLimitOrders || !marketId) return;
+    try {
+      const orders = await getUserLimitOrders(marketId);
+      setOpenOrders(orders || []);
+    } catch (err) {
+      // Silently fail - API might not be running yet
+      // Orders will just be empty until API is available
+      setOpenOrders([]);
+    }
+  }, [isConnected, getUserLimitOrders, marketId]);
+
+  useEffect(() => {
+    fetchOpenOrders();
+    // Refresh orders every 60 seconds (reduced from 30 seconds)
+    const interval = setInterval(fetchOpenOrders, 60000);
+    return () => clearInterval(interval);
+  }, [fetchOpenOrders]);
 
   const handleBuy = async () => {
     if (!tradeAmount || parseFloat(tradeAmount) <= 0) {
@@ -181,24 +245,262 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
     }
 
     if (parseFloat(tradeAmount) > parseFloat(ethBalance)) {
-      toast.error('Insufficient ETH balance');
+      toast.error(`Insufficient ${currencySymbol} balance`);
       return;
     }
 
     setLoading(true);
 
     try {
-      await buyShares(marketId, tradeSide === 'yes', tradeAmount);
-      setTradeAmount('');
-      await fetchData(); // Refresh data
+      if (orderType === 'limit') {
+        // Place limit order using hybrid order system (EIP-712)
+        if (!limitPrice || parseFloat(limitPrice) <= 0 || parseFloat(limitPrice) > 100) {
+          toast.error('Please enter a valid limit price (0.01-1.00 TCENT)');
+          setLoading(false);
+          return;
+        }
+
+        if (!signer) {
+          toast.error('Please connect your wallet');
+          setLoading(false);
+          return;
+        }
+
+        // Create order object for EIP-712 signing
+        const outcomeId = tradeSide === 'yes' ? 0 : 1;
+        const orderData = {
+          maker: account,
+          marketId: marketId.toString(),
+          outcomeId: outcomeId.toString(),
+          price: centsToTicks(parseFloat(limitPrice)).toString(),
+          size: ethers.utils.parseUnits(tradeAmount || '0', 18).toString(),
+          side: true // true = buy
+        };
+
+        const order = createOrderWithDefaults(orderData);
+
+        // Validate order
+        const validation = validateOrder(order);
+        if (!validation.valid) {
+          toast.error(validation.error);
+          setLoading(false);
+          return;
+        }
+
+        // Check if API is available
+        try {
+          const healthCheck = await fetch(`${API_BASE}/api/orders?marketId=${marketId}&outcomeId=0&depth=1`, {
+            method: 'GET'
+          });
+          if (!healthCheck.ok && healthCheck.status !== 400) {
+            throw new Error('API server is not responding. Please ensure the backend API server is running.');
+          }
+        } catch (err) {
+          if (err.message.includes('fetch')) {
+            toast.error('Cannot connect to API server. Please start the backend: node api-server.js');
+            setLoading(false);
+            return;
+          }
+        }
+
+        // Sign order with EIP-712
+        const signature = await signOrder(order, chainId, EXCHANGE_CONTRACT, signer);
+
+        // Submit to backend
+        const response = await fetch(`${API_BASE}/api/orders`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            order,
+            signature,
+            isMarketOrder: false
+          })
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: 'Failed to place order' }));
+          throw new Error(errorData.error || `HTTP ${response.status}: Failed to place order`);
+        }
+
+        const result = await response.json();
+
+        if (result.status === 'matched') {
+          // Enhanced toast for matched buy order
+          const orderType = tradeSide === 'yes' ? 'YES' : 'NO';
+          const priceInfo = result.matches && result.matches.length > 0 
+            ? `@ ${centsToTCENT(ticksToCents(parseInt(result.matches[0].fillPrice)))} TCENT`
+            : `@ ${centsToTCENT(limitPrice)} TCENT`;
+          const fillAmount = result.matches && result.matches.length > 0
+            ? result.matches.reduce((sum, m) => sum + parseFloat(ethers.utils.formatEther(m.fillSize)), 0)
+            : parseFloat(tradeAmount);
+          
+          toast.success(
+            `✅ ${orderType} shares BOUGHT! ${fillAmount.toFixed(4)} ${currencySymbol} ${priceInfo}`,
+            { 
+              icon: '💰',
+              duration: 5000,
+              style: {
+                background: '#10b981',
+                color: '#fff',
+                fontWeight: '600'
+              }
+            }
+          );
+          toast('Settling trade on-chain...', { icon: '⏳', duration: 3000 });
+          
+          // Refresh orders once after a delay
+          setTimeout(() => {
+            fetchOpenOrders();
+            fetchData();
+          }, 5000);
+        } else {
+          toast.success(`✅ Limit buy order placed at ${centsToTCENT(limitPrice)} TCENT!`);
+          // Refresh orders once
+          setTimeout(() => {
+            fetchOpenOrders();
+          }, 2000);
+        }
+        
+        setTradeAmount('');
+        setLimitPrice('');
+        
+        // Refresh data once after order placement
+        setTimeout(() => {
+          fetchData();
+        }, 3000);
+      } else {
+        // Market order (execute immediately from order book, fallback to AMM if no matches)
+        if (!signer) {
+          toast.error('Please connect your wallet');
+          setLoading(false);
+          return;
+        }
+
+        if (!buyShares) {
+          toast.error('Buy function not available. Please reconnect your wallet.');
+          setLoading(false);
+          return;
+        }
+
+        // Create order object for EIP-712 signing (market order)
+        const outcomeId = tradeSide === 'yes' ? 0 : 1;
+        const orderData = {
+          maker: account,
+          marketId: marketId.toString(),
+          outcomeId: outcomeId.toString(),
+          price: centsToTicks(currentPrice).toString(), // Use current market price
+          size: ethers.utils.parseUnits(tradeAmount || '0', 18).toString(),
+          side: true // true = buy
+        };
+
+        const order = createOrderWithDefaults(orderData);
+        
+        console.log('🔍 Signing order with:', {
+          chainId: chainId,
+          exchangeContract: EXCHANGE_CONTRACT,
+          order: order,
+          orderMaker: order.maker,
+          account: account
+        });
+        
+        const signature = await signOrder(order, chainId, EXCHANGE_CONTRACT, signer);
+        
+        console.log('✅ Order signed:', {
+          signature: signature.substring(0, 20) + '...',
+          orderPrice: order.price,
+          orderSize: order.size
+        });
+
+        // Submit market order to backend
+        const response = await fetch(`${API_BASE}/api/orders`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            order,
+            signature,
+            isMarketOrder: true
+          })
+        });
+
+        console.log('Market order response status:', response.status);
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: 'Failed to place market order' }));
+          console.error('Market order API error:', errorData);
+          throw new Error(errorData.error || errorData.suggestion || `HTTP ${response.status}: Failed to place market order`);
+        }
+
+        const result = await response.json();
+        console.log('Market order result:', result);
+
+        if (result.status === 'matched') {
+          // Enhanced toast for matched market buy order
+          const orderType = tradeSide === 'yes' ? 'YES' : 'NO';
+          const fillCount = result.fills?.length || result.matches?.length || 1;
+          const avgPrice = result.fills && result.fills.length > 0
+            ? result.fills.reduce((sum, f) => sum + ticksToCents(parseInt(f.fillPrice)), 0) / result.fills.length
+            : result.matches && result.matches.length > 0
+            ? ticksToCents(parseInt(result.matches[0].fillPrice))
+            : currentPrice;
+          const totalAmount = result.fills && result.fills.length > 0
+            ? result.fills.reduce((sum, f) => sum + parseFloat(ethers.utils.formatEther(f.fillSize)), 0)
+            : parseFloat(tradeAmount);
+          
+          toast.success(
+            `✅ ${orderType} shares BOUGHT! ${totalAmount.toFixed(4)} ${currencySymbol} @ ${centsToTCENT(avgPrice)} TCENT`,
+            { 
+              icon: '💰',
+              duration: 5000,
+              style: {
+                background: '#10b981',
+                color: '#fff',
+                fontWeight: '600'
+              }
+            }
+          );
+          // Trigger settlement if fills exist
+          if (result.fills && result.fills.length > 0) {
+            toast('Settling trade on-chain...', { icon: '⏳', duration: 3000 });
+          }
+        } else if (result.status === 'no_matches' || result.useAMM) {
+          // No matches in order book - fallback to AMM
+          console.log('No matches in order book, using AMM fallback');
+          
+          if (!buyShares) {
+            throw new Error('Buy function not available. Please reconnect your wallet.');
+          }
+          
+          toast('No matching orders - executing via AMM...', { icon: '🔄' });
+          try {
+            console.log(`Calling buyShares: marketId=${marketId}, isYes=${tradeSide === 'yes'}, amount=${tradeAmount}`);
+            await buyShares(marketId, tradeSide === 'yes', tradeAmount);
+            toast.success('✅ Shares purchased successfully via AMM!');
+          } catch (ammError) {
+            console.error('AMM buy failed:', ammError);
+            throw new Error(`AMM buy failed: ${ammError.message}`);
+          }
+        } else {
+          console.warn('Unexpected market order result:', result);
+          toast.error(`Market order could not be filled. Status: ${result.status || 'unknown'}`);
+        }
+
+        setTradeAmount('');
+      }
+      
+      // Refresh data once after order placement (no immediate refresh)
+      // Only refresh if trade was successful
+      setTimeout(() => {
+        fetchData();
+        fetchOpenOrders();
+      }, 10000); // Increased to 10 seconds to give blockchain time to update
+      
       // Call the refresh callback to update chart and all data
       if (onTradeComplete) {
-        setTimeout(() => onTradeComplete(), 2000); // Wait for blockchain confirmation
+        setTimeout(() => onTradeComplete(), 5000); // Reduced from 3 seconds
       }
-      toast.success('✅ Shares purchased successfully!');
     } catch (err) {
-      console.error('Buy failed:', err);
-      toast.error(`Buy failed: ${err.message}`);
+      console.error(orderType === 'limit' ? 'Limit order failed:' : 'Buy failed:', err);
+      toast.error(`${orderType === 'limit' ? 'Limit order' : 'Buy'} failed: ${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -219,17 +521,228 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
     setLoading(true);
 
     try {
-      await sellShares(marketId, tradeSide === 'yes', tradeAmount);
-      setTradeAmount('');
-      await fetchData(); // Refresh data
+      if (orderType === 'limit') {
+        // Place limit sell order using hybrid order system (EIP-712)
+        if (!limitPrice || parseFloat(limitPrice) <= 0 || parseFloat(limitPrice) > 100) {
+          toast.error('Please enter a valid limit price (0.01-1.00 TCENT)');
+          setLoading(false);
+          return;
+        }
+
+        if (!signer) {
+          toast.error('Please connect your wallet');
+          setLoading(false);
+          return;
+        }
+
+        // Create order object for EIP-712 signing
+        const outcomeId = tradeSide === 'yes' ? 0 : 1;
+        const orderData = {
+          maker: account,
+          marketId: marketId.toString(),
+          outcomeId: outcomeId.toString(),
+          price: centsToTicks(parseFloat(limitPrice)).toString(),
+          size: ethers.utils.parseUnits(tradeAmount || '0', 18).toString(),
+          side: false // false = sell
+        };
+
+        const order = createOrderWithDefaults(orderData);
+
+        // Validate order
+        const validation = validateOrder(order);
+        if (!validation.valid) {
+          toast.error(validation.error);
+          setLoading(false);
+          return;
+        }
+
+        // Check if API is available
+        try {
+          const healthCheck = await fetch(`${API_BASE}/api/orders?marketId=${marketId}&outcomeId=${outcomeId}&depth=1`, {
+            method: 'GET'
+          });
+          if (!healthCheck.ok && healthCheck.status !== 400) {
+            throw new Error('API server is not responding. Please ensure the backend API server is running.');
+          }
+        } catch (err) {
+          if (err.message.includes('fetch')) {
+            toast.error('Cannot connect to API server. Please start the backend: node api-server.js');
+            setLoading(false);
+            return;
+          }
+        }
+
+        // Sign order with EIP-712
+        const signature = await signOrder(order, chainId, EXCHANGE_CONTRACT, signer);
+
+        // Submit to backend
+        const response = await fetch(`${API_BASE}/api/orders`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            order,
+            signature,
+            isMarketOrder: false
+          })
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: 'Failed to place order' }));
+          throw new Error(errorData.error || `HTTP ${response.status}: Failed to place order`);
+        }
+
+        const result = await response.json();
+
+        if (result.status === 'matched') {
+          // Enhanced toast for matched sell order
+          const orderType = tradeSide === 'yes' ? 'YES' : 'NO';
+          const priceInfo = result.matches && result.matches.length > 0 
+            ? `@ ${centsToTCENT(ticksToCents(parseInt(result.matches[0].fillPrice)))} TCENT`
+            : `@ ${centsToTCENT(limitPrice)} TCENT`;
+          const fillAmount = result.matches && result.matches.length > 0
+            ? result.matches.reduce((sum, m) => sum + parseFloat(ethers.utils.formatEther(m.fillSize)), 0)
+            : parseFloat(tradeAmount);
+          
+          toast.success(
+            `✅ ${orderType} shares SOLD! ${fillAmount.toFixed(4)} ${currencySymbol} ${priceInfo}`,
+            { 
+              icon: '💸',
+              duration: 5000,
+              style: {
+                background: '#ef4444',
+                color: '#fff',
+                fontWeight: '600'
+              }
+            }
+          );
+          toast('Settling trade on-chain...', { icon: '⏳', duration: 3000 });
+          
+          // Refresh orders once after a delay
+          setTimeout(() => {
+            fetchOpenOrders();
+            fetchData();
+          }, 5000);
+        } else {
+          toast.success(`✅ Limit sell order placed at ${centsToTCENT(limitPrice)} TCENT!`);
+          // Refresh orders once
+          setTimeout(() => {
+            fetchOpenOrders();
+          }, 2000);
+        }
+        
+        setTradeAmount('');
+        setLimitPrice('');
+        
+        // Refresh data once after order placement
+        setTimeout(() => {
+          fetchData();
+        }, 3000);
+      } else {
+        // Market sell order (execute immediately from order book only)
+        if (!signer) {
+          toast.error('Please connect your wallet');
+          setLoading(false);
+          return;
+        }
+
+        // Create order object for EIP-712 signing (market sell)
+        const outcomeId = tradeSide === 'yes' ? 0 : 1;
+        const orderData = {
+          maker: account,
+          marketId: marketId.toString(),
+          outcomeId: outcomeId.toString(),
+          price: centsToTicks(currentPrice).toString(), // Use current market price
+          size: ethers.utils.parseUnits(tradeAmount || '0', 18).toString(),
+          side: false // false = sell
+        };
+
+        const order = createOrderWithDefaults(orderData);
+        const signature = await signOrder(order, chainId, EXCHANGE_CONTRACT, signer);
+
+        // Submit market order to backend
+        const response = await fetch(`${API_BASE}/api/orders`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            order,
+            signature,
+            isMarketOrder: true
+          })
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: 'Failed to place market order' }));
+          throw new Error(errorData.error || errorData.suggestion || `HTTP ${response.status}: Failed to place market order`);
+        }
+
+        const result = await response.json();
+
+        if (result.status === 'matched') {
+          // Enhanced toast for matched market sell order
+          const orderType = tradeSide === 'yes' ? 'YES' : 'NO';
+          const fillCount = result.fills?.length || result.matches?.length || 1;
+          const avgPrice = result.fills && result.fills.length > 0
+            ? result.fills.reduce((sum, f) => sum + ticksToCents(parseInt(f.fillPrice)), 0) / result.fills.length
+            : result.matches && result.matches.length > 0
+            ? ticksToCents(parseInt(result.matches[0].fillPrice))
+            : currentPrice;
+          const totalAmount = result.fills && result.fills.length > 0
+            ? result.fills.reduce((sum, f) => sum + parseFloat(ethers.utils.formatEther(f.fillSize)), 0)
+            : parseFloat(tradeAmount);
+          
+          toast.success(
+            `✅ ${orderType} shares SOLD! ${totalAmount.toFixed(4)} ${currencySymbol} @ ${centsToTCENT(avgPrice)} TCENT`,
+            { 
+              icon: '💸',
+              duration: 5000,
+              style: {
+                background: '#ef4444',
+                color: '#fff',
+                fontWeight: '600'
+              }
+            }
+          );
+          // Trigger settlement if fills exist
+          if (result.fills && result.fills.length > 0) {
+            toast('Settling trade on-chain...', { icon: '⏳', duration: 3000 });
+          }
+        } else if (result.status === 'no_matches' || result.useAMM) {
+          // No matches in order book - fallback to AMM
+          console.log('No matches in order book, using AMM fallback');
+          
+          if (!sellShares) {
+            throw new Error('Sell function not available. Please reconnect your wallet.');
+          }
+          
+          toast('No matching orders - executing via AMM...', { icon: '🔄' });
+          try {
+            await sellShares(marketId, tradeSide === 'yes', tradeAmount);
+            toast.success('✅ Shares sold successfully via AMM!');
+          } catch (ammError) {
+            console.error('AMM sell failed:', ammError);
+            throw new Error(`AMM sell failed: ${ammError.message}`);
+          }
+        } else {
+          toast.error('Market sell order could not be filled - no matching buy orders');
+        }
+
+        setTradeAmount('');
+      }
+      
+      // Refresh data once after order placement (no immediate refresh)
+      // Only refresh if trade was successful
+      setTimeout(() => {
+        fetchData();
+        fetchOpenOrders();
+      }, 10000); // Increased to 10 seconds to give blockchain time to update
+      
       // Call the refresh callback to update chart and all data
       if (onTradeComplete) {
-        setTimeout(() => onTradeComplete(), 2000); // Wait for blockchain confirmation
+        setTimeout(() => onTradeComplete(), 5000); // Reduced from 3 seconds
       }
-      toast.success('✅ Shares sold successfully!');
     } catch (err) {
-      console.error('Sell failed:', err);
-      toast.error(`Sell failed: ${err.message}`);
+      console.error(orderType === 'limit' ? 'Limit order failed:' : 'Sell failed:', err);
+      toast.error(`${orderType === 'limit' ? 'Limit order' : 'Sell'} failed: ${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -252,9 +765,9 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
   }
 
   // Define prices early to avoid initialization issues
-  // Prioritize marketData over market prop, with fallback to 50¢
-  const yesPrice = marketData?.yesPrice || market?.yesPrice || 50; // Default to 50¢
-  const noPrice = marketData?.noPrice || market?.noPrice || 50; // Default to 50¢
+  // Prioritize marketData over market prop, with fallback to 50 (represents 0.50 TCENT)
+  const yesPrice = marketData?.yesPrice || market?.yesPrice || 50; // Default to 50 (0.50 TCENT)
+  const noPrice = marketData?.noPrice || market?.noPrice || 50; // Default to 50 (0.50 TCENT)
   const currentPrice = tradeSide === 'yes' ? yesPrice : noPrice;
   
   // Debug logging
@@ -339,7 +852,7 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
           >
             <div className="text-xs text-gray-600 mb-1">Yes</div>
             <div className="text-xl font-bold text-green-600">
-              ${(yesPrice / 100).toFixed(2)}
+              {centsToTCENT(yesPrice)} TCENT
             </div>
           </button>
           <button
@@ -352,7 +865,7 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
           >
             <div className="text-xs text-gray-600 mb-1">No</div>
             <div className="text-xl font-bold text-red-600">
-              ${(noPrice / 100).toFixed(2)}
+              {centsToTCENT(noPrice)} TCENT
             </div>
           </button>
         </div>
@@ -386,19 +899,123 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
           </div>
         </div>
 
+        {/* Order Type Selection */}
+        {(activeTab === 'buy' || activeTab === 'sell') && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Order Type</label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => {
+                  setOrderType('market');
+                  setLimitPrice('');
+                }}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  orderType === 'market'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Market
+              </button>
+              <button
+                onClick={() => {
+                  setOrderType('limit');
+                  // Always set limit price to current market price when switching to limit
+                  setLimitPrice(currentPrice.toFixed(2));
+                }}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  orderType === 'limit'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Limit
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Limit Price Input */}
+        {orderType === 'limit' && (
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-sm font-medium text-gray-700">Limit Price (TCENT)</label>
+              <span className="text-xs text-gray-500">
+                Current: <span className="font-semibold">{centsToTCENT(currentPrice)} TCENT</span>
+              </span>
+            </div>
+            <input
+              type="number"
+              step="0.01"
+              min="0.01"
+              max="100"
+              value={limitPrice}
+              onChange={(e) => setLimitPrice(e.target.value)}
+              placeholder={currentPrice.toFixed(2)}
+              className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+            <div className="mt-1 flex gap-2">
+              <button
+                onClick={() => setLimitPrice((currentPrice * 0.95).toFixed(2))}
+                className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded text-gray-700"
+              >
+                -5%
+              </button>
+              <button
+                onClick={() => setLimitPrice(currentPrice.toFixed(2))}
+                className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded text-gray-700"
+              >
+                Market
+              </button>
+              <button
+                onClick={() => setLimitPrice((currentPrice * 1.05).toFixed(2))}
+                className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded text-gray-700"
+              >
+                +5%
+              </button>
+            </div>
+            {limitPrice && parseFloat(limitPrice) < currentPrice && (
+              <div className="mt-2 text-xs text-green-600 bg-green-50 p-2 rounded">
+                ✓ Your order will execute if price drops to {centsToTCENT(limitPrice)} TCENT or below
+              </div>
+            )}
+            {limitPrice && parseFloat(limitPrice) > currentPrice && (
+              <div className="mt-2 text-xs text-orange-600 bg-orange-50 p-2 rounded">
+                ⚠ Your order will execute if price rises to {centsToTCENT(limitPrice)} TCENT or above
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Market Order Info */}
+        {orderType === 'market' && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <div className="text-xs text-blue-900 font-medium mb-1">Market Order</div>
+            <div className="text-xs text-blue-700">
+              {activeTab === 'buy' 
+                ? `Will execute immediately against best available sell orders (~${centsToTCENT(currentPrice)} TCENT)`
+                : `Will execute immediately if there's a matching buy order (~${centsToTCENT(currentPrice)} TCENT)`
+              }
+            </div>
+            <div className="text-xs text-blue-600 mt-2">
+              💡 Want to set a specific price? Switch to <strong>Limit</strong> order
+            </div>
+          </div>
+        )}
+
         {/* Amount Input - Dribbble Style */}
         <div>
           <div className="flex items-center justify-between mb-2">
             <label className="text-sm font-medium text-gray-700">Amount</label>
             <span className="text-sm text-gray-500">
               Balance: <span className="font-semibold text-gray-900">
-                {activeTab === 'buy' ? `${parseFloat(ethBalance).toFixed(4)} ETH` : `${parseFloat(tradeSide === 'yes' ? position.yesShares : position.noShares).toFixed(2)} shares`}
+                {activeTab === 'buy' ? `${parseFloat(ethBalance).toFixed(4)} ${currencySymbol}` : `${parseFloat(tradeSide === 'yes' ? position.yesShares : position.noShares).toFixed(2)} shares`}
               </span>
             </span>
           </div>
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <span className="text-green-600 font-semibold">ETH</span>
+              <span className="text-green-600 font-semibold">{currencySymbol}</span>
             </div>
             <input
               type="number"
@@ -423,9 +1040,20 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
               Max
             </button>
           </div>
-          {activeTab === 'buy' && parseFloat(tradeAmount) > 0 && (
+          {activeTab === 'buy' && parseFloat(tradeAmount) > 0 && orderType === 'market' && (
             <div className="mt-2 text-xs text-gray-500">
-              Rate: <span className="font-semibold">{ratePerShare} ETH = 1 Share</span>
+              Rate: <span className="font-semibold">{ratePerShare} {currencySymbol} = 1 Share</span>
+            </div>
+          )}
+          {activeTab === 'buy' && parseFloat(tradeAmount) > 0 && orderType === 'limit' && limitPrice && (
+            <div className="mt-2 text-xs text-gray-500">
+              Will buy at: <span className="font-semibold">{centsToTCENT(limitPrice)} TCENT</span>
+              {parseFloat(limitPrice) < currentPrice && (
+                <span className="text-green-600 ml-2">(Below market - will execute if price drops)</span>
+              )}
+              {parseFloat(limitPrice) > currentPrice && (
+                <span className="text-orange-600 ml-2">(Above market - will execute if price rises)</span>
+              )}
             </div>
           )}
         </div>
@@ -435,7 +1063,7 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
           <div className="space-y-3 pt-4 border-t border-gray-200">
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">Average Price</span>
-              <span className="font-semibold text-gray-900">${estimatedAveragePrice}</span>
+              <span className="font-semibold text-gray-900">{estimatedAveragePrice}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">Estimated Shares</span>
@@ -443,15 +1071,15 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">Estimated Profit</span>
-              <span className="font-semibold text-gray-900">${estimatedProfit}</span>
+              <span className="font-semibold text-gray-900">{estimatedProfit}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">Estimated Fees</span>
-              <span className="font-semibold text-gray-900">${estimatedFees}</span>
+              <span className="font-semibold text-gray-900">{estimatedFees}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">Max Return on Investment</span>
-              <span className="font-semibold text-gray-900">${maxROI}%</span>
+              <span className="font-semibold text-gray-900">{maxROI}%</span>
             </div>
           </div>
         )}
@@ -459,9 +1087,17 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
         {/* Buy/Sell Button - Dribbble Style */}
         <button
           onClick={activeTab === 'buy' ? handleBuy : handleSell}
-          disabled={loading || !tradeAmount || parseFloat(tradeAmount) <= 0}
+          disabled={
+            loading || 
+            !tradeAmount || 
+            parseFloat(tradeAmount) <= 0 ||
+            (orderType === 'limit' && (!limitPrice || parseFloat(limitPrice) <= 0 || parseFloat(limitPrice) > 100))
+          }
           className={`w-full py-4 px-6 rounded-lg font-semibold text-white transition-all duration-200 ${
-            loading || !tradeAmount || parseFloat(tradeAmount) <= 0
+            loading || 
+            !tradeAmount || 
+            parseFloat(tradeAmount) <= 0 ||
+            (orderType === 'limit' && (!limitPrice || parseFloat(limitPrice) <= 0 || parseFloat(limitPrice) > 100))
               ? 'bg-gray-300 cursor-not-allowed'
               : activeTab === 'buy'
               ? 'bg-blue-600 hover:bg-blue-700 shadow-md hover:shadow-lg'
@@ -474,9 +1110,41 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
               Processing...
             </div>
           ) : (
-            activeTab === 'buy' ? 'Buy' : 'Sell'
+            activeTab === 'buy' 
+              ? (orderType === 'limit' ? `Place Limit Order at ${centsToTCENT(limitPrice || 0)} TCENT` : 'Buy')
+              : 'Sell'
           )}
         </button>
+
+        {/* Open Orders */}
+        {activeTab === 'buy' && openOrders.length > 0 && (
+          <div className="pt-6 border-t border-gray-200">
+            <h3 className="text-sm font-semibold text-gray-900 mb-3">Your Open Orders</h3>
+            <div className="space-y-2">
+              {openOrders.map((order) => (
+                <div
+                  key={order.orderId}
+                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200"
+                >
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className={`text-xs font-medium px-2 py-1 rounded ${
+                        order.isYes ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                      }`}>
+                        {order.isYes ? 'YES' : 'NO'}
+                      </span>
+                      <span className="text-sm font-semibold text-gray-900">{centsToTCENT(order.price)} TCENT</span>
+                      <span className="text-xs text-gray-500">× {order.amount.toFixed(4)} {currencySymbol}</span>
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      {new Date(order.timestamp).toLocaleString()}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* My Signals - Dribbble Style */}
         <div className="pt-6 border-t border-gray-200">

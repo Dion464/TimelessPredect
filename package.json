@@ -1,0 +1,19 @@
+{
+  "name": "metapoly-api",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "license": "MIT",
+  "dependencies": {
+    "@neondatabase/serverless": "^0.10.3",
+    "@prisma/client": "^5.18.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "ethers": "^5.7.2",
+    "express": "^5.1.0",
+    "ws": "^8.16.0"
+  },
+  "devDependencies": {
+    "prisma": "^5.18.0"
+  }
+}

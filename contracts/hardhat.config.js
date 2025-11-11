@@ -58,6 +58,12 @@ module.exports = {
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
       chainId: 8453,
     },
+    incentiv: {
+      url: "https://rpc-testnet.incentiv.io/",
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+      chainId: 28802,
+      gasPrice: 20000000000, // 20 gwei
+    },
   },
   etherscan: {
     apiKey: {

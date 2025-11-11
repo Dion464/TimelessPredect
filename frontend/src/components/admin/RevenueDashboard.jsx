@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useWeb3 } from '../../hooks/useWeb3';
+import { getCurrencySymbol } from '../../utils/currency';
 import { ethers } from 'ethers';
 
 const RevenueDashboard = () => {
-  const { contracts, provider } = useWeb3();
+  const { contracts, provider, chainId } = useWeb3();
+  const currencySymbol = getCurrencySymbol(chainId);
   const [loading, setLoading] = useState(true);
   const [revenueData, setRevenueData] = useState({
     tradingFees: 0, // Calculated from totalVolume * platformFeePercent
@@ -100,7 +102,7 @@ const RevenueDashboard = () => {
       value: revenueData.marketCreationFees,
       percentage: revenueData.totalRevenue > 0 ? (revenueData.marketCreationFees / revenueData.totalRevenue) * 100 : 0,
       color: 'bg-green-500',
-      description: `${parseFloat(revenueData.marketCreationFee).toFixed(4)} ETH per market`,
+      description: `${parseFloat(revenueData.marketCreationFee).toFixed(4)} ${currencySymbol} per market`,
       icon: '🏦'
     }
   ];
@@ -142,7 +144,7 @@ const RevenueDashboard = () => {
             <span className="text-2xl">💹</span>
           </div>
           <div className="text-3xl font-bold text-green-900">
-            {parseFloat(revenueData.totalVolume).toFixed(4)} ETH
+            {parseFloat(revenueData.totalVolume).toFixed(4)} {currencySymbol}
           </div>
           <div className="text-sm text-green-700 mt-1">All-time trading volume</div>
         </div>
@@ -153,7 +155,7 @@ const RevenueDashboard = () => {
             <span className="text-2xl">💰</span>
           </div>
           <div className="text-3xl font-bold text-purple-900">
-            {parseFloat(revenueData.contractBalance).toFixed(4)} ETH
+            {parseFloat(revenueData.contractBalance).toFixed(4)} {currencySymbol}
           </div>
           <div className="text-sm text-purple-700 mt-1">Accumulated fees</div>
         </div>
@@ -176,7 +178,7 @@ const RevenueDashboard = () => {
               <p className="text-xs text-gray-600">Per market creation</p>
             </div>
             <div className="text-2xl font-bold text-green-600">
-              {revenueData.marketCreationFee} ETH
+              {revenueData.marketCreationFee} {currencySymbol}
             </div>
           </div>
         </div>
@@ -188,7 +190,7 @@ const RevenueDashboard = () => {
           <div>
             <h2 className="text-lg font-medium opacity-90">Total Revenue (All-Time)</h2>
             <div className="text-4xl font-bold mt-2">
-              {revenueData.totalRevenue.toFixed(6)} ETH
+              {revenueData.totalRevenue.toFixed(6)} {currencySymbol}
             </div>
             <div className="text-sm opacity-75 mt-1">
               From {revenueData.totalMarkets} markets
@@ -208,7 +210,7 @@ const RevenueDashboard = () => {
             </div>
             <h3 className="text-lg font-semibold text-gray-900 mb-1">{stream.name}</h3>
             <div className="text-2xl font-bold text-gray-900 mb-2">
-              {stream.value.toFixed(6)} ETH
+              {stream.value.toFixed(6)} {currencySymbol}
             </div>
             <div className="text-sm text-gray-600 mb-3">{stream.description}</div>
             <div className="flex items-center">
@@ -240,11 +242,11 @@ const RevenueDashboard = () => {
             <div className="space-y-3">
               <div className="flex justify-between">
                 <span className="text-gray-600">Total Volume:</span>
-                <span className="font-medium">{parseFloat(revenueData.totalVolume).toFixed(6)} ETH</span>
+                <span className="font-medium">{parseFloat(revenueData.totalVolume).toFixed(6)} {currencySymbol}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Trading Fees Collected:</span>
-                <span className="font-medium text-blue-600">{revenueData.tradingFees.toFixed(6)} ETH</span>
+                <span className="font-medium text-blue-600">{revenueData.tradingFees.toFixed(6)} {currencySymbol}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Average Volume/Market:</span>
@@ -252,7 +254,7 @@ const RevenueDashboard = () => {
                   {revenueData.totalMarkets > 0 
                     ? (parseFloat(revenueData.totalVolume) / revenueData.totalMarkets).toFixed(6)
                     : '0.000000'
-                  } ETH
+                  } {currencySymbol}
                 </span>
               </div>
             </div>
@@ -266,11 +268,11 @@ const RevenueDashboard = () => {
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Market Creation Fees Collected:</span>
-                <span className="font-medium text-green-600">{revenueData.marketCreationFees.toFixed(6)} ETH</span>
+                <span className="font-medium text-green-600">{revenueData.marketCreationFees.toFixed(6)} {currencySymbol}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Contract Balance:</span>
-                <span className="font-medium text-purple-600">{parseFloat(revenueData.contractBalance).toFixed(6)} ETH</span>
+                <span className="font-medium text-purple-600">{parseFloat(revenueData.contractBalance).toFixed(6)} {currencySymbol}</span>
               </div>
             </div>
           </div>

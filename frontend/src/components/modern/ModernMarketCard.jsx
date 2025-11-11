@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useHistory } from 'react-router-dom';
+import { centsToTCENT } from '../../utils/priceFormatter';
 
 // Helper function to format volume
 const formatVolumeDisplay = (volume) => {
@@ -17,9 +18,18 @@ const ModernMarketCard = ({ market, showBuyButtons = false, onBuy }) => {
   const history = useHistory();
   const [hoveredSide, setHoveredSide] = useState(null);
   
-  const probability = market.currentProbability || market.initialProbability || 0.5;
-  const yesPrice = Math.round(probability * 100);
-  const noPrice = 100 - yesPrice;
+  // Use actual prices from market if available (from blockchain), otherwise calculate from probability
+  let yesPrice, noPrice;
+  if (market.yesPrice !== undefined && market.noPrice !== undefined) {
+    // Prices are already in cents from blockchain
+    yesPrice = Math.round(market.yesPrice);
+    noPrice = Math.round(market.noPrice);
+  } else {
+    // Fallback to probability calculation
+    const probability = market.currentProbability || market.initialProbability || 0.5;
+    yesPrice = Math.round(probability * 100);
+    noPrice = 100 - yesPrice;
+  }
   
   const handleCardClick = (e) => {
     // Don't navigate if clicking on buy buttons
@@ -64,23 +74,78 @@ const ModernMarketCard = ({ market, showBuyButtons = false, onBuy }) => {
     return colors[category] || 'bg-gray-500';
   };
 
+  // Generate image URL based on category and market ID (Polymarket-style)
+  const getMarketImage = () => {
+    const marketId = market.id || '0';
+    
+    // First, check if there's a stored image URL in localStorage
+    try {
+      const marketImages = JSON.parse(localStorage.getItem('marketImages') || '{}');
+      if (marketImages[marketId]) {
+        return marketImages[marketId];
+      }
+    } catch (err) {
+      console.log('Error reading market images from localStorage');
+    }
+    
+    // If market has an imageUrl prop, use it
+    if (market.imageUrl) {
+      return market.imageUrl;
+    }
+    
+    // Otherwise, generate a placeholder based on category
+    const category = market.category || 'General';
+    
+    // Use Unsplash API for category-based images
+    const categoryKeywords = {
+      'Technology': 'technology,computer,digital',
+      'Sports': 'sports,athlete,competition',
+      'Politics': 'politics,government,democracy',
+      'Entertainment': 'entertainment,showbiz,celebrity',
+      'Economics': 'economics,money,finance',
+      'Science': 'science,research,laboratory',
+      'General': 'abstract,pattern,design'
+    };
+    
+    const keywords = categoryKeywords[category] || categoryKeywords['General'];
+    // Use a deterministic seed based on market ID for consistent images
+    const seed = parseInt(marketId) % 1000;
+    
+    return `https://source.unsplash.com/400x200/?${keywords}&sig=${seed}`;
+  };
+
   return (
     <div 
       onClick={handleCardClick}
-      className="bg-white rounded-xl border border-gray-200 hover:border-gray-300 transition-all duration-200 cursor-pointer overflow-hidden"
+      className="bg-white rounded-xl border border-gray-200 hover:border-gray-300 transition-all duration-200 cursor-pointer overflow-hidden shadow-sm hover:shadow-md"
     >
-      {/* Header */}
-      <div className="p-4 pb-3">
-        <div className="flex items-center justify-between mb-3">
-          <span className={`px-2 py-1 rounded-full text-xs font-medium text-white ${getCategoryColor(market.category)}`}>
+      {/* Market Image */}
+      <div className="relative w-full h-40 bg-gradient-to-br from-gray-100 to-gray-200 overflow-hidden">
+        <img
+          src={getMarketImage()}
+          alt={market.questionTitle || 'Market'}
+          className="w-full h-full object-cover"
+          onError={(e) => {
+            // Fallback to gradient if image fails to load
+            e.target.style.display = 'none';
+            e.target.parentElement.className = 'relative w-full h-40 bg-gradient-to-br from-blue-100 via-purple-100 to-pink-100';
+          }}
+        />
+        <div className="absolute top-2 left-2">
+          <span className={`px-2 py-1 rounded-full text-xs font-medium text-white shadow-sm ${getCategoryColor(market.category)}`}>
             {market.category || 'General'}
           </span>
-          <span className="text-xs text-gray-500">
+        </div>
+        <div className="absolute top-2 right-2">
+          <span className="px-2 py-1 rounded-full text-xs font-medium text-white bg-black bg-opacity-50 backdrop-blur-sm">
             {formatTimeRemaining(market.resolutionDateTime)}
           </span>
         </div>
-        
-        <h3 className="text-gray-900 font-medium text-sm leading-tight mb-3 line-clamp-3">
+      </div>
+
+      {/* Header */}
+      <div className="p-4 pb-3">
+        <h3 className="text-gray-900 font-medium text-sm leading-tight mb-3 line-clamp-2">
           {market.questionTitle}
         </h3>
       </div>
@@ -105,7 +170,7 @@ const ModernMarketCard = ({ market, showBuyButtons = false, onBuy }) => {
                 {market.yesLabel || 'Yes'}
               </div>
               <div className="text-lg font-bold text-green-600">
-                {yesPrice}¢
+                {centsToTCENT(yesPrice)} TCENT
               </div>
               {showBuyButtons && (
                 <div className="text-xs text-green-600 mt-1">
@@ -132,7 +197,7 @@ const ModernMarketCard = ({ market, showBuyButtons = false, onBuy }) => {
                 {market.noLabel || 'No'}
               </div>
               <div className="text-lg font-bold text-red-600">
-                {noPrice}¢
+                {centsToTCENT(noPrice)} TCENT
               </div>
               {showBuyButtons && (
                 <div className="text-xs text-red-600 mt-1">

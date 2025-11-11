@@ -13,7 +13,8 @@ async function main() {
   const network = await ethers.provider.getNetwork();
   console.log("Network:", network.name, "Chain ID:", network.chainId);
 
-  // Deploy Mock USDC for testing (on testnets)
+  // Deploy Mock USDC for testing (only on localhost and goerli)
+  // Note: ETHPredictionMarket uses native tokens (ETH/TCENT), not USDC
   let usdcAddress;
   if (network.chainId === 1337 || network.chainId === 5) { // localhost or goerli
     console.log("\n📄 Deploying Mock USDC...");
@@ -22,6 +23,10 @@ async function main() {
     await mockUSDC.deployed();
     usdcAddress = mockUSDC.address;
     console.log("Mock USDC deployed to:", usdcAddress);
+  } else if (network.chainId === 28802) {
+    // Incentiv Testnet - uses native TCENT tokens, no USDC needed
+    usdcAddress = ethers.constants.AddressZero;
+    console.log("\n✅ Using native TCENT tokens (no USDC needed)");
   } else {
     // Use real USDC addresses for mainnets
     const usdcAddresses = {
@@ -37,12 +42,13 @@ async function main() {
     console.log("Using USDC at:", usdcAddress);
   }
 
-  // Deploy PredictionMarket contract (use ETHPredictionMarket for ETH-based markets)
+  // Deploy PredictionMarket contract (use ETHPredictionMarket for native token markets)
   console.log("\n📄 Deploying ETHPredictionMarket...");
+  console.log("ℹ️  This contract uses native tokens (ETH/TCENT), not ERC20 tokens");
   const ETHPredictionMarket = await ethers.getContractFactory("ETHPredictionMarket");
   
   // Deploy ETHPredictionMarket with market creation fee and platform fee
-  // marketCreationFee = 0.01 ETH, platformFeePercent = 200 basis points (2%)
+  // marketCreationFee = 0.01 TCENT, platformFeePercent = 200 basis points (2%)
   const marketCreationFee = ethers.utils.parseEther("0.01");
   const platformFeePercent = 200; // 2% in basis points
   const predictionMarket = await ETHPredictionMarket.deploy(marketCreationFee, platformFeePercent);
@@ -65,7 +71,7 @@ async function main() {
         },
         USDC: {
           address: usdcAddress,
-          isMock: network.chainId === 1337 || network.chainId === 5,
+          isMock: network.chainId === 1337 || network.chainId === 5 || network.chainId === 28802,
         },
       },
     configuration: {

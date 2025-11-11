@@ -3,7 +3,71 @@ import { useParams, useHistory } from 'react-router-dom';
 import PolymarketChart from '../../components/charts/PolymarketChart';
 import Web3TradingInterface from '../../components/trading/Web3TradingInterface';
 import { useWeb3 } from '../../hooks/useWeb3';
+import { getCurrencySymbol } from '../../utils/currency';
 import { ethers } from 'ethers';
+
+// Generate image URL based on category and market ID (Polymarket-style)
+const getMarketImage = (market, marketIdParam) => {
+  if (!market) return 'https://source.unsplash.com/200x200/?abstract,pattern,design';
+  
+  // Get market ID - handle both string and number formats
+  const marketId = market.id?.toString() || 
+                   market.marketId?.toString() || 
+                   marketIdParam?.toString() || 
+                   String(market.id) ||
+                   '0';
+  
+  // First, check if there's a stored image URL in localStorage
+  try {
+    const marketImages = JSON.parse(localStorage.getItem('marketImages') || '{}');
+    
+    // Try exact match first
+    if (marketImages[marketId]) {
+      return marketImages[marketId];
+    }
+    
+    // Try number format
+    const numId = parseInt(marketId);
+    if (!isNaN(numId) && marketImages[numId.toString()]) {
+      return marketImages[numId.toString()];
+    }
+    
+    // Try all keys to find a match
+    for (const key in marketImages) {
+      if (parseInt(key) === numId || key === marketId) {
+        return marketImages[key];
+      }
+    }
+  } catch (err) {
+    console.log('Error reading market images from localStorage:', err);
+  }
+  
+  // If market has an imageUrl prop, use it
+  if (market?.imageUrl) {
+    return market.imageUrl;
+  }
+  
+  // Otherwise, generate a placeholder based on category
+  const category = market?.category || 'General';
+  
+  // Use Unsplash API for category-based images
+  const categoryKeywords = {
+    'Technology': 'technology,computer,digital',
+    'Crypto': 'cryptocurrency,bitcoin,blockchain',
+    'Sports': 'sports,athlete,competition',
+    'Politics': 'politics,government,democracy',
+    'Entertainment': 'entertainment,showbiz,celebrity',
+    'Economics': 'economics,money,finance',
+    'Science': 'science,research,laboratory',
+    'General': 'abstract,pattern,design'
+  };
+  
+  const keywords = categoryKeywords[category] || categoryKeywords['General'];
+  // Use a deterministic seed based on market ID for consistent images
+  const seed = parseInt(marketId) % 1000;
+  
+  return `https://source.unsplash.com/200x200/?${keywords}&sig=${seed}`;
+};
 
 const PolymarketStyleTrading = () => {
   const { marketId } = useParams();
@@ -18,7 +82,10 @@ const PolymarketStyleTrading = () => {
     web3Context = { isConnected: false, contracts: {} };
   }
   
-  const { isConnected, contracts, getMarketData } = web3Context;
+  const { isConnected, contracts, getMarketData, chainId } = web3Context;
+  const currencySymbol = getCurrencySymbol(chainId);
+  // Use current origin for API calls if VITE_API_BASE_URL is not set
+  const API_BASE = import.meta.env.VITE_API_BASE_URL || (typeof window !== 'undefined' ? window.location.origin : '');
   const [market, setMarket] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('trade');
@@ -31,46 +98,63 @@ const PolymarketStyleTrading = () => {
   const [orderBook, setOrderBook] = useState({ yes: [], no: [] });
   const [uniqueTraders, setUniqueTraders] = useState(0);
   const [liquidity, setLiquidity] = useState(0);
+  const [timeframe, setTimeframe] = useState('1d');
   const refreshTriggerRef = useRef(0); // Force refresh counter
 
   // These functions need to be defined before refreshAllData
   const fetchRecentTrades = useCallback(async () => {
-    if (!contracts?.predictionMarket) return;
-    
+    if (!contracts?.predictionMarket) {
+      console.warn('Prediction market contract not available, skipping recent trades fetch');
+      return;
+    }
+
     try {
-      // Fetch real trades from the contract
-      const trades = await contracts.predictionMarket.getRecentTrades(marketId, 10);
-      
+      const trades = await contracts.predictionMarket.getRecentTrades(marketId, 100);
+
       if (!trades || trades.length === 0) {
         setRecentTrades([]);
+        setUniqueTraders(0);
         return;
       }
-      
-      // Convert trades to display format
+
       const formattedTrades = trades.map(trade => {
-        const tradePrice = parseFloat(trade.price.toString()) / 100; // Convert from basis points to cents
-        const shares = parseFloat(ethers.utils.formatEther(trade.shares));
-        const timestamp = new Date(parseInt(trade.timestamp.toString()) * 1000);
-        
+        const priceBps = Number(trade.price?.toString?.() ?? trade.price ?? 0);
+        const timestampSeconds = Number(trade.timestamp?.toString?.() ?? trade.timestamp ?? 0);
+        const sharesWei = trade.shares?.toString?.() ?? trade.shares ?? '0';
+        let sharesFormatted = '0';
+
+        try {
+          sharesFormatted = ethers.utils.formatEther(sharesWei);
+        } catch (err) {
+          sharesFormatted = sharesWei.toString();
+        }
+
+        const timestamp = new Date(timestampSeconds * 1000);
+
         return {
           side: trade.isYes ? 'yes' : 'no',
-          amount: shares.toFixed(4),
-          price: Math.round(tradePrice * 100), // Display in cents
-          timestamp: timestamp.toLocaleTimeString(),
-          date: timestamp.toLocaleString(),
+          amount: parseFloat(sharesFormatted).toFixed(4),
+          price: priceBps / 10000,
+          yesPrice: trade.isYes ? priceBps / 10000 : (10000 - priceBps) / 10000,
+          noPrice: trade.isYes ? (10000 - priceBps) / 10000 : priceBps / 10000,
+          timestamp: timestamp.toISOString(),
           trader: trade.trader
         };
       });
-      
-      // Sort by timestamp (most recent first)
-      formattedTrades.sort((a, b) => new Date(b.date) - new Date(a.date));
-      
+
+      // Sort newest first
+      formattedTrades.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
       setRecentTrades(formattedTrades);
-      console.log('✅ Loaded real trades from blockchain:', formattedTrades.length, 'trades');
+
+      const uniqueAddresses = new Set(formattedTrades.map(trade => (trade.trader || '').toLowerCase()));
+      setUniqueTraders(uniqueAddresses.size);
+
+      console.log('✅ Loaded trades from blockchain:', formattedTrades.length);
     } catch (error) {
-      console.error('Error fetching recent trades:', error);
-      // Fallback to empty array if function doesn't exist or errors
+      console.error('Error fetching recent trades from blockchain:', error);
       setRecentTrades([]);
+      setUniqueTraders(0);
     }
   }, [contracts?.predictionMarket, marketId]);
 
@@ -128,32 +212,6 @@ const PolymarketStyleTrading = () => {
     }
   }, [contracts?.predictionMarket, contracts?.pricingAMM, marketId]);
 
-  const fetchUniqueTraders = useCallback(async () => {
-    if (!contracts?.predictionMarket) return;
-    
-    try {
-      // Fetch recent trades to count unique traders
-      const trades = await contracts.predictionMarket.getRecentTrades(marketId, 100);
-      
-      if (!trades || trades.length === 0) {
-        setUniqueTraders(0);
-        return;
-      }
-      
-      // Count unique trader addresses
-      const uniqueAddresses = new Set();
-      trades.forEach(trade => {
-        uniqueAddresses.add(trade.trader.toLowerCase());
-      });
-      
-      setUniqueTraders(uniqueAddresses.size);
-      console.log('✅ Counted unique traders:', uniqueAddresses.size);
-    } catch (error) {
-      console.error('Error fetching unique traders:', error);
-      setUniqueTraders(0);
-    }
-  }, [contracts?.predictionMarket, marketId]);
-
   const fetchLiquidity = useCallback(async () => {
     if (!contracts?.predictionMarket || !contracts?.pricingAMM) return;
     
@@ -172,67 +230,221 @@ const PolymarketStyleTrading = () => {
       const totalLiquidity = liquidity > 0 ? liquidity : balanceEth;
       
       setLiquidity(totalLiquidity);
-      console.log('✅ Fetched liquidity:', totalLiquidity.toFixed(4), 'ETH');
+      console.log('✅ Fetched liquidity:', totalLiquidity.toFixed(4), currencySymbol);
     } catch (error) {
       console.error('Error fetching liquidity:', error);
       setLiquidity(0);
     }
   }, [contracts?.predictionMarket, contracts?.pricingAMM, marketId]);
 
-  const updatePriceHistory = useCallback(async () => {
-    if (!market || !contracts?.predictionMarket) return;
-    
+  // Function to record price snapshot to database
+  const recordPriceSnapshot = useCallback(async (yesPriceBps, noPriceBps) => {
     try {
-      // Get current prices
-      const yesPrice = await contracts.predictionMarket.getCurrentPrice(marketId, true);
-      const noPrice = await contracts.predictionMarket.getCurrentPrice(marketId, false);
-      
-      const currentYesPrice = parseFloat(yesPrice.toString()) / 100; // Convert to cents, then to decimal
-      const currentNoPrice = parseFloat(noPrice.toString()) / 100;
-      
-      // Add new data point to history
-      const now = new Date();
-      const newYesPoint = {
-        price: currentYesPrice / 100, // Convert cents to decimal (50 -> 0.5)
-        timestamp: now.toISOString()
-      };
-      const newNoPoint = {
-        price: currentNoPrice / 100,
-        timestamp: now.toISOString()
-      };
-      
-      setYesPriceHistory(prev => {
-        const updated = [...prev, newYesPoint];
-        // Keep only last 100 points
-        return updated.slice(-100);
+      if (!marketId || !API_BASE) {
+        console.warn('Cannot record price snapshot: missing marketId or API_BASE');
+        return;
+      }
+
+      // Validate prices before recording
+      // Ensure prices are reasonable (between 10 bps = 0.1% and 9990 bps = 99.9%)
+      if (yesPriceBps < 10 || yesPriceBps > 9990 || noPriceBps < 10 || noPriceBps > 9990) {
+        console.warn('⚠️  Invalid prices detected, skipping price snapshot:', {
+          marketId: marketId.toString(),
+          yesPriceBps,
+          noPriceBps,
+          yesPricePercent: (yesPriceBps / 100).toFixed(2),
+          noPricePercent: (noPriceBps / 100).toFixed(2)
+        });
+        return;
+      }
+
+      // Ensure YES + NO = 10000 (within rounding tolerance)
+      const total = yesPriceBps + noPriceBps;
+      if (Math.abs(total - 10000) > 100) { // Allow 1% tolerance
+        console.warn('⚠️  Price sum mismatch, normalizing before recording:', {
+          yesPriceBps,
+          noPriceBps,
+          total
+        });
+        // Normalize to ensure they sum to 10000
+        const scale = 10000 / total;
+        yesPriceBps = Math.round(yesPriceBps * scale);
+        noPriceBps = 10000 - yesPriceBps;
+      }
+
+      console.log('📊 Recording price snapshot to DB:', {
+        marketId: marketId.toString(),
+        yesPriceBps: yesPriceBps,
+        noPriceBps: noPriceBps,
+        yesPriceCents: (yesPriceBps / 100).toFixed(2),
+        noPriceCents: (noPriceBps / 100).toFixed(2),
+        sum: yesPriceBps + noPriceBps
       });
-      
-      setNoPriceHistory(prev => {
-        const updated = [...prev, newNoPoint];
-        // Keep only last 100 points
-        return updated.slice(-100);
+
+      const response = await fetch(`${API_BASE}/api/record-price`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          marketId: marketId.toString(),
+          yesPriceBps: yesPriceBps,
+          noPriceBps: noPriceBps
+        })
       });
-      
-      console.log('✅ Updated price history with new data point');
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Failed to record price snapshot:', errorText);
+      } else {
+        const result = await response.json();
+        console.log('✅ Price snapshot recorded successfully:', result);
+      }
     } catch (error) {
-      console.error('Error updating price history:', error);
+      console.error('❌ Error recording price snapshot:', error);
+      // Don't throw - this is non-critical
     }
-  }, [market, contracts?.predictionMarket, marketId]);
+  }, [API_BASE, marketId]);
+
+  const fetchPriceHistoryFromDb = useCallback(async (range = timeframe) => {
+    try {
+      if (!marketId) {
+        return;
+      }
+
+      const response = await fetch(`${API_BASE}/api/price-history?marketId=${marketId}&timeframe=${range}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch price history');
+      }
+
+      const raw = await response.text();
+      let data;
+      try {
+        data = JSON.parse(raw);
+      } catch (err) {
+        throw new Error('Price history endpoint did not return JSON. Ensure the API backend is running.');
+      }
+      const intervals = Array.isArray(data.intervals) ? data.intervals : [];
+
+      if (intervals.length === 0) {
+        setYesPriceHistory([]);
+        setNoPriceHistory([]);
+        setPriceHistory([]);
+        return;
+      }
+
+      // Use all actual timestamps from database - don't fill gaps, show real price history
+      const sorted = intervals
+        .map(entry => ({
+          yesPrice: entry.yesPrice, // Already in decimal (0-1) from API
+          noPrice: entry.noPrice,   // Already in decimal (0-1) from API
+          timestamp: new Date(entry.intervalStart).getTime()
+        }))
+        .sort((a, b) => a.timestamp - b.timestamp);
+
+      // Convert to chart format - prices are already in decimal (0-1) from database
+      // Chart expects prices in decimal format (0-1), not cents
+      const yesHistory = sorted.map(point => ({
+        price: point.yesPrice, // Already decimal, e.g., 0.50 = 50%
+        timestamp: new Date(point.timestamp).toISOString()
+      }));
+
+      const noHistory = sorted.map(point => ({
+        price: point.noPrice, // Already decimal, e.g., 0.50 = 50%
+        timestamp: new Date(point.timestamp).toISOString()
+      }));
+
+      console.log('📊 Loaded price history from database:', {
+        intervals: intervals.length,
+        yesHistory: yesHistory.length,
+        noHistory: noHistory.length,
+        yesPrices: yesHistory.map(p => (p.price * 100).toFixed(2) + '%').slice(0, 5),
+        noPrices: noHistory.map(p => (p.price * 100).toFixed(2) + '%').slice(0, 5)
+      });
+
+      setYesPriceHistory(yesHistory);
+      setNoPriceHistory(noHistory);
+      setPriceHistory(yesHistory);
+
+      // Don't update market prices from DB - prices come from chain
+    } catch (error) {
+      console.error('Error fetching price history from database:', error);
+      setYesPriceHistory([]);
+      setNoPriceHistory([]);
+      setPriceHistory([]);
+    }
+  }, [API_BASE, marketId, timeframe]);
+
+  const fetchMarketData = useCallback(async () => {
+    try {
+      setLoading(true);
+
+      if (!isConnected || !contracts?.predictionMarket) {
+        console.warn('Wallet not connected or contracts unavailable. Connect wallet to view market data.');
+        setMarket(null);
+        setOrderBook({ yes: [], no: [] });
+        setLiquidity(0);
+        setRecentTrades([]);
+        setUniqueTraders(0);
+        return;
+      }
+
+      const marketData = await getMarketData(marketId);
+
+      const processedMarket = {
+        id: Number(marketData.id),
+        questionTitle: marketData.question,
+        description: marketData.description,
+        category: marketData.category || 'General',
+        resolutionDateTime: new Date(Number(marketData.resolutionTime) * 1000).toISOString(),
+        createdAt: new Date(Number(marketData.createdAt) * 1000).toISOString(),
+        endTime: Number(marketData.endTime),
+        creatorUsername: marketData.creator,
+        isResolved: marketData.resolved,
+        totalVolume: parseFloat(ethers.utils.formatEther(marketData.totalVolume)),
+        yesPrice: marketData.yesPrice ?? 50,
+        noPrice: marketData.noPrice ?? 50,
+        currentProbability: (marketData.yesPrice ?? 50) / 100
+      };
+
+      setMarket(processedMarket);
+
+      // Fetch all data in parallel for better performance
+      await Promise.all([
+        fetchPriceHistoryFromDb(),
+        fetchRecentTrades(),
+        fetchOrderBook(),
+        fetchLiquidity()
+      ]);
+    } catch (error) {
+      console.error('Error fetching market data:', error);
+      setMarket(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [contracts?.predictionMarket, fetchLiquidity, fetchOrderBook, fetchPriceHistoryFromDb, fetchRecentTrades, getMarketData, isConnected, marketId]);
+
+  const handleTimeframeChange = useCallback(async (range) => {
+    setTimeframe(range);
+    await fetchPriceHistoryFromDb(range);
+  }, [fetchPriceHistoryFromDb]);
 
   // Refresh function that can be called after trades
   const refreshAllData = useCallback(async () => {
     refreshTriggerRef.current += 1;
     await fetchMarketData();
-    await fetchRecentTrades();
-    await fetchOrderBook();
-    await fetchUniqueTraders();
-    await fetchLiquidity();
-    await updatePriceHistory();
-  }, [marketId, contracts, isConnected, fetchRecentTrades, fetchOrderBook, fetchUniqueTraders, fetchLiquidity, updatePriceHistory]);
+  }, [fetchMarketData]);
 
   useEffect(() => {
     fetchMarketData();
-  }, [marketId, isConnected]);
+    
+    // Auto-refresh market data every 60 seconds only if connected (reduced from 10 seconds)
+    const refreshInterval = setInterval(() => {
+      if (isConnected && contracts?.predictionMarket && marketId) {
+        fetchMarketData();
+      }
+    }, 60000); // 60 seconds
+    
+    return () => clearInterval(refreshInterval);
+  }, [fetchMarketData, isConnected, contracts?.predictionMarket, marketId]);
 
   // Set up event listeners for real-time updates
   useEffect(() => {
@@ -244,14 +456,58 @@ const PolymarketStyleTrading = () => {
 
     const handlePurchased = async (...args) => {
       console.log('🟢 SharesPurchased event detected:', args);
-      // Refresh all data after a short delay to ensure blockchain state is updated
-      setTimeout(() => refreshAllData(), 2000);
+      // Wait for blockchain state to update, then refresh data and record price
+      setTimeout(async () => {
+        // Force price recording after trade FIRST, then refresh chart
+        if (contracts?.predictionMarket && marketId) {
+          try {
+            const yesPrice = await contracts.predictionMarket.getCurrentPrice(marketId, true);
+            const noPrice = await contracts.predictionMarket.getCurrentPrice(marketId, false);
+            const yesPriceBps = parseFloat(yesPrice.toString());
+            const noPriceBps = parseFloat(noPrice.toString());
+            console.log('🔄 Recording price after buy trade:', { yesPriceBps, noPriceBps });
+            await recordPriceSnapshot(yesPriceBps, noPriceBps);
+            // Wait a bit for DB to commit, then refresh chart
+            setTimeout(() => {
+              refreshAllData();
+            }, 500);
+          } catch (err) {
+            console.error('Failed to record price after trade:', err);
+            // Still refresh even if price recording failed
+            await refreshAllData();
+          }
+        } else {
+          await refreshAllData();
+        }
+      }, 2000);
     };
 
     const handleSold = async (...args) => {
       console.log('🔴 SharesSold event detected:', args);
-      // Refresh all data after a short delay to ensure blockchain state is updated
-      setTimeout(() => refreshAllData(), 2000);
+      // Wait for blockchain state to update, then refresh data and record price
+      setTimeout(async () => {
+        // Force price recording after trade FIRST, then refresh chart
+        if (contracts?.predictionMarket && marketId) {
+          try {
+            const yesPrice = await contracts.predictionMarket.getCurrentPrice(marketId, true);
+            const noPrice = await contracts.predictionMarket.getCurrentPrice(marketId, false);
+            const yesPriceBps = parseFloat(yesPrice.toString());
+            const noPriceBps = parseFloat(noPrice.toString());
+            console.log('🔄 Recording price after sell trade:', { yesPriceBps, noPriceBps });
+            await recordPriceSnapshot(yesPriceBps, noPriceBps);
+            // Wait a bit for DB to commit, then refresh chart
+            setTimeout(() => {
+              refreshAllData();
+            }, 500);
+          } catch (err) {
+            console.error('Failed to record price after trade:', err);
+            // Still refresh even if price recording failed
+            await refreshAllData();
+          }
+        } else {
+          await refreshAllData();
+        }
+      }, 2000);
     };
 
     contract.on(filterPurchased, handlePurchased);
@@ -261,197 +517,119 @@ const PolymarketStyleTrading = () => {
       contract.off(filterPurchased, handlePurchased);
       contract.off(filterSold, handleSold);
     };
-  }, [contracts?.predictionMarket, marketId, isConnected, refreshAllData]);
+  }, [contracts?.predictionMarket, marketId, isConnected, refreshAllData, recordPriceSnapshot]);
 
-  // Real-time updates for price history and trades
+  // Real-time price updates from chain - records to DB and updates UI
   useEffect(() => {
-    if (market && priceHistory.length > 0) {
-      const interval = setInterval(async () => {
-        try {
-          // Get updated prices from the contract (returns basis points 0-10000)
-          const yesPrice = await contracts.predictionMarket.getCurrentPrice(marketId, true);
-          const noPrice = await contracts.predictionMarket.getCurrentPrice(marketId, false);
-          
-          // Convert basis points to cents (5000 -> 50¢)
-          const currentYesPrice = parseFloat(yesPrice.toString()) / 100;
-          const currentNoPrice = parseFloat(noPrice.toString()) / 100;
-          
-          // Update market state with new prices
-          setMarket(prevMarket => ({
-            ...prevMarket,
-            yesPrice: currentYesPrice,
-            noPrice: currentNoPrice,
-            currentProbability: currentYesPrice
-          }));
-          
-          // Update price history with new data points
-          // Make sure to match the last history point with current header price
-          setYesPriceHistory(prevHistory => {
-            const newHistory = [...prevHistory];
-            // Update last point to match current price exactly
-            if (newHistory.length > 0) {
-              newHistory[newHistory.length - 1] = {
-                price: currentYesPrice / 100, // Convert cents to decimal
-                timestamp: new Date().toISOString()
-              };
-            }
-            return newHistory;
-          });
-          
-          setNoPriceHistory(prevHistory => {
-            const newHistory = [...prevHistory];
-            // Update last point to match current price exactly
-            if (newHistory.length > 0) {
-              newHistory[newHistory.length - 1] = {
-                price: currentNoPrice / 100, // Convert cents to decimal
-                timestamp: new Date().toISOString()
-              };
-            }
-            return newHistory;
-          });
+    if (!isConnected || !contracts?.predictionMarket || !marketId) return;
 
-          // Update recent trades, order book, traders, and liquidity with real data
-          await fetchRecentTrades();
-          await fetchOrderBook();
-          await fetchUniqueTraders();
-          await fetchLiquidity();
-          await updatePriceHistory();
-          
-        } catch (error) {
-          console.log('Error updating real-time data:', error);
-        }
-      }, 5000); // Update every 5 seconds for more responsiveness
+    let lastYesPriceBps = null;
+    let lastNoPriceBps = null;
 
-      return () => clearInterval(interval);
-    }
-  }, [market, priceHistory, contracts, marketId]);
-
-  const fetchMarketData = async () => {
-    try {
-      setLoading(true);
-      
-      if (!isConnected || !contracts?.predictionMarket) {
-        console.log('⚠️ Not connected or no contract available');
-        setLoading(false);
-        return;
-      }
-
-      console.log('📊 Fetching market data from blockchain for market ID:', marketId);
-      
+    const updatePrices = async () => {
       try {
-        // Use getMarketData function to get complete market data with LMSR pricing
-        const marketData = await getMarketData(marketId);
+        // Fetch current prices from chain
+        const yesPrice = await contracts.predictionMarket.getCurrentPrice(marketId, true);
+        const noPrice = await contracts.predictionMarket.getCurrentPrice(marketId, false);
         
-        const processedMarketData = {
-          id: marketData.id,
-          questionTitle: marketData.question,
-          description: marketData.description,
-          category: marketData.category,
-          resolutionDateTime: new Date(marketData.resolutionTime * 1000).toISOString(),
-          createdAt: new Date(marketData.createdAt * 1000).toISOString(),
-          endTime: marketData.endTime,
-          resolved: marketData.resolved,
-          active: marketData.active,
-          yesLabel: "YES",
-          noLabel: "NO",
-          currentProbability: parseFloat(marketData.yesPrice) / 100, // Use LMSR price from marketData
-          totalVolume: parseFloat(ethers.utils.formatEther(marketData.totalVolume)),
-          totalBets: Math.floor(Math.random() * 100) + 25, // Generate realistic trader count
-          yesPrice: parseFloat(marketData.yesPrice), // Use LMSR price from marketData
-          noPrice: parseFloat(marketData.noPrice) // Use LMSR price from marketData
-        };
+        // Convert to basis points (prices come as basis points from contract)
+        const yesPriceBps = parseFloat(yesPrice.toString());
+        const noPriceBps = parseFloat(noPrice.toString());
         
-        console.log('✅ Loaded market data from blockchain:', processedMarketData);
-        setMarket(processedMarketData);
-        
-        // Generate real price history based on current price
-        await generateRealPriceHistory(processedMarketData.yesPrice, processedMarketData.noPrice);
-        
-        // Fetch real data from blockchain
-        await fetchRecentTrades();
-        await fetchOrderBook();
-        await fetchUniqueTraders();
-        await fetchLiquidity();
-        
-      } catch (error) {
-        console.error('❌ Failed to fetch market from blockchain:', error);
-      }
-    } catch (error) {
-      console.error('Error fetching market data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+        // Convert to cents for display (5000 -> 50¢)
+        const yesPriceCents = yesPriceBps / 100;
+        const noPriceCents = noPriceBps / 100;
 
-  const generateRealPriceHistory = async (currentYesPrice, currentNoPrice) => {
-    const yesHistory = [];
-    const noHistory = [];
-    const now = Date.now();
-    
-    // Convert current prices (in cents) to decimal for calculations
-    const targetYesPrice = currentYesPrice / 100;
-    const targetNoPrice = currentNoPrice / 100;
-    
-    // Start from a different price point and work backwards to current price
-    let baseYesPrice = targetYesPrice + (Math.random() - 0.5) * 0.1; // Start ±10% from current
-    let baseNoPrice = 1 - baseYesPrice; // Ensure they sum to 1
-    
-    for (let i = 24; i >= 0; i--) {
-      const timestamp = now - (i * 60 * 60 * 1000); // Hours ago
-      
-      if (i === 0) {
-        // Last point should be exactly the current price
-        yesHistory.push({ 
-          price: targetYesPrice,
-          timestamp: new Date(timestamp).toISOString()
-        });
-        noHistory.push({ 
-          price: targetNoPrice,
-          timestamp: new Date(timestamp).toISOString()
-        });
-      } else {
-        // Simulate realistic price movements, gradually trending toward current price
-        const progressToNow = (24 - i) / 24; // 0 to 1 as we approach "now"
-        const tradingActivity = Math.random();
-        let yesPriceChange = 0;
-        
-        // Add some random movement
-        if (tradingActivity > 0.7) {
-          yesPriceChange = (Math.random() - 0.5) * 0.03;
-        } else if (tradingActivity > 0.4) {
-          yesPriceChange = (Math.random() - 0.5) * 0.015;
+        // Update market state with prices from chain
+        setMarket(prev => prev ? {
+          ...prev,
+          yesPrice: yesPriceCents,
+          noPrice: noPriceCents,
+          currentProbability: yesPriceBps / 10000
+        } : prev);
+
+        // Record price snapshot to DB if price changed
+        if (lastYesPriceBps !== yesPriceBps || lastNoPriceBps !== noPriceBps) {
+          console.log('💰 Price changed! Recording to DB:', {
+            previous: { yes: lastYesPriceBps, no: lastNoPriceBps },
+            current: { yes: yesPriceBps, no: noPriceBps }
+          });
+          await recordPriceSnapshot(yesPriceBps, noPriceBps);
+          lastYesPriceBps = yesPriceBps;
+          lastNoPriceBps = noPriceBps;
         } else {
-          yesPriceChange = (Math.random() - 0.5) * 0.008;
+          console.log('💰 Price unchanged, skipping DB record:', {
+            yes: yesPriceBps,
+            no: noPriceBps
+          });
         }
-        
-        // Gradually trend toward target price as we approach "now"
-        const trendAdjustment = (targetYesPrice - baseYesPrice) * progressToNow * 0.1;
-        baseYesPrice = Math.max(0.01, Math.min(0.99, baseYesPrice + yesPriceChange + trendAdjustment));
-        baseNoPrice = Math.max(0.01, Math.min(0.99, 1 - baseYesPrice));
-        
-        // Ensure prices sum to exactly 1.0 (100¢)
-        const total = baseYesPrice + baseNoPrice;
-        baseYesPrice = baseYesPrice / total;
-        baseNoPrice = baseNoPrice / total;
-        
-        yesHistory.push({ 
-          price: baseYesPrice,
-          timestamp: new Date(timestamp).toISOString()
-        });
-        noHistory.push({ 
-          price: baseNoPrice,
-          timestamp: new Date(timestamp).toISOString()
-        });
+      } catch (err) {
+        console.log('Failed to update prices from chain:', err.message);
       }
-    }
-    
-    setYesPriceHistory(yesHistory);
-    setNoPriceHistory(noHistory);
-    console.log('✅ Generated realistic YES/NO price history:', yesHistory.length, 'points each');
-    console.log('📊 YES final price:', (yesHistory[yesHistory.length - 1].price * 100).toFixed(1), '¢ (target:', currentYesPrice, '¢)');
-    console.log('📊 NO final price:', (noHistory[noHistory.length - 1].price * 100).toFixed(1), '¢ (target:', currentNoPrice, '¢)');
-  };
+    };
 
+    // Update prices every 30 seconds and only record if price changed
+    const interval = setInterval(async () => {
+      try {
+        // Only update if price actually changed
+        const currentYesPrice = await contracts.predictionMarket.getCurrentPrice(marketId, true);
+        const currentNoPrice = await contracts.predictionMarket.getCurrentPrice(marketId, false);
+        const yesPriceBps = parseFloat(currentYesPrice.toString());
+        const noPriceBps = parseFloat(currentNoPrice.toString());
+        
+        // Check if prices changed before recording
+        const yesPriceCents = yesPriceBps / 100;
+        const noPriceCents = noPriceBps / 100;
+        
+        // Only record if price changed significantly (at least 0.01 cent difference)
+        const priceChanged = Math.abs(yesPriceCents - (market?.yesPrice || 0)) > 0.01 ||
+                            Math.abs(noPriceCents - (market?.noPrice || 0)) > 0.01;
+        
+        if (priceChanged) {
+          await recordPriceSnapshot(yesPriceBps, noPriceBps);
+        }
+      } catch (err) {
+        console.log('Failed to update prices from chain:', err.message);
+      }
+    }, 30000); // Check every 30 seconds (reduced from 5 seconds)
+    
+    updatePrices(); // Initial update
+    return () => clearInterval(interval);
+  }, [isConnected, contracts?.predictionMarket, marketId, recordPriceSnapshot]);
+
+  // Periodic refresh of DB-backed data (price history)
+  useEffect(() => {
+    if (!marketId || !isConnected || !contracts?.predictionMarket) {
+      return;
+    }
+
+    const interval = setInterval(async () => {
+      await fetchPriceHistoryFromDb();
+    }, 60000); // Refresh every 60 seconds (reduced from 20 seconds)
+
+    return () => clearInterval(interval);
+  }, [contracts?.predictionMarket, fetchPriceHistoryFromDb, isConnected, marketId]);
+
+  const getTimeAgo = (date) => {
+    const now = new Date();
+    const diffMs = now - date;
+    const diffSeconds = Math.floor(diffMs / 1000);
+    const diffMinutes = Math.floor(diffSeconds / 60);
+    const diffHours = Math.floor(diffMinutes / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffSeconds < 60) {
+      return 'Just now';
+    } else if (diffMinutes < 60) {
+      return `${diffMinutes}m ago`;
+    } else if (diffHours < 24) {
+      return `${diffHours}h ago`;
+    } else if (diffDays < 7) {
+      return `${diffDays}d ago`;
+    } else {
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    }
+  };
 
   const getTimeRemaining = (resolutionDate) => {
     if (!resolutionDate) return 'No end date';
@@ -474,6 +652,28 @@ const PolymarketStyleTrading = () => {
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
           <p className="text-lg text-gray-600">Loading market data from blockchain...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isConnected) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center max-w-md">
+          <div className="text-gray-400 mb-4">
+            <svg className="mx-auto h-12 w-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a5 5 0 00-10 0v4m10-4a5 5 0 0110 0v4m-10 0V7m0 4a4 4 0 00-4 4v1a4 4 0 004 4h0a4 4 0 004-4v-1a4 4 0 00-4-4z" />
+            </svg>
+          </div>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Connect Your Wallet</h3>
+          <p className="text-gray-600 mb-4">Connect MetaMask to view market details and trade directly on-chain.</p>
+          <button
+            onClick={() => history.push('/markets')}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"
+          >
+            Back to Markets
+          </button>
         </div>
       </div>
     );
@@ -546,19 +746,38 @@ const PolymarketStyleTrading = () => {
           <div className="lg:col-span-2 space-y-6">
             {/* Header with Category & Market Title */}
             <div>
-              <div className="flex items-center gap-3 mb-4">
-                <span className={`px-3 py-1 rounded-full text-xs font-semibold text-white ${getCategoryColor(market.category)}`}>
-                  {market.category || 'General'}
-                </span>
-                <span className="px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
-                  ETH Market
-                </span>
-              </div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-6 leading-tight">
-                {market.questionTitle}
-              </h1>
+              <div className="flex items-start space-x-4 mb-4">
+                {/* Market Image - Top Left Corner */}
+                <div className="relative w-30 h-20 flex-shrink-0 rounded-xl overflow-hidden border-2 border-gray-200 bg-gradient-to-br from-gray-100 via-gray-50 to-gray-200">
+                  <img
+                    src={getMarketImage(market, marketId)}
+                    alt={market.questionTitle || 'Market'}
+                    className="w-full h-full object-cover"
+                    onLoad={() => console.log('✅ Market image loaded successfully')}
+                    onError={(e) => {
+                      console.log('❌ Image failed to load, showing gradient fallback');
+                      e.target.style.display = 'none';
+                      e.target.parentElement.className = 'relative w-20 h-20 flex-shrink-0 rounded-xl overflow-hidden border-2 border-gray-200 bg-gradient-to-br from-blue-100 via-purple-100 to-pink-100';
+                    }}
+                  />
+               
+                </div>
 
-              {/* Market Statistics Cards - Horizontal Row */}
+                {/* Market Title and Tags */}
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-3">
+                    <span className={`px-3 py-1 rounded-full text-xs font-semibold text-white ${getCategoryColor(market.category)}`}>
+                      {market.category || 'General'}
+                    </span>
+                    <span className="px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
+                      {currencySymbol} Market
+                    </span>
+                  </div>
+                  <h1 className="text-xl sm:text-2xl font-bold text-gray-900 leading-tight">
+                    {market.questionTitle}
+                  </h1>
+                </div>
+              </div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                 <div className="bg-white rounded-lg p-4 border border-gray-200">
                   <div className="text-xs text-gray-500 mb-1">24hr Volume</div>
@@ -575,7 +794,7 @@ const PolymarketStyleTrading = () => {
                 <div className="bg-white rounded-lg p-4 border border-gray-200">
                   <div className="text-xs text-gray-500 mb-1">Liquidity</div>
                   <div className="text-lg font-bold text-gray-900">
-                    {liquidity > 0 ? `${liquidity.toFixed(2)} ETH` : '0 ETH'}
+                    {liquidity > 0 ? `${liquidity.toFixed(2)} ${currencySymbol}` : `0 ${currencySymbol}`}
                   </div>
                 </div>
                 <div className="bg-white rounded-lg p-4 border border-gray-200">
@@ -587,25 +806,10 @@ const PolymarketStyleTrading = () => {
               </div>
             </div>
 
-            {/* Price Chart with Time Range Selector */}
+            {/* Price Chart */}
             <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
-              {/* Time Range Selector */}
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold text-gray-900">Market Context</h2>
-                <div className="flex gap-2">
-                  {['24hrs', '7d', '30d', 'All Time'].map((period) => (
-                    <button
-                      key={period}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                        period === '7d'
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      }`}
-                    >
-                      {period}
-                    </button>
-                  ))}
-                </div>
               </div>
               
               {/* Chart */}
@@ -615,31 +819,126 @@ const PolymarketStyleTrading = () => {
                 noPriceHistory={noPriceHistory}
                 currentYesPrice={market?.yesPrice || 50}
                 currentNoPrice={market?.noPrice || 50}
+                selectedRange={timeframe}
+                onRangeChange={handleTimeframeChange}
+                ranges={[
+                  { label: '1H', value: '1h' },
+                  { label: '6H', value: '6h' },
+                  { label: '1D', value: '1d' },
+                  { label: '1W', value: '1w' },
+                  { label: '1M', value: '1m' },
+                  { label: 'ALL', value: 'all' }
+                ]}
               />
 
               {/* Chart Legend - Current Prices */}
-              <div className="flex items-center gap-6 mt-4 pt-4 border-t border-gray-200">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                  <span className="text-sm font-medium text-gray-700">Yes</span>
-                  <span className="text-sm font-bold text-gray-900">
-                    ${(market?.yesPrice / 100 || 0.50).toFixed(2)}
-                  </span>
+              <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200">
+                <div className="flex items-center gap-6">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                    <span className="text-sm font-medium text-gray-700">YES</span>
+                    <span className="text-sm font-semibold text-green-600">
+                      {market?.yesPrice ? `${market.yesPrice.toFixed(1)}%` : '50.0%'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                    <span className="text-sm font-medium text-gray-700">NO</span>
+                    <span className="text-sm font-semibold text-red-600">
+                      {market?.noPrice ? `${market.noPrice.toFixed(1)}%` : '50.0%'}
+                    </span>
+                  </div>
+                  {market?.yesPrice && market?.noPrice && (
+                    <div className="text-sm text-gray-500">
+                      Difference: <span className="font-semibold">{(Math.abs(market.yesPrice - market.noPrice)).toFixed(1)}%</span>
+                    </div>
+                  )}
                 </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                  <span className="text-sm font-medium text-gray-700">No</span>
-                  <span className="text-sm font-bold text-gray-900">
-                    ${(market?.noPrice / 100 || 0.50).toFixed(2)}
-                  </span>
-                </div>
-                <div className="ml-auto text-sm text-gray-500">
-                  Total Predictions <span className="font-semibold text-gray-900">{uniqueTraders || 0}</span>
-                </div>
-                <div className="text-sm text-gray-500">
-                  Community Prediction <span className="font-semibold text-gray-900">{Math.round((market?.yesPrice || 50) / 100)}%</span>
+                <div className="text-xs text-gray-500">
+                  {yesPriceHistory.length + noPriceHistory.length > 0 
+                    ? `${yesPriceHistory.length + noPriceHistory.length} historical points from DB`
+                    : 'No historical data yet'}
                 </div>
               </div>
+            </div>
+
+            {/* Trades Activity Section - Polymarket Style */}
+            <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-gray-900">Activity</h2>
+                <span className="text-sm text-gray-500">{recentTrades.length} trades</span>
+              </div>
+              
+              {recentTrades.length === 0 ? (
+                <div className="text-center py-8">
+                  <div className="text-gray-400 mb-2">
+                    <svg className="mx-auto h-12 w-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <p className="text-gray-500 text-sm">No trades yet</p>
+                  <p className="text-gray-400 text-xs mt-1">Be the first to trade on this market</p>
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-96 overflow-y-auto">
+                  {recentTrades.slice(0, 50).map((trade, index) => {
+                    const tradeTime = new Date(trade.timestamp);
+                    const timeAgo = getTimeAgo(tradeTime);
+                    const pricePercent = Math.round(trade.price * 100);
+                    
+                    return (
+                      <div 
+                        key={index} 
+                        className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0"
+                      >
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          {/* Side indicator */}
+                          <div className={`flex items-center justify-center w-8 h-8 rounded-full flex-shrink-0 ${
+                            trade.side === 'yes' ? 'bg-green-100' : 'bg-red-100'
+                          }`}>
+                            <span className={`text-xs font-semibold ${
+                              trade.side === 'yes' ? 'text-green-600' : 'text-red-600'
+                            }`}>
+                              {trade.side === 'yes' ? 'YES' : 'NO'}
+                            </span>
+                          </div>
+                          
+                          {/* Trade details */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className={`text-sm font-semibold ${
+                                trade.side === 'yes' ? 'text-green-600' : 'text-red-600'
+                              }`}>
+                                {pricePercent}%
+                              </span>
+                              <span className="text-xs text-gray-500">•</span>
+                              <span className="text-sm text-gray-700 font-medium">
+                                {parseFloat(trade.amount).toFixed(4)} {currencySymbol}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span className="text-xs text-gray-500 truncate">
+                                {trade.trader ? `${trade.trader.slice(0, 6)}...${trade.trader.slice(-4)}` : 'Unknown'}
+                              </span>
+                              <span className="text-xs text-gray-400">•</span>
+                              <span className="text-xs text-gray-400">{timeAgo}</span>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {/* Trade price badge */}
+                        <div className={`px-2 py-1 rounded text-xs font-medium flex-shrink-0 ${
+                          trade.side === 'yes' 
+                            ? 'bg-green-50 text-green-700' 
+                            : 'bg-red-50 text-red-700'
+                        }`}>
+                          {trade.side === 'yes' ? '↗' : '↘'} {pricePercent}%
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
 

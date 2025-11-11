@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { ethers } from 'ethers';
 import toast from 'react-hot-toast';
 import { PREDICTION_MARKET_ADDRESS, CHAIN_ID } from '../contracts/config';
@@ -18,18 +18,23 @@ const PRICING_AMM_ABI = [
   "function calculateSharesToGive(uint256 marketId, bool isYes, uint256 amount) external view returns (uint256)"
 ];
 
-// Contract addresses (will be updated after Mumbai deployment)
+// Contract addresses (will be updated after deployment)
 const CONTRACT_ADDRESSES = {
-          // Local Hardhat
-          1337: {
-            ETH_PREDICTION_MARKET: PREDICTION_MARKET_ADDRESS, // Use deployed address from config.js
-            PRICING_AMM: "0x0000000000000000000000000000000000000000", // Will be set dynamically
-          },
-          // Alternative Hardhat chain ID
-          31337: {
-            ETH_PREDICTION_MARKET: PREDICTION_MARKET_ADDRESS,
-            PRICING_AMM: "0x0000000000000000000000000000000000000000", // Will be set dynamically
-          },
+  // Local Hardhat
+  1337: {
+    ETH_PREDICTION_MARKET: PREDICTION_MARKET_ADDRESS, // Use deployed address from config.js
+    PRICING_AMM: "0x0000000000000000000000000000000000000000", // Will be set dynamically
+  },
+  // Alternative Hardhat chain ID
+  31337: {
+    ETH_PREDICTION_MARKET: PREDICTION_MARKET_ADDRESS,
+    PRICING_AMM: "0x0000000000000000000000000000000000000000", // Will be set dynamically
+  },
+  // Incentiv Testnet (Chain ID: 28802)
+  28802: {
+    ETH_PREDICTION_MARKET: PREDICTION_MARKET_ADDRESS, // Deployed on Incentiv Testnet
+    PRICING_AMM: "0x0000000000000000000000000000000000000000", // Will be set dynamically
+  },
   // Polygon Amoy Testnet (current official testnet)
   80002: {
     ETH_PREDICTION_MARKET: "0x0000000000000000000000000000000000000000", // Update after deployment
@@ -78,12 +83,17 @@ export const Web3Provider = ({ children }) => {
   const [error, setError] = useState(null);
   const [contracts, setContracts] = useState({});
   const [ethBalance, setEthBalance] = useState('0');
+  
+  // Refs to prevent infinite loops
+  const connectingRef = useRef(false);
+  const autoConnectedRef = useRef(false);
 
   // Network info
   const getNetworkName = (chainId) => {
     switch (chainId) {
       case 1337: return 'Hardhat Local';
       case 31337: return 'Hardhat Local'; // Alternative Hardhat chain ID
+      case 28802: return 'Incentiv Testnet';
       case 1: return 'Ethereum Mainnet';
       case 80002: return 'Polygon Amoy';
       case 137: return 'Polygon Mainnet';
@@ -181,38 +191,132 @@ export const Web3Provider = ({ children }) => {
     }
   }, []);
 
-  // Get ETH balance
+  // Get ETH balance with retry logic
   const updateEthBalance = useCallback(async () => {
     if (!provider || !account) {
       console.log('⚠️ Missing provider or account:', { hasProvider: !!provider, account });
       return;
     }
 
-    try {
-      console.log('💰 Fetching ETH balance for account:', account);
-      const balance = await provider.getBalance(account);
-      
-      const formattedBalance = ethers.utils.formatEther(balance);
-      console.log('✅ Raw ETH balance:', balance.toString());
-      console.log('✅ Formatted ETH balance:', formattedBalance);
-      
-      setEthBalance(formattedBalance);
-    } catch (err) {
-      console.error('❌ Failed to update ETH balance:', err);
+    const maxRetries = 3;
+    let lastError;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`💰 Fetching ETH balance (attempt ${attempt}/${maxRetries}) for account:`, account);
+        
+        // Add delay between retries
+        if (attempt > 1) {
+          await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+        }
+
+        const balance = await provider.getBalance(account);
+        
+        const formattedBalance = ethers.utils.formatEther(balance);
+        console.log('✅ Raw ETH balance:', balance.toString());
+        console.log('✅ Formatted ETH balance:', formattedBalance);
+        
+        setEthBalance(formattedBalance);
+        return; // Success, exit retry loop
+      } catch (err) {
+        lastError = err;
+        console.error(`❌ Failed to update ETH balance (attempt ${attempt}):`, err);
+        
+        // If circuit breaker error, wait longer before retry
+        if (err.message && err.message.includes('circuit breaker')) {
+          console.log('⏳ Circuit breaker detected, waiting longer...');
+          await new Promise(resolve => setTimeout(resolve, 3000 * attempt));
+        }
+        
+        // If last attempt, set error
+        if (attempt === maxRetries) {
+          console.error('❌ Failed to update ETH balance after all retries:', lastError);
+          setEthBalance('0');
+        }
+      }
     }
   }, [provider, account]);
 
+  // Add network to MetaMask if not already added
+  const addNetwork = useCallback(async (targetChainId = CHAIN_ID) => {
+    if (typeof window.ethereum === 'undefined') {
+      return false;
+    }
+
+    try {
+      // Network configurations
+      const networkConfigs = {
+        1337: {
+          chainId: '0x539',
+          chainName: 'Hardhat Local',
+          nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+          rpcUrls: ['http://localhost:8545'],
+          blockExplorerUrls: null,
+        },
+        28802: {
+          chainId: '0x7082',
+          chainName: 'Incentiv Testnet',
+          nativeCurrency: { name: 'TCENT', symbol: 'TCENT', decimals: 18 },
+          rpcUrls: ['https://rpc-testnet.incentiv.io/'],
+          blockExplorerUrls: ['https://explorer-testnet.incentiv.io'],
+        },
+      };
+
+      const config = networkConfigs[targetChainId];
+      if (!config) {
+        console.error('Network configuration not found for chain ID:', targetChainId);
+        return false;
+      }
+      
+      // Try to switch to the network first
+      try {
+        await window.ethereum.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: config.chainId }],
+        });
+        return true;
+      } catch (switchError) {
+        // If network doesn't exist, add it
+        if (switchError.code === 4902) {
+          await window.ethereum.request({
+            method: 'wallet_addEthereumChain',
+            params: [config],
+          });
+          return true;
+        }
+        throw switchError;
+      }
+    } catch (error) {
+      console.error('Failed to add/switch network:', error);
+      return false;
+    }
+  }, []);
+
   // Connect wallet
   const connectWallet = useCallback(async () => {
+    // Prevent multiple simultaneous connection attempts
+    if (connectingRef.current || isConnecting) {
+      console.log('⚠️ Connection already in progress, skipping...');
+      return false;
+    }
+    
     if (typeof window.ethereum === 'undefined') {
       setError('MetaMask not detected. Please install MetaMask.');
       return false;
     }
 
+    connectingRef.current = true;
     setIsConnecting(true);
     setError(null);
 
     try {
+      // First, ensure we're on the correct network
+      console.log('🔗 Ensuring correct network is configured...');
+      await addNetwork(CHAIN_ID);
+      
+      // Wait a bit for network switch to complete
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
       // Request account access
       const accounts = await window.ethereum.request({
         method: 'eth_requestAccounts',
@@ -232,6 +336,17 @@ export const Web3Provider = ({ children }) => {
         networkName: network.name
       });
 
+      // Verify we're on a supported chain
+      const supportedChains = [1337, 31337, 28802]; // Hardhat Local and Incentiv Testnet
+      if (!supportedChains.includes(network.chainId)) {
+        const networkName = network.chainId === 28802 ? 'Incentiv Testnet' : 'Hardhat Local';
+        console.warn('⚠️ Wrong network detected. Expected supported chain, got:', network.chainId);
+        toast.error(`Please switch to ${networkName} (Chain ID: ${CHAIN_ID})`);
+        setIsConnecting(false);
+        connectingRef.current = false;
+        return false;
+      }
+
       setProvider(web3Provider);
       setChainId(network.chainId);
       setAccount(accounts[0]);
@@ -242,19 +357,31 @@ export const Web3Provider = ({ children }) => {
       const contractsResult = await initializeContracts(web3Signer);
       console.log('Contracts initialized:', contractsResult);
       
+      // Update ETH balance after a short delay
+      setTimeout(() => {
+        updateEthBalance();
+      }, 500);
+      
       toast.success('✅ Wallet connected successfully!');
-
       return true;
     } catch (err) {
       console.error('Failed to connect wallet:', err);
       setError(err.message);
-      toast.error(`Failed to connect wallet: ${err.message}`);
+      
+      // Check if it's a circuit breaker error
+      if (err.message && err.message.includes('circuit breaker')) {
+        toast.error('MetaMask circuit breaker is open. Please reset MetaMask or wait a few seconds and try again.');
+      } else {
+        toast.error(`Failed to connect wallet: ${err.message}`);
+      }
       setIsConnecting(false);
+      connectingRef.current = false;
       return false;
     } finally {
       setIsConnecting(false);
+      connectingRef.current = false;
     }
-  }, [initializeContracts]);
+  }, [initializeContracts, addNetwork, updateEthBalance, isConnecting]);
 
   // Disconnect wallet
   const disconnectWallet = useCallback(() => {
@@ -440,6 +567,130 @@ export const Web3Provider = ({ children }) => {
     }
   }, [contracts.predictionMarket, account]);
 
+  // Place a limit order
+  const placeLimitOrder = useCallback(async (marketId, isYes, priceCents, ethAmount) => {
+    if (!contracts.predictionMarket || !signer) {
+      throw new Error('Contracts not initialized');
+    }
+
+    const walletReady = await isWalletReady();
+    if (!walletReady) {
+      throw new Error('Wallet not ready. Please check your MetaMask connection.');
+    }
+
+    // Convert price from cents to basis points (50¢ -> 5000 basis points)
+    const priceBps = Math.round(priceCents * 100);
+    if (priceBps <= 0 || priceBps > 10000) {
+      throw new Error('Price must be between 1¢ and 100¢');
+    }
+
+    const maxRetries = 3;
+    let lastError;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`🔄 Placing limit order attempt ${attempt}/${maxRetries}`);
+        
+        if (attempt > 1) {
+          await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+        }
+
+        try {
+          const gasEstimate = await contracts.predictionMarket.estimateGas.placeLimitOrder(
+            marketId,
+            isYes,
+            priceBps,
+            {
+              value: ethers.utils.parseEther(ethAmount.toString())
+            }
+          );
+          console.log(`⛽ Gas estimate: ${gasEstimate.toString()}`);
+
+          const tx = await contracts.predictionMarket.placeLimitOrder(
+            marketId,
+            isYes,
+            priceBps,
+            {
+              value: ethers.utils.parseEther(ethAmount.toString()),
+              gasLimit: gasEstimate.mul(120).div(100)
+            }
+          );
+
+          console.log('Limit order transaction sent:', tx.hash);
+          const receipt = await tx.wait();
+          console.log('Limit order transaction confirmed:', receipt);
+
+          await updateEthBalance();
+          return receipt;
+        } catch (gasError) {
+          console.log(`⛽ Gas estimation failed, trying with fixed gas limit...`);
+          
+          const tx = await contracts.predictionMarket.placeLimitOrder(
+            marketId,
+            isYes,
+            priceBps,
+            {
+              value: ethers.utils.parseEther(ethAmount.toString()),
+              gasLimit: 500000
+            }
+          );
+
+          console.log('Limit order transaction sent (fixed gas):', tx.hash);
+          const receipt = await tx.wait();
+          console.log('Limit order transaction confirmed (fixed gas):', receipt);
+
+          await updateEthBalance();
+          return receipt;
+        }
+      } catch (err) {
+        lastError = err;
+        console.error(`❌ Limit order attempt ${attempt} failed:`, err.message);
+        
+        if (attempt === maxRetries) {
+          throw lastError;
+        }
+      }
+    }
+  }, [contracts.predictionMarket, signer, updateEthBalance, isWalletReady]);
+
+  // Get user's limit orders for a market (uses hybrid order API)
+  const getUserLimitOrders = useCallback(async (marketId) => {
+    if (!account) {
+      return [];
+    }
+
+    try {
+      // Use hybrid order system API instead of contract
+      const API_BASE = import.meta.env.VITE_API_BASE_URL || window.location.origin;
+      const response = await fetch(
+        `${API_BASE}/api/orders?user=${account}&marketId=${marketId}`
+      );
+
+      if (!response.ok) {
+        console.warn('Failed to fetch user orders from API');
+        return [];
+      }
+
+      const data = await response.json();
+      const orders = (data.orders || []).map(order => ({
+        orderId: order.id,
+        marketId: order.marketId.toString(),
+        isYes: order.outcomeId === '0' || order.outcomeId === 0,
+        price: parseFloat(order.price) / 100, // Convert ticks to cents
+        amount: parseFloat(ethers.utils.formatEther(order.size || '0')),
+        filled: order.filled ? parseFloat(ethers.utils.formatEther(order.filled)) : 0,
+        timestamp: order.createdAt || new Date().toISOString(),
+        status: order.status
+      }));
+
+      // Filter to only open and partially filled orders
+      return orders.filter(o => o.status === 'open' || o.status === 'partially_filled');
+    } catch (err) {
+      console.error('Failed to get user limit orders:', err);
+      return [];
+    }
+  }, [account]);
+
   // Get market data
   const getMarketData = useCallback(async (marketId) => {
     if (!contracts.predictionMarket) {
@@ -457,17 +708,27 @@ export const Web3Provider = ({ children }) => {
 
       console.log('Market data fetched:', market);
 
-      // Try to get prices from PricingAMM if available
+      // Get prices directly from chain using getCurrentPrice
       let yesPrice = 50; // Default 50¢
       let noPrice = 50; // Default 50¢
 
-      if (contracts.pricingAMM) {
-        try {
-          const prices = await contracts.pricingAMM.calculatePrice(normalizedMarketId);
-          yesPrice = prices[0].toNumber() / 100;
-          noPrice = prices[1].toNumber() / 100;
-        } catch (err) {
-          console.log('Could not get prices from PricingAMM, using defaults');
+      try {
+        // Prices come as basis points from contract (5000 = 50%)
+        const yesPriceBps = await contracts.predictionMarket.getCurrentPrice(normalizedMarketId, true);
+        const noPriceBps = await contracts.predictionMarket.getCurrentPrice(normalizedMarketId, false);
+        yesPrice = parseFloat(yesPriceBps.toString()) / 100; // Convert to cents
+        noPrice = parseFloat(noPriceBps.toString()) / 100; // Convert to cents
+      } catch (err) {
+        console.log('Could not get prices from chain, using defaults:', err.message);
+        // Fallback to PricingAMM if available
+        if (contracts.pricingAMM) {
+          try {
+            const prices = await contracts.pricingAMM.calculatePrice(normalizedMarketId);
+            yesPrice = prices[0].toNumber() / 100;
+            noPrice = prices[1].toNumber() / 100;
+          } catch (ammErr) {
+            console.log('Could not get prices from PricingAMM either, using defaults');
+          }
         }
       }
 
@@ -658,13 +919,19 @@ export const Web3Provider = ({ children }) => {
     }
   }, [account, disconnectWallet]);
 
-  // Auto-connect if previously connected
+  // Auto-connect if previously connected (only once on mount)
   useEffect(() => {
+    // Only auto-connect once, and only if not already connected
+    if (autoConnectedRef.current || isConnected || connectingRef.current) {
+      return;
+    }
+
     const autoConnect = async () => {
       if (typeof window.ethereum !== 'undefined') {
         try {
           const accounts = await window.ethereum.request({ method: 'eth_accounts' });
-          if (accounts.length > 0) {
+          if (accounts.length > 0 && !isConnected && !connectingRef.current) {
+            autoConnectedRef.current = true;
             await connectWallet();
           }
         } catch (err) {
@@ -674,7 +941,8 @@ export const Web3Provider = ({ children }) => {
     };
 
     autoConnect();
-  }, [connectWallet]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty deps - only run once on mount
 
   const value = {
     // Connection state
@@ -702,6 +970,8 @@ export const Web3Provider = ({ children }) => {
     getMarketData,
     createMarket,
     claimWinnings,
+    placeLimitOrder,
+    getUserLimitOrders,
   };
 
   return (

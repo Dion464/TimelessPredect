@@ -11,6 +11,7 @@
     "deploy:mainnet": "hardhat run scripts/deploy.js --network mainnet",
     "deploy:polygon": "hardhat run scripts/deploy.js --network polygon",
     "deploy:arbitrum": "hardhat run scripts/deploy.js --network arbitrum",
+    "deploy:incentiv": "hardhat run scripts/deploy.js --network incentiv",
     "verify": "hardhat verify",
     "node": "hardhat node",
     "console": "hardhat console"
