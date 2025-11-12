@@ -1,14 +1,14 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { ethers } from 'ethers';
 import toast from 'react-hot-toast';
-import { PREDICTION_MARKET_ADDRESS, CHAIN_ID } from '../contracts/config';
+import { CONTRACT_ADDRESS, CHAIN_ID, CONTRACT_ABI, RPC_URL, NETWORK_NAME } from '../contracts/eth-config';
 
 // Debug log to verify import
-console.log('📍 Imported PREDICTION_MARKET_ADDRESS:', PREDICTION_MARKET_ADDRESS);
+console.log('📍 Imported CONTRACT_ADDRESS:', CONTRACT_ADDRESS);
 console.log('📍 CHAIN_ID:', CHAIN_ID);
+console.log('📍 RPC_URL:', RPC_URL);
+console.log('📍 NETWORK_NAME:', NETWORK_NAME);
 
-// Use the ABI from eth-config as it has all the necessary functions
-import { CONTRACT_ABI } from '../contracts/eth-config';
 const ETH_PREDICTION_MARKET_ABI = CONTRACT_ABI;
 
 // PricingAMM ABI (simplified for price calculation)
@@ -18,30 +18,11 @@ const PRICING_AMM_ABI = [
   "function calculateSharesToGive(uint256 marketId, bool isYes, uint256 amount) external view returns (uint256)"
 ];
 
-// Contract addresses (will be updated after deployment)
+// Contract addresses - dynamically set from environment variables
 const CONTRACT_ADDRESSES = {
-  // Local Hardhat
-  1337: {
-    ETH_PREDICTION_MARKET: PREDICTION_MARKET_ADDRESS, // Use deployed address from config.js
+  [CHAIN_ID]: {
+    ETH_PREDICTION_MARKET: CONTRACT_ADDRESS,
     PRICING_AMM: "0x0000000000000000000000000000000000000000", // Will be set dynamically
-  },
-  // Alternative Hardhat chain ID
-  31337: {
-    ETH_PREDICTION_MARKET: PREDICTION_MARKET_ADDRESS,
-    PRICING_AMM: "0x0000000000000000000000000000000000000000", // Will be set dynamically
-  },
-  // Incentiv Testnet (Chain ID: 28802)
-  28802: {
-    ETH_PREDICTION_MARKET: PREDICTION_MARKET_ADDRESS, // Deployed on Incentiv Testnet
-    PRICING_AMM: "0x0000000000000000000000000000000000000000", // Will be set dynamically
-  },
-  // Polygon Amoy Testnet (current official testnet)
-  80002: {
-    ETH_PREDICTION_MARKET: "0x0000000000000000000000000000000000000000", // Update after deployment
-  },
-  // Polygon Mainnet
-  137: {
-    ETH_PREDICTION_MARKET: "0x0000000000000000000000000000000000000000", // For future use
   }
 };
 
@@ -88,17 +69,12 @@ export const Web3Provider = ({ children }) => {
   const connectingRef = useRef(false);
   const autoConnectedRef = useRef(false);
 
-  // Network info
+  // Network info - use environment variable
   const getNetworkName = (chainId) => {
-    switch (chainId) {
-      case 1337: return 'Hardhat Local';
-      case 31337: return 'Hardhat Local'; // Alternative Hardhat chain ID
-      case 28802: return 'Incentiv Testnet';
-      case 1: return 'Ethereum Mainnet';
-      case 80002: return 'Polygon Amoy';
-      case 137: return 'Polygon Mainnet';
-      default: return `Chain ${chainId}`;
+    if (chainId === CHAIN_ID) {
+      return NETWORK_NAME || `Chain ${chainId}`;
     }
+    return `Chain ${chainId}`;
   };
   const networkName = getNetworkName(chainId);
 
@@ -113,8 +89,8 @@ export const Web3Provider = ({ children }) => {
       const addresses = CONTRACT_ADDRESSES[chainId];
       if (!addresses) {
         console.error(`❌ Unsupported network: ${chainId}`);
-        console.log('Available networks:', Object.keys(CONTRACT_ADDRESSES));
-        throw new Error(`Unsupported network: ${chainId}. Please switch to Hardhat Local (1337) or Localhost 8545 (31337).`);
+        console.log('Expected chain ID:', CHAIN_ID);
+        throw new Error(`Unsupported network: ${chainId}. Please switch to ${NETWORK_NAME} (Chain ID: ${CHAIN_ID}).`);
       }
 
       console.log('Contract addresses for chain', chainId, ':', addresses);
@@ -244,27 +220,17 @@ export const Web3Provider = ({ children }) => {
     }
 
     try {
-      // Network configurations
-      const networkConfigs = {
-        1337: {
-          chainId: '0x539',
-          chainName: 'Hardhat Local',
-          nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
-          rpcUrls: ['http://localhost:8545'],
-          blockExplorerUrls: null,
-        },
-        28802: {
-          chainId: '0x7082',
-          chainName: 'Incentiv Testnet',
-          nativeCurrency: { name: 'TCENT', symbol: 'TCENT', decimals: 18 },
-          rpcUrls: ['https://rpc-testnet.incentiv.io/'],
-          blockExplorerUrls: ['https://explorer-testnet.incentiv.io'],
-        },
+      // Use environment variables for network configuration
+      const config = {
+        chainId: `0x${targetChainId.toString(16)}`,
+        chainName: NETWORK_NAME || 'Unknown Network',
+        nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
+        rpcUrls: [RPC_URL],
+        blockExplorerUrls: null,
       };
 
-      const config = networkConfigs[targetChainId];
-      if (!config) {
-        console.error('Network configuration not found for chain ID:', targetChainId);
+      if (!RPC_URL || !NETWORK_NAME) {
+        console.error('Network configuration incomplete. Please set VITE_RPC_URL and VITE_NETWORK_NAME');
         return false;
       }
       
@@ -336,12 +302,10 @@ export const Web3Provider = ({ children }) => {
         networkName: network.name
       });
 
-      // Verify we're on a supported chain
-      const supportedChains = [1337, 31337, 28802]; // Hardhat Local and Incentiv Testnet
-      if (!supportedChains.includes(network.chainId)) {
-        const networkName = network.chainId === 28802 ? 'Incentiv Testnet' : 'Hardhat Local';
-        console.warn('⚠️ Wrong network detected. Expected supported chain, got:', network.chainId);
-        toast.error(`Please switch to ${networkName} (Chain ID: ${CHAIN_ID})`);
+      // Verify we're on the correct chain
+      if (network.chainId !== CHAIN_ID) {
+        console.warn('⚠️ Wrong network detected. Expected:', CHAIN_ID, 'Got:', network.chainId);
+        toast.error(`Please switch to ${NETWORK_NAME} (Chain ID: ${CHAIN_ID})`);
         setIsConnecting(false);
         connectingRef.current = false;
         return false;
