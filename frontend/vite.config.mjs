@@ -35,7 +35,7 @@ export default defineConfig(() => {
       include: ['buffer', 'ethers'],
     },
     build: {
-      outDir: 'build',
+      outDir: 'dist',
       commonjsOptions: { transformMixedEsModules: true },
       chunkSizeWarningLimit: 1000,
       rollupOptions: {
