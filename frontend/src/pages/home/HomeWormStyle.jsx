@@ -4,7 +4,7 @@ import { useWeb3 } from '../../hooks/useWeb3';
 import { getCurrencySymbol } from '../../utils/currency';
 import { ethers } from 'ethers';
 import WormStyleNavbar from '../../components/modern/WormStyleNavbar';
-import { CONTRACT_ADDRESS, CONTRACT_ABI } from '../../contracts/eth-config';
+import { CONTRACT_ADDRESS, CONTRACT_ABI, RPC_URL } from '../../contracts/eth-config';
 
 const HomeWormStyle = () => {
   const history = useHistory();
@@ -32,8 +32,10 @@ const HomeWormStyle = () => {
       
       if (!contractToUse) {
         // Use direct RPC connection without wallet
-        const rpcUrl = import.meta.env.VITE_RPC_URL || 'http://localhost:8545';
-        const directProvider = new ethers.providers.JsonRpcProvider(rpcUrl);
+        if (!RPC_URL) {
+          throw new Error('RPC_URL not configured. Please set VITE_RPC_URL environment variable.');
+        }
+        const directProvider = new ethers.providers.JsonRpcProvider(RPC_URL);
         contractToUse = new ethers.Contract(
           CONTRACT_ADDRESS,
           CONTRACT_ABI,
