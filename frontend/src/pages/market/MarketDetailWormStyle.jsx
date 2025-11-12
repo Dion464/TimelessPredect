@@ -125,7 +125,8 @@ const MarketDetailWormStyle = () => {
       
       if (!contractToUse) {
         // Use direct RPC connection without wallet
-        const directProvider = new ethers.providers.JsonRpcProvider('http://localhost:8545');
+        const rpcUrl = import.meta.env.VITE_RPC_URL || 'http://localhost:8545';
+        const directProvider = new ethers.providers.JsonRpcProvider(rpcUrl);
         contractToUse = new ethers.Contract(
           CONTRACT_ADDRESS,
           CONTRACT_ABI,

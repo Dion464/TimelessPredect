@@ -2,10 +2,10 @@
 // Generated at: 2025-11-12T12:07:21.804Z
 // Network: unknown (Chain ID: 1337)
 
-export const CONTRACT_ADDRESS = "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6";
-export const CHAIN_ID = 1337;
-export const MARKET_CREATION_FEE = "0.01";
-export const PLATFORM_FEE_BPS = 200;
+export const CONTRACT_ADDRESS = import.meta.env.VITE_CONTRACT_ADDRESS || "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6";
+export const CHAIN_ID = parseInt(import.meta.env.VITE_CHAIN_ID || "1337");
+export const MARKET_CREATION_FEE = import.meta.env.VITE_MARKET_CREATION_FEE || "0.01";
+export const PLATFORM_FEE_BPS = parseInt(import.meta.env.VITE_PLATFORM_FEE_BPS || "200");
 
 export const CONTRACT_ABI = [
   "function createMarket(string memory _question, string memory _description, string memory _category, uint256 _endTime, uint256 _resolutionTime) payable returns (uint256)",
