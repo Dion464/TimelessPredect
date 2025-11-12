@@ -1,16 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
 import ModernMarketCard from './ModernMarketCard';
-import { useAuth } from '../../helpers/AuthContent';
 import { useWeb3 } from '../../hooks/useWeb3';
 
 const ModernMarketList = () => {
   const [markets, setMarkets] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedCategory, setSelectedCategory] = useState('All');
   const [sortBy, setSortBy] = useState('volume'); // volume, newest, ending
   const [searchTerm, setSearchTerm] = useState('');
-  const { isLoggedIn } = useAuth();
   
   // Get Web3 context
   let web3Context;
@@ -25,6 +22,15 @@ const ModernMarketList = () => {
 
   useEffect(() => {
     fetchMarkets();
+    
+    // Auto-refresh markets every 15 seconds to show real-time price and volume updates
+    const refreshInterval = setInterval(() => {
+      if (isConnected && contracts.predictionMarket) {
+        fetchMarkets();
+      }
+    }, 15000);
+    
+    return () => clearInterval(refreshInterval);
   }, [isConnected, contracts.predictionMarket]);
 
   const fetchMarkets = async () => {
@@ -74,8 +80,22 @@ const ModernMarketList = () => {
         
         const marketsData = await Promise.all(marketPromises);
         const validMarkets = marketsData.filter(market => market !== null);
-        setMarkets(validMarkets);
-        console.log('✅ Loaded markets from blockchain:', validMarkets);
+        const footballMarkets = validMarkets
+          .filter(({ market }) => {
+            const sourceCategory = (market?.category || '').toLowerCase();
+            if (!sourceCategory) return false;
+            return sourceCategory.includes('football') || sourceCategory.includes('soccer');
+          })
+          .map((marketData) => ({
+            ...marketData,
+            market: {
+              ...marketData.market,
+              category: 'Football'
+            }
+          }));
+
+        setMarkets(footballMarkets);
+        console.log('✅ Loaded football markets from blockchain:', footballMarkets);
       } else {
         console.log('⚠️ Wallet not connected or contracts not loaded');
         setMarkets([]);
@@ -88,17 +108,11 @@ const ModernMarketList = () => {
     }
   };
 
-  // Extract unique categories, ensuring no duplicates
-  const uniqueCategories = [...new Set(markets.map(m => m.market?.category).filter(c => c && c !== 'All'))];
-  const categories = ['All', ...uniqueCategories];
-  console.log('🏷️ Categories:', categories);
-
   const filteredAndSortedMarkets = markets
     .filter(m => {
       const market = m.market;
-      const matchesCategory = selectedCategory === 'All' || (market?.category || 'General') === selectedCategory;
       const matchesSearch = !searchTerm || market?.questionTitle?.toLowerCase().includes(searchTerm.toLowerCase());
-      return matchesCategory && matchesSearch;
+      return matchesSearch;
     })
     .sort((a, b) => {
       const marketA = a.market;
@@ -141,7 +155,7 @@ const ModernMarketList = () => {
             </svg>
           </div>
           <h3 className="text-lg font-medium text-gray-900 mb-2">Connect Your Wallet</h3>
-          <p className="text-gray-600">Connect your MetaMask wallet to view and trade prediction markets.</p>
+          <p className="text-gray-600">Connect your MetaMask wallet to view and trade markets.</p>
         </div>
       </div>
     );
@@ -151,8 +165,8 @@ const ModernMarketList = () => {
     <div className="max-w-7xl mx-auto px-4 py-6">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Prediction Markets</h1>
-        <p className="text-gray-600">Trade on the outcome of future events with ETH</p>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">Football Markets</h1>
+        <p className="text-gray-600">Trade on upcoming football results with ETH</p>
         {markets.length > 0 && (
           <div className="mt-2 text-sm text-green-600">
             ✅ {markets.length} active markets loaded from blockchain
@@ -168,12 +182,12 @@ const ModernMarketList = () => {
             </svg>
           </div>
           <h3 className="text-lg font-medium text-gray-900 mb-2">No Markets Available</h3>
-          <p className="text-gray-600 mb-4">No prediction markets have been created yet.</p>
+          <p className="text-gray-600 mb-4">No markets have been created yet.</p>
           <p className="text-sm text-gray-500">Markets are loaded directly from the blockchain smart contract.</p>
         </div>
       ) : (
         <>
-          {/* Filters and Search */}
+          {/* Search and Sort */}
           <div className="mb-6 space-y-4">
             {/* Search */}
             <div className="relative">
@@ -191,45 +205,24 @@ const ModernMarketList = () => {
               </div>
             </div>
 
-            {/* Filters */}
-            <div className="flex flex-wrap items-center gap-4">
-              {/* Categories */}
-              <div className="flex flex-wrap gap-2">
-                {categories.map(category => (
-                  <button
-                    key={category}
-                    onClick={() => setSelectedCategory(category)}
-                    className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-                      selectedCategory === category
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-                  >
-                    {category}
-                  </button>
-                ))}
-              </div>
-
-              {/* Sort */}
-              <div className="ml-auto">
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
-                  className="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="volume">Highest Volume</option>
-                  <option value="newest">Newest</option>
-                  <option value="ending">Ending Soon</option>
-                </select>
-              </div>
+            {/* Sort */}
+            <div className="flex justify-end">
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="volume">Highest Volume</option>
+                <option value="newest">Newest</option>
+                <option value="ending">Ending Soon</option>
+              </select>
             </div>
           </div>
 
           {/* Results Count */}
           <div className="mb-4">
             <p className="text-sm text-gray-600">
-              {filteredAndSortedMarkets.length} market{filteredAndSortedMarkets.length !== 1 ? 's' : ''}
-              {selectedCategory !== 'All' && ` in ${selectedCategory}`}
+              {filteredAndSortedMarkets.length} football market{filteredAndSortedMarkets.length !== 1 ? 's' : ''}
               {searchTerm && ` matching "${searchTerm}"`}
             </p>
           </div>

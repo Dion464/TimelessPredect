@@ -1,12 +1,15 @@
-import React from 'react';
-import ModernMarketList from '../../components/modern/ModernMarketList';
+import React, { useEffect } from 'react';
+import { useHistory } from 'react-router-dom';
 
 function Markets() {
-    return (
-        <div className="min-h-screen bg-gray-50">
-            <ModernMarketList />
-        </div>
-    );
+  const history = useHistory();
+  
+  useEffect(() => {
+    // Redirect to home page
+    history.replace('/');
+  }, [history]);
+
+  return null;
 }
 
 export default Markets;

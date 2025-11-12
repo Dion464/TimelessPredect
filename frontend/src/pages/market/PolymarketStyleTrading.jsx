@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useHistory } from 'react-router-dom';
 import PolymarketChart from '../../components/charts/PolymarketChart';
 import Web3TradingInterface from '../../components/trading/Web3TradingInterface';
+import WormStyleNavbar from '../../components/modern/WormStyleNavbar';
 import { useWeb3 } from '../../hooks/useWeb3';
 import { getCurrencySymbol } from '../../utils/currency';
 import { ethers } from 'ethers';
@@ -657,45 +658,52 @@ const PolymarketStyleTrading = () => {
     );
   }
 
-  if (!isConnected) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center max-w-md">
-          <div className="text-gray-400 mb-4">
-            <svg className="mx-auto h-12 w-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a5 5 0 00-10 0v4m10-4a5 5 0 0110 0v4m-10 0V7m0 4a4 4 0 00-4 4v1a4 4 0 004 4h0a4 4 0 004-4v-1a4 4 0 00-4-4z" />
-            </svg>
-          </div>
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Connect Your Wallet</h3>
-          <p className="text-gray-600 mb-4">Connect MetaMask to view market details and trade directly on-chain.</p>
-          <button
-            onClick={() => history.push('/markets')}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"
-          >
-            Back to Markets
-          </button>
-        </div>
-      </div>
-    );
-  }
+  // Remove the wallet connection check - allow viewing without wallet
+  // if (!isConnected) {
+  //   return (
+  //     <div className="min-h-screen bg-[#171717]" style={{ fontFamily: 'gilroy, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
+  //       <WormStyleNavbar />
+  //       <div className="flex items-center justify-center" style={{ minHeight: 'calc(100vh - 80px)' }}>
+  //         <div className="text-center max-w-md">
+  //           <div className="text-gray-400 mb-4">
+  //             <svg className="mx-auto h-12 w-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+  //               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a5 5 0 00-10 0v4m10-4a5 5 0 0110 0v4m-10 0V7m0 4a4 4 0 00-4 4v1a4 4 0 004 4h0a4 4 0 004-4v-1a4 4 0 00-4-4z" />
+  //             </svg>
+  //           </div>
+  //           <h3 className="text-lg font-medium text-white mb-2">Connect Your Wallet</h3>
+  //           <p className="text-gray-400 mb-4">Connect MetaMask to view market details and trade directly on-chain.</p>
+  //           <button
+  //             onClick={() => history.push('/markets')}
+  //             className="bg-white text-[#171717] px-6 py-3 rounded-full font-bold hover:bg-gray-100 transition-all"
+  //           >
+  //             Back to Markets
+  //           </button>
+  //         </div>
+  //       </div>
+  //     </div>
+  //   );
+  // }
 
   if (!market) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-gray-400 mb-4">
-            <svg className="mx-auto h-12 w-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
+      <div className="min-h-screen bg-[#171717]" style={{ fontFamily: 'gilroy, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
+        <WormStyleNavbar />
+        <div className="flex items-center justify-center" style={{ minHeight: 'calc(100vh - 80px)' }}>
+          <div className="text-center">
+            <div className="text-gray-400 mb-4">
+              <svg className="mx-auto h-12 w-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-medium text-white mb-2">Market Not Found</h3>
+            <p className="text-gray-400 mb-4">The market you're looking for doesn't exist.</p>
+            <button
+              onClick={() => history.push('/markets')}
+              className="bg-white text-[#171717] px-6 py-3 rounded-full font-bold hover:bg-gray-100 transition-all"
+            >
+              Back to Markets
+            </button>
           </div>
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Market Not Found</h3>
-          <p className="text-gray-600 mb-4">The market you're looking for doesn't exist.</p>
-          <button
-            onClick={() => history.push('/markets')}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"
-          >
-            Back to Markets
-          </button>
         </div>
       </div>
     );
@@ -727,231 +735,206 @@ const PolymarketStyleTrading = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 py-6">
-        {/* Back Button */}
-        <button
-          onClick={() => history.push('/markets')}
-          className="flex items-center text-gray-600 hover:text-gray-800 mb-6"
-        >
-          <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-          Back to Markets
-        </button>
-
-        {/* Two Column Layout - Dribbble Style */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Section - Market Info & Chart (2/3 width) */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Header with Category & Market Title */}
-            <div>
-              <div className="flex items-start space-x-4 mb-4">
-                {/* Market Image - Top Left Corner */}
-                <div className="relative w-30 h-20 flex-shrink-0 rounded-xl overflow-hidden border-2 border-gray-200 bg-gradient-to-br from-gray-100 via-gray-50 to-gray-200">
-                  <img
-                    src={getMarketImage(market, marketId)}
-                    alt={market.questionTitle || 'Market'}
-                    className="w-full h-full object-cover"
-                    onLoad={() => console.log('✅ Market image loaded successfully')}
-                    onError={(e) => {
-                      console.log('❌ Image failed to load, showing gradient fallback');
-                      e.target.style.display = 'none';
-                      e.target.parentElement.className = 'relative w-20 h-20 flex-shrink-0 rounded-xl overflow-hidden border-2 border-gray-200 bg-gradient-to-br from-blue-100 via-purple-100 to-pink-100';
-                    }}
-                  />
-               
-                </div>
-
-                {/* Market Title and Tags */}
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-3">
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold text-white ${getCategoryColor(market.category)}`}>
-                      {market.category || 'General'}
-                    </span>
-                    <span className="px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
-                      {currencySymbol} Market
-                    </span>
-                  </div>
-                  <h1 className="text-xl sm:text-2xl font-bold text-gray-900 leading-tight">
-                    {market.questionTitle}
-                  </h1>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                <div className="bg-white rounded-lg p-4 border border-gray-200">
-                  <div className="text-xs text-gray-500 mb-1">24hr Volume</div>
-                  <div className="text-lg font-bold text-gray-900">
-                    ${(market.totalVolume || 0).toFixed(2)}
-                  </div>
-                </div>
-                <div className="bg-white rounded-lg p-4 border border-gray-200">
-                  <div className="text-xs text-gray-500 mb-1">Total Volume</div>
-                  <div className="text-lg font-bold text-gray-900">
-                    ${(market.totalVolume || 0).toFixed(2)}
-                  </div>
-                </div>
-                <div className="bg-white rounded-lg p-4 border border-gray-200">
-                  <div className="text-xs text-gray-500 mb-1">Liquidity</div>
-                  <div className="text-lg font-bold text-gray-900">
-                    {liquidity > 0 ? `${liquidity.toFixed(2)} ${currencySymbol}` : `0 ${currencySymbol}`}
-                  </div>
-                </div>
-                <div className="bg-white rounded-lg p-4 border border-gray-200">
-                  <div className="text-xs text-gray-500 mb-1">Expires</div>
-                  <div className="text-lg font-bold text-gray-900">
-                    {formatDate(market.resolutionDateTime)}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Price Chart */}
-            <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-gray-900">Market Context</h2>
-              </div>
-              
-              {/* Chart */}
-              <PolymarketChart 
-                priceHistory={priceHistory}
-                yesPriceHistory={yesPriceHistory}
-                noPriceHistory={noPriceHistory}
-                currentYesPrice={market?.yesPrice || 50}
-                currentNoPrice={market?.noPrice || 50}
-                selectedRange={timeframe}
-                onRangeChange={handleTimeframeChange}
-                ranges={[
-                  { label: '1H', value: '1h' },
-                  { label: '6H', value: '6h' },
-                  { label: '1D', value: '1d' },
-                  { label: '1W', value: '1w' },
-                  { label: '1M', value: '1m' },
-                  { label: 'ALL', value: 'all' }
-                ]}
-              />
-
-              {/* Chart Legend - Current Prices */}
-              <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200">
-                <div className="flex items-center gap-6">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                    <span className="text-sm font-medium text-gray-700">YES</span>
-                    <span className="text-sm font-semibold text-green-600">
-                      {market?.yesPrice ? `${market.yesPrice.toFixed(1)}%` : '50.0%'}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                    <span className="text-sm font-medium text-gray-700">NO</span>
-                    <span className="text-sm font-semibold text-red-600">
-                      {market?.noPrice ? `${market.noPrice.toFixed(1)}%` : '50.0%'}
-                    </span>
-                  </div>
-                  {market?.yesPrice && market?.noPrice && (
-                    <div className="text-sm text-gray-500">
-                      Difference: <span className="font-semibold">{(Math.abs(market.yesPrice - market.noPrice)).toFixed(1)}%</span>
-                    </div>
-                  )}
-                </div>
-                <div className="text-xs text-gray-500">
-                  {yesPriceHistory.length + noPriceHistory.length > 0 
-                    ? `${yesPriceHistory.length + noPriceHistory.length} historical points from DB`
-                    : 'No historical data yet'}
-                </div>
-              </div>
-            </div>
-
-            {/* Trades Activity Section - Polymarket Style */}
-            <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-gray-900">Activity</h2>
-                <span className="text-sm text-gray-500">{recentTrades.length} trades</span>
-              </div>
-              
-              {recentTrades.length === 0 ? (
-                <div className="text-center py-8">
-                  <div className="text-gray-400 mb-2">
-                    <svg className="mx-auto h-12 w-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                  <p className="text-gray-500 text-sm">No trades yet</p>
-                  <p className="text-gray-400 text-xs mt-1">Be the first to trade on this market</p>
-                </div>
-              ) : (
-                <div className="space-y-2 max-h-96 overflow-y-auto">
-                  {recentTrades.slice(0, 50).map((trade, index) => {
-                    const tradeTime = new Date(trade.timestamp);
-                    const timeAgo = getTimeAgo(tradeTime);
-                    const pricePercent = Math.round(trade.price * 100);
-                    
-                    return (
-                      <div 
-                        key={index} 
-                        className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0"
-                      >
-                        <div className="flex items-center gap-3 flex-1 min-w-0">
-                          {/* Side indicator */}
-                          <div className={`flex items-center justify-center w-8 h-8 rounded-full flex-shrink-0 ${
-                            trade.side === 'yes' ? 'bg-green-100' : 'bg-red-100'
-                          }`}>
-                            <span className={`text-xs font-semibold ${
-                              trade.side === 'yes' ? 'text-green-600' : 'text-red-600'
-                            }`}>
-                              {trade.side === 'yes' ? 'YES' : 'NO'}
-                            </span>
-                          </div>
-                          
-                          {/* Trade details */}
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className={`text-sm font-semibold ${
-                                trade.side === 'yes' ? 'text-green-600' : 'text-red-600'
-                              }`}>
-                                {pricePercent}%
-                              </span>
-                              <span className="text-xs text-gray-500">•</span>
-                              <span className="text-sm text-gray-700 font-medium">
-                                {parseFloat(trade.amount).toFixed(4)} {currencySymbol}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2 mt-0.5">
-                              <span className="text-xs text-gray-500 truncate">
-                                {trade.trader ? `${trade.trader.slice(0, 6)}...${trade.trader.slice(-4)}` : 'Unknown'}
-                              </span>
-                              <span className="text-xs text-gray-400">•</span>
-                              <span className="text-xs text-gray-400">{timeAgo}</span>
-                            </div>
-                          </div>
-                        </div>
-                        
-                        {/* Trade price badge */}
-                        <div className={`px-2 py-1 rounded text-xs font-medium flex-shrink-0 ${
-                          trade.side === 'yes' 
-                            ? 'bg-green-50 text-green-700' 
-                            : 'bg-red-50 text-red-700'
-                        }`}>
-                          {trade.side === 'yes' ? '↗' : '↘'} {pricePercent}%
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Right Section - Trading Interface (1/3 width) */}
-          <div className="lg:col-span-1">
+    <div className="min-h-screen bg-[#0E0E0E]" style={{ fontFamily: 'gilroy, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
+      <WormStyleNavbar />
+      
+      <div className="max-w-7xl mx-auto px-4 pt-24 pb-12">
+        {/* Two Column Layout - Reversed */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          {/* Left Section - Trading Interface (1/3 width) */}
+          <div className="lg:col-span-4">
             <Web3TradingInterface 
               marketId={marketId}
               market={market}
               onTradeComplete={refreshAllData}
             />
           </div>
+
+          {/* Right Section - Market Info (2/3 width) */}
+          <div className="lg:col-span-8 space-y-6">
+            {/* Market Header */}
+            <div className="bg-white/[0.08] backdrop-blur-xl rounded-[24px] p-6 border border-white/20 shadow-lg">
+              <div className="flex items-start justify-between gap-6">
+                <div className="flex-1">
+                  {/* Creator Info */}
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2 text-sm text-gray-400">
+                      <span>Creator:</span>
+                      <div className="flex items-center gap-1.5 bg-white/15 backdrop-blur-md px-3 py-1.5 rounded-lg border border-white/10">
+                        <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                        </svg>
+                        <span className="text-white font-semibold">@{market.creator ? market.creator.slice(2, 8) : 'creator'}</span>
+                      </div>
+                      <div className="bg-white/15 backdrop-blur-md px-3 py-1.5 rounded-lg border border-white/10">
+                        <span className="text-white text-xs font-semibold">UMA</span>
+                      </div>
+                    </div>
+                    <button className="p-2 hover:bg-white/15 rounded-lg transition-colors backdrop-blur-md">
+                      <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                      </svg>
+                    </button>
+                  </div>
+
+                  {/* Question */}
+                  <h1 className="text-2xl font-bold text-white leading-tight">
+                    {market.questionTitle}
+                  </h1>
+                </div>
+
+                {/* Market Image - Right Side */}
+                <div className="relative rounded-[16px] overflow-hidden flex-shrink-0 border border-white/20 shadow-lg" style={{ width: '200px', height: '150px' }}>
+                  <img
+                    src={getMarketImage(market, marketId)}
+                    alt={market.questionTitle}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                      e.target.parentElement.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Percentage Display */}
+            <div className="bg-white/[0.08] backdrop-blur-xl rounded-[24px] p-8 border border-white/20 shadow-lg">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-4">
+                  <div className="text-6xl font-bold text-white font-space-grotesk">{market?.yesPrice ? `${market.yesPrice.toFixed(0)}%` : '50%'}</div>
+                  <div className="text-gray-400 text-lg">chance</div>
+                </div>
+                <button className="p-2 hover:bg-white/15 rounded-lg transition-colors backdrop-blur-md">
+                  <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Tabs */}
+            <div className="bg-white/[0.08] backdrop-blur-xl rounded-[24px] border border-white/20 overflow-hidden shadow-lg">
+              <div className="flex border-b border-white/20">
+                {['market', 'rules', 'holders'].map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={`flex-1 py-4 text-sm font-semibold capitalize transition-all backdrop-blur-md ${
+                      activeTab === tab
+                        ? 'bg-white/15 text-white'
+                        : 'text-gray-400 hover:text-gray-300 hover:bg-white/10'
+                    }`}
+                  >
+                    {tab === 'holders' ? 'Top Holders' : tab}
+                  </button>
+                ))}
+              </div>
+
+              {/* Tab Content */}
+              <div className="p-6">
+              {activeTab === 'market' && (
+                <div className="space-y-4">
+                  <div className="bg-white/10 backdrop-blur-lg rounded-xl p-4 border border-white/15">
+                    <p className="text-sm text-gray-400 mb-4">
+                      This market was created on X. Create a market yourself below
+                    </p>
+                    <div className="space-y-3">
+                      <div className="flex items-start gap-3">
+                        <div className="w-6 h-6 rounded-full bg-white/15 backdrop-blur-md flex items-center justify-center text-xs font-bold flex-shrink-0 text-white">
+                          1
+                        </div>
+                        <p className="text-sm text-gray-300">Click create on X</p>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <div className="w-6 h-6 rounded-full bg-white/15 backdrop-blur-md flex items-center justify-center text-xs font-bold flex-shrink-0 text-white">
+                          2
+                        </div>
+                        <p className="text-sm text-gray-300">Tag @WormPredict and make your prediction</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'rules' && (
+                <div className="space-y-4">
+                  <div className="bg-white/10 backdrop-blur-lg rounded-xl p-4 border border-white/15">
+                    <p className="text-sm text-gray-400 mb-4">
+                      This market will resolve based on verifiable information and predetermined criteria.
+                    </p>
+                    <div className="space-y-3">
+                      <div className="flex items-start gap-3">
+                        <div className="w-6 h-6 rounded-full bg-white/15 backdrop-blur-md flex items-center justify-center text-xs font-bold flex-shrink-0 text-white">
+                          1
+                        </div>
+                        <p className="text-sm text-gray-300">The outcome must be verifiable through official sources</p>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <div className="w-6 h-6 rounded-full bg-white/15 backdrop-blur-md flex items-center justify-center text-xs font-bold flex-shrink-0 text-white">
+                          2
+                        </div>
+                        <p className="text-sm text-gray-300">Resolution will occur after the event date has passed</p>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <div className="w-6 h-6 rounded-full bg-white/15 backdrop-blur-md flex items-center justify-center text-xs font-bold flex-shrink-0 text-white">
+                          3
+                        </div>
+                        <p className="text-sm text-gray-300">In case of ambiguity, the market creator's interpretation will be final</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'holders' && (
+                <div className="bg-white/10 backdrop-blur-lg rounded-xl p-8 border border-white/15 text-center">
+                  <p className="text-gray-400 text-sm">No positions yet. Be the first to trade!</p>
+                </div>
+              )}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
+
+      {/* Footer */}
+      <footer className="border-t border-white/10 mt-20">
+        <div className="max-w-7xl mx-auto px-4 py-8">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+            <div className="flex gap-6 text-sm">
+              <button className="text-gray-400 hover:text-white transition-colors font-medium">
+                Terms of Service
+              </button>
+              <button className="text-gray-400 hover:text-white transition-colors font-medium">
+                Privacy Policy
+              </button>
+            </div>
+            
+            <button className="text-gray-400 hover:text-white transition-colors text-sm font-medium">
+              How it Works?
+            </button>
+            
+            <div className="flex gap-4">
+              <a href="https://twitter.com" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition-colors">
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                </svg>
+              </a>
+              <a href="https://discord.com" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition-colors">
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515a.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0a12.64 12.64 0 0 0-.617-1.25a.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057a19.9 19.9 0 0 0 5.993 3.03a.078.078 0 0 0 .084-.028a14.09 14.09 0 0 0 1.226-1.994a.076.076 0 0 0-.041-.106a13.107 13.107 0 0 1-1.872-.892a.077.077 0 0 1-.008-.128a10.2 10.2 0 0 0 .372-.292a.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127a12.299 12.299 0 0 1-1.873.892a.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028a19.839 19.839 0 0 0 6.002-3.03a.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419c0-1.333.956-2.419 2.157-2.419c1.21 0 2.176 1.096 2.157 2.42c0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419c0-1.333.955-2.419 2.157-2.419c1.21 0 2.176 1.096 2.157 2.42c0 1.333-.946 2.418-2.157 2.418z"/>
+                </svg>
+              </a>
+              <a href="https://telegram.org" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition-colors">
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12a12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472c-.18 1.898-.962 6.502-1.36 8.627c-.168.9-.499 1.201-.82 1.23c-.696.065-1.225-.46-1.9-.902c-1.056-.693-1.653-1.124-2.678-1.8c-1.185-.78-.417-1.21.258-1.91c.177-.184 3.247-2.977 3.307-3.23c.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345c-.48.33-.913.49-1.302.48c-.428-.008-1.252-.241-1.865-.44c-.752-.245-1.349-.374-1.297-.789c.027-.216.325-.437.893-.663c3.498-1.524 5.83-2.529 6.998-3.014c3.332-1.386 4.025-1.627 4.476-1.635z"/>
+                </svg>
+              </a>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 };

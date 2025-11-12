@@ -4,7 +4,7 @@ function About() {
   return (
     <div className='flex flex-col h-full text-white p-4 md:p-6 lg:p-8'>
       <h1 className='text-2xl md:text-3xl font-bold mb-4'>
-        About SocialPredict
+        About MetaPoly
       </h1>
       <div className='bg-gray-800 rounded-lg shadow-lg flex-grow overflow-auto'>
         <div className='p-4 md:p-6 space-y-4 md:space-y-6'>
@@ -15,7 +15,7 @@ function About() {
               rel='noopener noreferrer'
               className='text-blue-400 hover:text-blue-300 transition-colors duration-200'
             >
-              📈 Built with SocialPredict <br /> ⭐ Star Us on Github!
+              📈 Built with MetaPoly <br /> ⭐ Star Us on Github!
             </a>
           </p>
 
@@ -37,7 +37,7 @@ function About() {
             <h3 className='text-lg font-semibold mb-2'>
               Efficiency through Community Engagement
             </h3>
-            <p className='mb-2'>SocialPredict is Open Source Software Which:</p>
+              <p className='mb-2'>MetaPoly is Open Source Software Which:</p>
             <ul className='list-disc list-inside pl-4'>
               <li>
                 Embraces the open-source ethos, making our platform free for

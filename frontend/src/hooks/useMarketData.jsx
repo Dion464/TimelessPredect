@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
+import { ethers } from 'ethers';
 import useWebSocket from './useWebSocket';
+import { useWeb3 } from './useWeb3';
 
 const useMarketData = (marketId = null) => {
   const [markets, setMarkets] = useState([]);
@@ -8,6 +10,8 @@ const useMarketData = (marketId = null) => {
   const [recentTrades, setRecentTrades] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  const { isConnected, contracts, getMarketData } = useWeb3();
 
   // For now, disable WebSocket connection since backend doesn't have WebSocket server
   // We'll simulate real-time updates with intervals instead
@@ -93,29 +97,42 @@ const useMarketData = (marketId = null) => {
     setError(null);
 
     try {
-      const response = await fetch('http://localhost:8080/v0/markets');
-      if (!response.ok) {
-        throw new Error('Failed to fetch markets');
+      if (!isConnected || !contracts?.predictionMarket) {
+        setMarkets([]);
+        setPriceHistory({});
+        setError('Connect your wallet to load markets from the blockchain');
+        return;
       }
-      
-      const data = await response.json();
-      
-      // Transform the nested market data structure
-      const transformedMarkets = (data.markets || []).map(item => ({
-        id: item.market.id,
-        questionTitle: item.market.questionTitle,
-        description: item.market.description,
-        category: item.market.category || 'General',
-        currentProbability: item.lastProbability || item.market.initialProbability,
-        initialProbability: item.market.initialProbability,
-        totalVolume: item.totalVolume || 0,
-        totalBets: item.numUsers || 0,
-        resolutionDateTime: item.market.resolutionDateTime,
-        yesLabel: item.market.yesLabel,
-        noLabel: item.market.noLabel,
-        creatorUsername: item.market.creatorUsername,
-        isResolved: item.market.isResolved
-      }));
+
+      const activeMarketIds = await contracts.predictionMarket.getActiveMarkets();
+      const marketsData = await Promise.all(
+        activeMarketIds.map(async (rawMarketId) => {
+          try {
+            const marketData = await getMarketData(rawMarketId.toString());
+            const probability = (marketData.yesPrice ?? 50) / 100;
+            return {
+              id: Number(marketData.id),
+              questionTitle: marketData.question,
+              description: marketData.description,
+              category: marketData.category || 'General',
+              currentProbability: probability,
+              initialProbability: probability,
+              totalVolume: parseFloat(ethers.utils.formatEther(marketData.totalVolume)),
+              totalBets: 0,
+              resolutionDateTime: new Date(Number(marketData.resolutionTime) * 1000).toISOString(),
+              yesLabel: 'YES',
+              noLabel: 'NO',
+              creatorUsername: marketData.creator,
+              isResolved: marketData.resolved
+            };
+          } catch (err) {
+            console.error('Failed to load market from blockchain:', err);
+            return null;
+          }
+        })
+      );
+
+      const transformedMarkets = marketsData.filter(Boolean);
       
       setMarkets(transformedMarkets);
       
@@ -128,80 +145,18 @@ const useMarketData = (marketId = null) => {
         }];
       });
       setPriceHistory(initialHistory);
-      
+
     } catch (error) {
-      console.error('Error fetching markets:', error);
+      console.error('Error fetching markets from blockchain:', error);
       setError(error.message);
-      
-      // Fallback to mock data for development
-      generateMockData();
+      setMarkets([]);
+      setPriceHistory({});
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [contracts?.predictionMarket, getMarketData, isConnected]);
 
   // Generate mock data for development
-  const generateMockData = useCallback(() => {
-    const mockMarkets = [
-      {
-        id: 1,
-        questionTitle: "Will Bitcoin reach $100,000 by end of 2024?",
-        category: "Technology",
-        currentProbability: 0.65,
-        totalVolume: 125000,
-        totalBets: 1250,
-        resolutionDateTime: "2024-12-31T23:59:59Z",
-        yesLabel: "Yes",
-        noLabel: "No"
-      },
-      {
-        id: 2,
-        questionTitle: "Will the Lakers win the NBA Championship?",
-        category: "Sports",
-        currentProbability: 0.35,
-        totalVolume: 85000,
-        totalBets: 890,
-        resolutionDateTime: "2024-06-30T23:59:59Z",
-        yesLabel: "Yes",
-        noLabel: "No"
-      },
-      {
-        id: 3,
-        questionTitle: "Will AI achieve AGI by 2025?",
-        category: "Technology",
-        currentProbability: 0.25,
-        totalVolume: 200000,
-        totalBets: 2100,
-        resolutionDateTime: "2025-12-31T23:59:59Z",
-        yesLabel: "Yes",
-        noLabel: "No"
-      }
-    ];
-
-    setMarkets(mockMarkets);
-    
-    // Initialize mock price history
-    const mockHistory = {};
-    mockMarkets.forEach(market => {
-      const history = [];
-      const basePrice = market.currentProbability;
-      
-      // Generate 24 hours of mock price data
-      for (let i = 24; i >= 0; i--) {
-        const timestamp = Date.now() - (i * 60 * 60 * 1000); // Hours ago
-        const volatility = 0.05; // 5% volatility
-        const change = (Math.random() - 0.5) * volatility;
-        const price = Math.max(0.01, Math.min(0.99, basePrice + change));
-        
-        history.push({ price, timestamp });
-      }
-      
-      mockHistory[market.id] = history;
-    });
-    
-    setPriceHistory(mockHistory);
-  }, []);
-
   // Simulate real-time price updates for development
   useEffect(() => {
     if (markets.length === 0) return;
@@ -226,32 +181,8 @@ const useMarketData = (marketId = null) => {
   }, [fetchMarkets]);
 
   // Place order function
-  const placeOrder = useCallback(async (marketId, side, amount, price) => {
-    try {
-      const response = await fetch('http://localhost:8080/v0/bet', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          marketId,
-          side, // 'yes' or 'no'
-          amount,
-          price,
-          type: 'limit'
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to place order');
-      }
-
-      const result = await response.json();
-      return result;
-    } catch (error) {
-      console.error('Error placing order:', error);
-      throw error;
-    }
+  const placeOrder = useCallback(async () => {
+    throw new Error('Direct order placement via API is disabled. Use the on-chain trading interface.');
   }, []);
 
   // Get market by ID

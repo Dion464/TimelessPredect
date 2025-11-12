@@ -70,6 +70,24 @@ contract ETHPredictionMarket is ReentrancyGuard, Ownable {
     LimitOrder[] public allLimitOrders;
     mapping(uint256 => uint256[]) public marketLimitOrders; // marketId => order IDs
     
+    // Optimistic Oracle Resolution System
+    struct ResolutionProposal {
+        uint8 proposedOutcome; // 1=YES, 2=NO, 3=INVALID
+        address proposer;
+        uint256 proposalTime;
+        uint256 proposerBond;
+        bool disputed;
+        address disputer;
+        uint256 disputeTime;
+        uint256 disputerBond;
+        bool finalized;
+    }
+    
+    mapping(uint256 => ResolutionProposal) public resolutionProposals;
+    uint256 public proposerBondAmount = 0.01 ether; // Default bond amount (0.01 ETH)
+    uint256 public disputePeriod = 1 days; // Default dispute period (1 day)
+    uint256 public disputerBondMultiplier = 2; // Disputer must post 2x the proposer bond
+    
     // Events
     event MarketCreated(
         uint256 indexed marketId,
@@ -104,6 +122,28 @@ contract ETHPredictionMarket is ReentrancyGuard, Ownable {
     );
     
     event LimitOrderPlaced(uint256 indexed marketId, address indexed trader, bool isYes, uint256 price, uint256 amount);
+    
+    // Optimistic Oracle Events
+    event ResolutionProposed(
+        uint256 indexed marketId,
+        address indexed proposer,
+        uint8 proposedOutcome,
+        uint256 proposalTime,
+        uint256 bond
+    );
+    
+    event ResolutionDisputed(
+        uint256 indexed marketId,
+        address indexed disputer,
+        uint256 disputeTime,
+        uint256 bond
+    );
+    
+    event ResolutionFinalized(
+        uint256 indexed marketId,
+        uint8 finalOutcome,
+        address indexed finalizer
+    );
 
     constructor(uint256 _marketCreationFee, uint256 _platformFeePercent) {
         nextMarketId = 1;
@@ -171,12 +211,60 @@ contract ETHPredictionMarket is ReentrancyGuard, Ownable {
         require(!market.resolved, "Market already resolved");
         require(block.timestamp < market.endTime, "Market has ended");
 
-        // Calculate platform fee
-        uint256 platformFee = (msg.value * platformFeePercent) / 10000;
-        uint256 investmentAmount = msg.value - platformFee;
+        // Ensure AMM market is properly initialized before proceeding
+        // Check liquidity to verify market exists in AMM
+        (,, uint256 ammLiquidity,) = pricingAMM.markets(_marketId);
+        require(ammLiquidity > 0, "AMM market not initialized - please wait for market creation to complete");
 
-        // Calculate shares using LMSR pricing
-        uint256 shares = pricingAMM.calculateSharesToGive(_marketId, _isYes, investmentAmount);
+        // Update AMM state to current market state BEFORE calculating shares
+        pricingAMM.updateMarketState(_marketId, market.totalYesShares, market.totalNoShares);
+        
+        // Calculate platform fee
+        uint256 platformFee;
+        uint256 investmentAmount;
+        unchecked {
+            platformFee = (msg.value * platformFeePercent) / 10000;
+            investmentAmount = msg.value - platformFee;
+        }
+
+        // Calculate shares based on current price
+        // If price is 50¢, then 0.1 ETH should buy ~0.2 shares
+        // Formula: shares = (investmentAmount * priceMultiplier) / currentPrice
+        // where currentPrice is in basis points (5000 = 50¢)
+        
+        uint256 shares;
+        unchecked {
+            // Get current price from AMM
+            (uint256 currentYesPrice, uint256 currentNoPrice) = pricingAMM.calculatePrice(_marketId);
+            
+            // Ensure AMM returned valid prices (should always return at least 5000 for initial state)
+            require(currentYesPrice > 0 && currentNoPrice > 0, "AMM price calculation failed");
+            uint256 currentPrice = _isYes ? currentYesPrice : currentNoPrice;
+            
+            // CRITICAL: Prevent trading when price is at extreme values
+            // Prices are clamped to 100-9900 basis points (1%-99%) but double-check here
+            require(currentPrice >= 100 && currentPrice <= 9900, "Price at extreme, trading disabled");
+            require(currentPrice > 0, "Invalid price");
+            
+            // Calculate shares: investmentAmount / (currentPrice / 10000)
+            // Example: 0.1 ETH / (5000/10000) = 0.1 ETH / 0.5 = 0.2 shares
+            // To avoid division loss: shares = (investmentAmount * 10000) / currentPrice
+            // But we need to protect against overflow
+            
+            // Correct calculation: at 50¢ price, 0.1 ETH buys 0.2 shares
+            // Formula: shares = investmentAmount * 10000 / currentPrice
+            // Example: (0.1 * 10000) / 5000 = 1000 / 5000 = 0.2
+            // Need to scale properly for wei amounts
+            shares = (investmentAmount * 10000) / currentPrice;
+            
+            // Apply 98% to account for fees/slippage
+            shares = (shares * 9800) / 10000;
+            
+            // Ensure minimum
+            if (shares == 0) {
+                shares = 1;
+            }
+        }
         require(shares > 0, "No shares calculated");
 
         // Update market state
@@ -196,16 +284,12 @@ contract ETHPredictionMarket is ReentrancyGuard, Ownable {
         }
         position.totalInvested += msg.value;
 
-        // Update pricing AMM (don't send ETH, just update state)
-        if (_isYes) {
-            pricingAMM.buyYes{value: 0}(_marketId, investmentAmount);
-        } else {
-            pricingAMM.buyNo{value: 0}(_marketId, investmentAmount);
-        }
-
+        // Update AMM state again with the new totals AFTER adding shares
+        pricingAMM.updateMarketState(_marketId, market.totalYesShares, market.totalNoShares);
+        
         // Get current prices from AMM
-        (uint256 yesPrice, uint256 noPrice) = pricingAMM.calculatePrice(_marketId);
-        market.lastTradedPrice = _isYes ? yesPrice : noPrice;
+        (uint256 finalYesPrice, uint256 finalNoPrice) = pricingAMM.calculatePrice(_marketId);
+        market.lastTradedPrice = _isYes ? finalYesPrice : finalNoPrice;
 
         // Record trade
         allTrades.push(Trade({
@@ -213,11 +297,11 @@ contract ETHPredictionMarket is ReentrancyGuard, Ownable {
             trader: msg.sender,
             isYes: _isYes,
             shares: shares,
-            price: _isYes ? yesPrice : noPrice,
+            price: _isYes ? finalYesPrice : finalNoPrice,
             timestamp: block.timestamp
         }));
 
-        emit SharesPurchased(_marketId, msg.sender, _isYes, shares, msg.value, _isYes ? yesPrice : noPrice);
+        emit SharesPurchased(_marketId, msg.sender, _isYes, shares, msg.value, _isYes ? finalYesPrice : finalNoPrice);
     }
 
     // Sell shares
@@ -238,8 +322,12 @@ contract ETHPredictionMarket is ReentrancyGuard, Ownable {
         }
 
         // Get current price before the sale
-        (uint256 yesPrice, uint256 noPrice) = pricingAMM.calculatePrice(_marketId);
-        uint256 currentPrice = _isYes ? yesPrice : noPrice;
+        (uint256 currentYesPrice, uint256 currentNoPrice) = pricingAMM.calculatePrice(_marketId);
+        uint256 currentPrice = _isYes ? currentYesPrice : currentNoPrice;
+        
+        // CRITICAL: Prevent trading when price is at extreme values
+        require(currentPrice >= 100 && currentPrice <= 9900, "Price at extreme, trading disabled");
+        require(currentPrice > 0, "Invalid price");
         
         // Calculate payout: shares * currentPrice / 10000 (convert from basis points)
         // Apply a small fee (2%)
@@ -256,12 +344,8 @@ contract ETHPredictionMarket is ReentrancyGuard, Ownable {
             market.totalNoShares -= _shares;
         }
 
-        // Update PricingAMM to reflect the sell (decreases shares, affects pricing)
-        if (_isYes) {
-            pricingAMM.sellYes(_marketId, _shares);
-        } else {
-            pricingAMM.sellNo(_marketId, _shares);
-        }
+        // Update AMM state to match our market state for accurate price calculations
+        pricingAMM.updateMarketState(_marketId, market.totalYesShares, market.totalNoShares);
 
         // Update total volume
         market.totalVolume += payout;
@@ -288,7 +372,170 @@ contract ETHPredictionMarket is ReentrancyGuard, Ownable {
         emit SharesSold(_marketId, msg.sender, _isYes, _shares, userPayout, currentPrice);
     }
 
-    // Resolve market (only owner or creator after resolution time)
+    // ============ Optimistic Oracle Resolution Functions ============
+    
+    /**
+     * @dev Propose a resolution for a market (anyone can propose with bond)
+     * @param _marketId The market to propose resolution for
+     * @param _proposedOutcome The outcome being proposed (1=YES, 2=NO, 3=INVALID)
+     */
+    function proposeResolution(uint256 _marketId, uint8 _proposedOutcome) external payable nonReentrant {
+        Market storage market = markets[_marketId];
+        require(market.active, "Market not active");
+        require(!market.resolved, "Market already resolved");
+        require(_proposedOutcome >= 1 && _proposedOutcome <= 3, "Invalid outcome");
+        require(block.timestamp >= market.resolutionTime, "Market not ready for resolution");
+        require(msg.value >= proposerBondAmount, "Insufficient bond amount");
+        
+        ResolutionProposal storage proposal = resolutionProposals[_marketId];
+        require(proposal.proposer == address(0) || proposal.finalized, "Proposal already exists or disputed");
+        
+        // If there was a previous proposal that was disputed, create new one
+        if (proposal.disputed) {
+            // Previous proposal was disputed, allow new proposal
+            delete resolutionProposals[_marketId];
+        }
+        
+        // Create new proposal
+        proposal.proposedOutcome = _proposedOutcome;
+        proposal.proposer = msg.sender;
+        proposal.proposalTime = block.timestamp;
+        proposal.proposerBond = msg.value;
+        proposal.disputed = false;
+        proposal.finalized = false;
+        
+        emit ResolutionProposed(_marketId, msg.sender, _proposedOutcome, block.timestamp, msg.value);
+    }
+    
+    /**
+     * @dev Dispute a proposed resolution (requires posting bond)
+     * @param _marketId The market with the proposal to dispute
+     */
+    function disputeResolution(uint256 _marketId) external payable nonReentrant {
+        ResolutionProposal storage proposal = resolutionProposals[_marketId];
+        require(proposal.proposer != address(0), "No proposal exists");
+        require(!proposal.disputed, "Already disputed");
+        require(!proposal.finalized, "Already finalized");
+        require(block.timestamp < proposal.proposalTime + disputePeriod, "Dispute period expired");
+        
+        uint256 requiredBond = proposal.proposerBond * disputerBondMultiplier;
+        require(msg.value >= requiredBond, "Insufficient dispute bond");
+        
+        proposal.disputed = true;
+        proposal.disputer = msg.sender;
+        proposal.disputeTime = block.timestamp;
+        proposal.disputerBond = msg.value;
+        
+        // Return proposer's bond to them (they lost)
+        if (proposal.proposerBond > 0) {
+            payable(proposal.proposer).transfer(proposal.proposerBond);
+            proposal.proposerBond = 0;
+        }
+        
+        emit ResolutionDisputed(_marketId, msg.sender, block.timestamp, msg.value);
+        
+        // Clear the proposal to allow new proposal
+        delete resolutionProposals[_marketId];
+    }
+    
+    /**
+     * @dev Finalize a resolution if dispute period has passed
+     * @param _marketId The market to finalize resolution for
+     */
+    function finalizeResolution(uint256 _marketId) external nonReentrant {
+        Market storage market = markets[_marketId];
+        ResolutionProposal storage proposal = resolutionProposals[_marketId];
+        
+        require(proposal.proposer != address(0), "No proposal exists");
+        require(!proposal.disputed, "Proposal was disputed");
+        require(!proposal.finalized, "Already finalized");
+        require(block.timestamp >= proposal.proposalTime + disputePeriod, "Dispute period not expired");
+        require(!market.resolved, "Market already resolved");
+        
+        // Finalize the resolution
+        proposal.finalized = true;
+        market.resolved = true;
+        market.outcome = proposal.proposedOutcome;
+        market.active = false;
+        
+        // Return proposer's bond as reward for correct resolution
+        if (proposal.proposerBond > 0) {
+            payable(proposal.proposer).transfer(proposal.proposerBond);
+        }
+        
+        // Remove from active markets
+        for (uint i = 0; i < activeMarketIds.length; i++) {
+            if (activeMarketIds[i] == _marketId) {
+                activeMarketIds[i] = activeMarketIds[activeMarketIds.length - 1];
+                activeMarketIds.pop();
+                break;
+            }
+        }
+        
+        emit ResolutionFinalized(_marketId, proposal.proposedOutcome, msg.sender);
+        emit MarketResolved(_marketId, proposal.proposedOutcome, market.totalVolume);
+    }
+    
+    /**
+     * @dev Get resolution proposal details
+     * @param _marketId The market ID
+     */
+    function getResolutionProposal(uint256 _marketId) external view returns (
+        uint8 proposedOutcome,
+        address proposer,
+        uint256 proposalTime,
+        uint256 proposerBond,
+        bool disputed,
+        address disputer,
+        uint256 disputeTime,
+        bool finalized,
+        uint256 timeUntilFinalizable
+    ) {
+        ResolutionProposal memory proposal = resolutionProposals[_marketId];
+        uint256 finalizableTime = proposal.proposalTime + disputePeriod;
+        
+        return (
+            proposal.proposedOutcome,
+            proposal.proposer,
+            proposal.proposalTime,
+            proposal.proposerBond,
+            proposal.disputed,
+            proposal.disputer,
+            proposal.disputeTime,
+            proposal.finalized,
+            block.timestamp >= finalizableTime ? 0 : finalizableTime - block.timestamp
+        );
+    }
+    
+    // ============ Admin Functions for Optimistic Oracle ============
+    
+    /**
+     * @dev Set the proposer bond amount (only owner)
+     */
+    function setProposerBondAmount(uint256 _amount) external onlyOwner {
+        proposerBondAmount = _amount;
+    }
+    
+    /**
+     * @dev Set the dispute period (only owner)
+     */
+    function setDisputePeriod(uint256 _period) external onlyOwner {
+        disputePeriod = _period;
+    }
+    
+    /**
+     * @dev Set the disputer bond multiplier (only owner)
+     */
+    function setDisputerBondMultiplier(uint256 _multiplier) external onlyOwner {
+        disputerBondMultiplier = _multiplier;
+    }
+    
+    // ============ Legacy Resolution Functions (for backward compatibility) ============
+    
+    /**
+     * @dev Resolve market (only owner or creator after resolution time) - LEGACY
+     * Still available but recommend using optimistic oracle instead
+     */
     function resolveMarket(uint256 _marketId, uint8 _outcome) external nonReentrant {
         Market storage market = markets[_marketId];
         require(market.active, "Market not active");
@@ -299,6 +546,9 @@ contract ETHPredictionMarket is ReentrancyGuard, Ownable {
             (msg.sender == market.creator && block.timestamp >= market.resolutionTime),
             "Not authorized to resolve"
         );
+
+        // Clear any existing proposals
+        delete resolutionProposals[_marketId];
 
         market.resolved = true;
         market.outcome = _outcome;

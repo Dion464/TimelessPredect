@@ -814,57 +814,59 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
     : (currentPrice / 100).toFixed(2);
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
-      {/* Buy/Sell Tabs - Dribbble Style */}
-      <div className="flex border-b border-gray-200">
+    <div className="bg-white/[0.08] rounded-[24px] border border-white/20 overflow-hidden backdrop-blur-xl shadow-lg">
+      {/* Buy/Sell Tabs - Worm Style */}
+      <div className="flex gap-2 p-4 border-b border-white/10">
         <button
           onClick={() => setActiveTab('buy')}
-          className={`flex-1 py-4 px-6 text-sm font-semibold transition-colors ${
+          className={`flex-1 py-2 px-3 font-space-grotesk font-normal rounded-full transition-colors ${
             activeTab === 'buy'
-              ? 'text-blue-600 border-b-2 border-blue-600'
-              : 'text-gray-600 hover:text-gray-900'
+              ? 'bg-white/10 text-white backdrop-blur-md'
+              : 'bg-transparent text-gray-400 hover:bg-white/5 hover:text-gray-300'
           }`}
+          style={{ fontSize: '12px' }}
         >
           Buy
         </button>
         <button
           onClick={() => setActiveTab('sell')}
-          className={`flex-1 py-4 px-6 text-sm font-semibold transition-colors ${
+          className={`flex-1 py-2 px-3 font-space-grotesk font-normal rounded-full transition-colors ${
             activeTab === 'sell'
-              ? 'text-blue-600 border-b-2 border-blue-600'
-              : 'text-gray-600 hover:text-gray-900'
+              ? 'bg-white/10 text-white backdrop-blur-md'
+              : 'bg-transparent text-gray-400 hover:bg-white/5 hover:text-gray-300'
           }`}
+          style={{ fontSize: '12px' }}
         >
           Sell
         </button>
       </div>
 
-      <div className="p-6 space-y-6">
-        {/* Current Market Prices - Dribbble Style (Clickable) */}
+      <div className="p-6 space-y-5">
+        {/* Current Market Prices - Worm Style (Clickable) */}
         <div className="grid grid-cols-2 gap-3">
           <button
             onClick={() => setTradeSide('yes')}
-            className={`p-4 rounded-lg text-left transition-all ${
+            className={`p-4 rounded-xl text-left transition-all backdrop-blur-md ${
               tradeSide === 'yes' 
-                ? 'bg-green-50 border-2 border-green-300' 
-                : 'bg-gray-50 hover:bg-gray-100'
+                ? 'bg-green-500/20 border-2 border-green-500/50' 
+                : 'bg-white/5 hover:bg-white/10 border-2 border-white/10'
             }`}
           >
-            <div className="text-xs text-gray-600 mb-1">Yes</div>
-            <div className="text-xl font-bold text-green-600">
+            <div className="text-xs text-gray-400 mb-1 font-space-grotesk">Yes</div>
+            <div className="text-xl font-bold text-green-400 font-space-grotesk">
               {centsToTCENT(yesPrice)} TCENT
             </div>
           </button>
           <button
             onClick={() => setTradeSide('no')}
-            className={`p-4 rounded-lg text-left transition-all ${
+            className={`p-4 rounded-xl text-left transition-all backdrop-blur-md ${
               tradeSide === 'no' 
-                ? 'bg-red-50 border-2 border-red-300' 
-                : 'bg-gray-50 hover:bg-gray-100'
+                ? 'bg-red-500/20 border-2 border-red-500/50' 
+                : 'bg-white/5 hover:bg-white/10 border-2 border-white/10'
             }`}
           >
-            <div className="text-xs text-gray-600 mb-1">No</div>
-            <div className="text-xl font-bold text-red-600">
+            <div className="text-xs text-gray-400 mb-1 font-space-grotesk">No</div>
+            <div className="text-xl font-bold text-red-400 font-space-grotesk">
               {centsToTCENT(noPrice)} TCENT
             </div>
           </button>
@@ -902,18 +904,19 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
         {/* Order Type Selection */}
         {(activeTab === 'buy' || activeTab === 'sell') && (
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Order Type</label>
-            <div className="grid grid-cols-2 gap-2">
+            <label className="block text-sm font-medium text-gray-300 mb-3 font-space-grotesk">Order Type</label>
+            <div className="flex gap-2">
               <button
                 onClick={() => {
                   setOrderType('market');
                   setLimitPrice('');
                 }}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                className={`flex-1 py-2 px-4 rounded-full font-space-grotesk font-normal transition-all backdrop-blur-md ${
                   orderType === 'market'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    ? 'bg-white/10 text-white'
+                    : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-gray-300'
                 }`}
+                style={{ fontSize: '12px' }}
               >
                 Market
               </button>
@@ -923,11 +926,12 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
                   // Always set limit price to current market price when switching to limit
                   setLimitPrice(currentPrice.toFixed(2));
                 }}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                className={`flex-1 py-2 px-4 rounded-full font-space-grotesk font-normal transition-all backdrop-blur-md ${
                   orderType === 'limit'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    ? 'bg-white/10 text-white'
+                    : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-gray-300'
                 }`}
+                style={{ fontSize: '12px' }}
               >
                 Limit
               </button>
@@ -938,10 +942,10 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
         {/* Limit Price Input */}
         {orderType === 'limit' && (
           <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-sm font-medium text-gray-700">Limit Price (TCENT)</label>
-              <span className="text-xs text-gray-500">
-                Current: <span className="font-semibold">{centsToTCENT(currentPrice)} TCENT</span>
+            <div className="flex items-center justify-between mb-3">
+              <label className="text-sm font-medium text-gray-300 font-space-grotesk">Limit Price (TCENT)</label>
+              <span className="text-sm text-gray-400 font-space-grotesk">
+                Current: <span className="font-bold text-white">{centsToTCENT(currentPrice)} TCENT</span>
               </span>
             </div>
             <input
@@ -952,35 +956,35 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
               value={limitPrice}
               onChange={(e) => setLimitPrice(e.target.value)}
               placeholder={currentPrice.toFixed(2)}
-              className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-3.5 bg-white/5 border-2 border-white/10 rounded-xl focus:ring-2 focus:ring-white/20 focus:border-white/20 font-space-grotesk font-medium text-lg text-white placeholder-gray-500"
             />
-            <div className="mt-1 flex gap-2">
+            <div className="mt-2 flex gap-2">
               <button
                 onClick={() => setLimitPrice((currentPrice * 0.95).toFixed(2))}
-                className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded text-gray-700"
+                className="text-sm px-3 py-1.5 bg-white/5 hover:bg-white/10 rounded-lg text-gray-300 font-space-grotesk font-medium backdrop-blur-md"
               >
                 -5%
               </button>
               <button
                 onClick={() => setLimitPrice(currentPrice.toFixed(2))}
-                className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded text-gray-700"
+                className="text-sm px-3 py-1.5 bg-white/5 hover:bg-white/10 rounded-lg text-gray-300 font-space-grotesk font-medium backdrop-blur-md"
               >
                 Market
               </button>
               <button
                 onClick={() => setLimitPrice((currentPrice * 1.05).toFixed(2))}
-                className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded text-gray-700"
+                className="text-sm px-3 py-1.5 bg-white/5 hover:bg-white/10 rounded-lg text-gray-300 font-space-grotesk font-medium backdrop-blur-md"
               >
                 +5%
               </button>
             </div>
             {limitPrice && parseFloat(limitPrice) < currentPrice && (
-              <div className="mt-2 text-xs text-green-600 bg-green-50 p-2 rounded">
+              <div className="mt-2 text-sm text-green-400 bg-green-500/10 border border-green-500/20 p-3 rounded-xl font-space-grotesk backdrop-blur-md">
                 ✓ Your order will execute if price drops to {centsToTCENT(limitPrice)} TCENT or below
               </div>
             )}
             {limitPrice && parseFloat(limitPrice) > currentPrice && (
-              <div className="mt-2 text-xs text-orange-600 bg-orange-50 p-2 rounded">
+              <div className="mt-2 text-sm text-orange-400 bg-orange-500/10 border border-orange-500/20 p-3 rounded-xl font-space-grotesk backdrop-blur-md">
                 ⚠ Your order will execute if price rises to {centsToTCENT(limitPrice)} TCENT or above
               </div>
             )}
@@ -989,33 +993,33 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
 
         {/* Market Order Info */}
         {orderType === 'market' && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-            <div className="text-xs text-blue-900 font-medium mb-1">Market Order</div>
-            <div className="text-xs text-blue-700">
+          <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 backdrop-blur-md">
+            <div className="text-sm text-blue-300 font-semibold mb-1 font-space-grotesk">Market Order</div>
+            <div className="text-sm text-blue-200 font-space-grotesk">
               {activeTab === 'buy' 
                 ? `Will execute immediately against best available sell orders (~${centsToTCENT(currentPrice)} TCENT)`
                 : `Will execute immediately if there's a matching buy order (~${centsToTCENT(currentPrice)} TCENT)`
               }
             </div>
-            <div className="text-xs text-blue-600 mt-2">
+            <div className="text-xs text-blue-300 mt-2">
               💡 Want to set a specific price? Switch to <strong>Limit</strong> order
             </div>
           </div>
         )}
 
-        {/* Amount Input - Dribbble Style */}
+        {/* Amount Input - Worm Style */}
         <div>
-          <div className="flex items-center justify-between mb-2">
-            <label className="text-sm font-medium text-gray-700">Amount</label>
-            <span className="text-sm text-gray-500">
-              Balance: <span className="font-semibold text-gray-900">
+          <div className="flex items-center justify-between mb-3">
+            <label className="text-sm font-medium text-gray-300 font-space-grotesk">Amount</label>
+            <span className="text-sm text-gray-400 font-space-grotesk">
+              Balance: <span className="font-bold text-white">
                 {activeTab === 'buy' ? `${parseFloat(ethBalance).toFixed(4)} ${currencySymbol}` : `${parseFloat(tradeSide === 'yes' ? position.yesShares : position.noShares).toFixed(2)} shares`}
               </span>
             </span>
           </div>
           <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <span className="text-green-600 font-semibold">{currencySymbol}</span>
+            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+              <span className="text-green-400 font-bold font-space-grotesk">{currencySymbol}</span>
             </div>
             <input
               type="number"
@@ -1023,8 +1027,8 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
               min="0"
               value={tradeAmount}
               onChange={(e) => setTradeAmount(e.target.value)}
-              placeholder="0.00"
-              className="w-full pl-12 pr-16 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="0.1"
+              className="w-full pl-14 pr-16 py-3.5 bg-white/5 border-2 border-white/10 rounded-xl focus:ring-2 focus:ring-white/20 focus:border-white/20 font-space-grotesk font-medium text-lg text-white placeholder-gray-500"
             />
             <button
               onClick={() => {
@@ -1035,56 +1039,56 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
                   setTradeAmount(parseFloat(available).toFixed(2));
                 }
               }}
-              className="absolute inset-y-0 right-0 pr-3 flex items-center text-blue-600 hover:text-blue-700 font-medium text-sm"
+              className="absolute top-4 right-4 text-blue-400 hover:text-blue-300 font-medium text-sm font-space-grotesk"
             >
               Max
             </button>
           </div>
           {activeTab === 'buy' && parseFloat(tradeAmount) > 0 && orderType === 'market' && (
-            <div className="mt-2 text-xs text-gray-500">
-              Rate: <span className="font-semibold">{ratePerShare} {currencySymbol} = 1 Share</span>
+            <div className="mt-2 text-sm text-gray-400 font-space-grotesk">
+              Rate: <span className="font-semibold text-white">{ratePerShare} {currencySymbol} = 1 Share</span>
             </div>
           )}
           {activeTab === 'buy' && parseFloat(tradeAmount) > 0 && orderType === 'limit' && limitPrice && (
-            <div className="mt-2 text-xs text-gray-500">
-              Will buy at: <span className="font-semibold">{centsToTCENT(limitPrice)} TCENT</span>
+            <div className="mt-2 text-sm text-gray-400 font-space-grotesk">
+              Will buy at: <span className="font-semibold text-white">{centsToTCENT(limitPrice)} TCENT</span>
               {parseFloat(limitPrice) < currentPrice && (
-                <span className="text-green-600 ml-2">(Below market - will execute if price drops)</span>
+                <span className="text-green-400 ml-2">(Below market - will execute if price drops)</span>
               )}
               {parseFloat(limitPrice) > currentPrice && (
-                <span className="text-orange-600 ml-2">(Above market - will execute if price rises)</span>
+                <span className="text-orange-400 ml-2">(Above market - will execute if price rises)</span>
               )}
             </div>
           )}
         </div>
 
-        {/* Estimated Trade Details - Dribbble Style */}
+        {/* Estimated Trade Details - Worm Style */}
         {activeTab === 'buy' && parseFloat(tradeAmount) > 0 && (
-          <div className="space-y-3 pt-4 border-t border-gray-200">
+          <div className="space-y-3 pt-4 border-t border-white/10">
             <div className="flex justify-between text-sm">
-              <span className="text-gray-600">Average Price</span>
-              <span className="font-semibold text-gray-900">{estimatedAveragePrice}</span>
+              <span className="text-gray-400 font-space-grotesk">Average Price</span>
+              <span className="font-bold text-white font-space-grotesk">{estimatedAveragePrice}</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-gray-600">Estimated Shares</span>
-              <span className="font-semibold text-gray-900">{parseFloat(estimatedShares).toFixed(2)}</span>
+              <span className="text-gray-400 font-space-grotesk">Estimated Shares</span>
+              <span className="font-bold text-white font-space-grotesk">{parseFloat(estimatedShares).toFixed(2)}</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-gray-600">Estimated Profit</span>
-              <span className="font-semibold text-gray-900">{estimatedProfit}</span>
+              <span className="text-gray-400 font-space-grotesk">Estimated Profit</span>
+              <span className="font-bold text-white font-space-grotesk">{estimatedProfit}</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-gray-600">Estimated Fees</span>
-              <span className="font-semibold text-gray-900">{estimatedFees}</span>
+              <span className="text-gray-400 font-space-grotesk">Estimated Fees</span>
+              <span className="font-bold text-white font-space-grotesk">{estimatedFees}</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-gray-600">Max Return on Investment</span>
-              <span className="font-semibold text-gray-900">{maxROI}%</span>
+              <span className="text-gray-400 font-space-grotesk">Max Return on Investment</span>
+              <span className="font-bold text-white font-space-grotesk">{maxROI}%</span>
             </div>
           </div>
         )}
 
-        {/* Buy/Sell Button - Dribbble Style */}
+        {/* Buy/Sell Button - Worm Style */}
         <button
           onClick={activeTab === 'buy' ? handleBuy : handleSell}
           disabled={
@@ -1093,19 +1097,18 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
             parseFloat(tradeAmount) <= 0 ||
             (orderType === 'limit' && (!limitPrice || parseFloat(limitPrice) <= 0 || parseFloat(limitPrice) > 100))
           }
-          className={`w-full py-4 px-6 rounded-lg font-semibold text-white transition-all duration-200 ${
+          className={`w-full py-3 px-6 rounded-full font-space-grotesk font-bold text-white transition-all duration-200 backdrop-blur-md ${
             loading || 
             !tradeAmount || 
             parseFloat(tradeAmount) <= 0 ||
             (orderType === 'limit' && (!limitPrice || parseFloat(limitPrice) <= 0 || parseFloat(limitPrice) > 100))
-              ? 'bg-gray-300 cursor-not-allowed'
-              : activeTab === 'buy'
-              ? 'bg-blue-600 hover:bg-blue-700 shadow-md hover:shadow-lg'
-              : 'bg-red-600 hover:bg-red-700 shadow-md hover:shadow-lg'
+              ? 'bg-white/10 cursor-not-allowed opacity-50'
+              : 'bg-white/10 hover:bg-white/20 border border-white/20'
           }`}
+          style={{ fontSize: '16px' }}
         >
           {loading ? (
-            <div className="flex items-center justify-center">
+            <div className="flex items-center justify-center font-space-grotesk">
               <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent mr-2"></div>
               Processing...
             </div>

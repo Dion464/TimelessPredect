@@ -3,7 +3,7 @@ import { Route, Switch } from 'react-router-dom';
 import Markets from '../pages/markets/Markets';
 import About from '../pages/about/About';
 import Stats from '../pages/stats/Stats';
-import Home from '../pages/home/Home';
+import HomeWormStyle from '../pages/home/HomeWormStyle';
 import PolymarketStyleTrading from '../pages/market/PolymarketStyleTrading';
 import User from '../pages/user/User';
 import MarketCreation from '../pages/admin/MarketCreation';
@@ -26,7 +26,7 @@ const AppRoutes = () => {
       
       <Route exact path='/markets' component={Markets} />
       
-      <Route exact path='/user/:username' component={User} />
+      <Route exact path='/user/:address' component={User} />
       
       <Route exact path='/stats' component={Stats} />
 
@@ -36,7 +36,7 @@ const AppRoutes = () => {
       <Route exact path='/admin/revenue' component={RevenueDashboard} />
 
       {/* Home Route */}
-      <Route exact path='/' component={Home} />
+      <Route exact path='/' component={HomeWormStyle} />
 
       {/* 404 Route */}
       <Route path='*' component={NotFound} />

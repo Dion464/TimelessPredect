@@ -1,14 +1,14 @@
 // Auto-generated contract configuration
-// Generated on: 2025-11-10T18:08:45.726Z
+// Updated to use Localhost (Hardhat Local)
 
 export const CONTRACT_CONFIG = {
-  "PREDICTION_MARKET_ADDRESS": "0x6b1e116ba6F6396cc3c16b1152CA32c3eb911f40",
+  "PREDICTION_MARKET_ADDRESS": "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6",
   "USDC_ADDRESS": "0x0000000000000000000000000000000000000000",
-  "CHAIN_ID": 28802,
-  "NETWORK_NAME": "Incentiv Testnet"
+  "CHAIN_ID": 1337,
+  "NETWORK_NAME": "Hardhat Local"
 };
 
-export const PREDICTION_MARKET_ADDRESS = "0x6b1e116ba6F6396cc3c16b1152CA32c3eb911f40";
+export const PREDICTION_MARKET_ADDRESS = "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6";
 export const USDC_ADDRESS = "0x0000000000000000000000000000000000000000";
-export const CHAIN_ID = 28802;
-export const NETWORK_NAME = "Incentiv Testnet";
+export const CHAIN_ID = 1337;
+export const NETWORK_NAME = "Hardhat Local";

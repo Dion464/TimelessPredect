@@ -5,7 +5,6 @@ import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './helpers/AuthContent';
 import { Web3Provider } from './hooks/useWeb3';
 import AppRoutes from './helpers/AppRoutes';
-import ModernNavbar from './components/modern/ModernNavbar';
 import '../index.css';
 
 function ErrorFallback({ error, resetErrorBoundary }) {
@@ -38,7 +37,7 @@ function App() {
         <AuthProvider>
           <Router>
             <div className='App min-h-screen bg-gray-50 font-body'>
-              <ModernNavbar />
+            {/*  <ModernNavbar /> */}
               <main>
                 <AppRoutes />
               </main>

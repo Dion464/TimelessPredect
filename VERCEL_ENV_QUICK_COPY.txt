@@ -1,0 +1,53 @@
+════════════════════════════════════════════════════════════════════════════
+   VERCEL ENVIRONMENT VARIABLES - QUICK COPY
+   Copy each line below as a separate environment variable in Vercel
+════════════════════════════════════════════════════════════════════════════
+
+EXCHANGE_CONTRACT_ADDRESS=0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9
+PAYMENT_TOKEN_ADDRESS=0x5FbDB2315678afecb367f032d93F642f64180aa3
+OUTCOME_TOKEN_ADDRESS=0x6b1e116ba6F6396cc3c16b1152CA32c3eb911f40
+PREDICTION_MARKET_ADDRESS=0x6b1e116ba6F6396cc3c16b1152CA32c3eb911f40
+CHAIN_ID=28802
+RPC_URL=https://rpc-testnet.incentiv.io/
+SETTLEMENT_PRIVATE_KEY=0xe516ae4914310bca210e71786c48fafda9aed07457654f649f32576746b5120c
+PORT=8080
+TREASURY_ADDRESS=0xed27C34A8434ADc188A2D7503152024F64967B61
+
+════════════════════════════════════════════════════════════════════════════
+   TO UPDATE AFTER DEPLOYMENT:
+════════════════════════════════════════════════════════════════════════════
+
+API_BASE_URL=https://your-backend-api.vercel.app
+DATABASE_URL=postgresql://user:password@host:5432/database
+
+════════════════════════════════════════════════════════════════════════════
+   INSTRUCTIONS:
+════════════════════════════════════════════════════════════════════════════
+
+1. Go to Vercel Dashboard → Your Project → Settings → Environment Variables
+2. Click "Add New"
+3. Copy the NAME (before =) into "Key" field
+4. Copy the VALUE (after =) into "Value" field
+5. Select: Production, Preview, Development (all three)
+6. Click "Save"
+7. Repeat for each variable above
+
+8. For DATABASE_URL:
+   - First create a PostgreSQL database (Vercel Postgres or Supabase)
+   - Then add the connection string
+
+9. For API_BASE_URL:
+   - Deploy backend first
+   - Get the URL from Vercel
+   - Update this variable with the actual URL
+
+════════════════════════════════════════════════════════════════════════════
+   SECURITY NOTE:
+════════════════════════════════════════════════════════════════════════════
+
+⚠️  These are TESTNET credentials - safe to use for testing
+🔐 For MAINNET, use different private keys and never share them
+✅ Vercel encrypts all environment variables at rest
+
+════════════════════════════════════════════════════════════════════════════
+

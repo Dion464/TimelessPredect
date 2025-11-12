@@ -1,87 +1,86 @@
 const { ethers } = require("hardhat");
 
 async function main() {
-    console.log("🧪 Testing Buy/Sell Functionality...");
+  console.log("🧪 Testing buy/sell functionality...\n");
 
-    const [deployer] = await ethers.getSigners();
-    console.log("Testing with account:", deployer.address);
+  const [deployer, buyer] = await ethers.getSigners();
+  console.log("Deployer:", deployer.address);
+  console.log("Buyer:", buyer.address);
 
-    // Get the deployed contract
-    const ETHPredictionMarket = await ethers.getContractFactory("ETHPredictionMarket");
-    const contract = await ETHPredictionMarket.attach("0x19cEcCd6942ad38562Ee10bAfd44776ceB67e923");
+  // Load the deployment info
+  const fs = require('fs');
+  const path = require('path');
+  const deploymentFile = path.join(__dirname, "../deployments/unknown-1337.json");
+  const deployment = JSON.parse(fs.readFileSync(deploymentFile, 'utf8'));
+  
+  const contractAddress = deployment.contracts.ETHPredictionMarket.address;
+  console.log("Contract address:", contractAddress);
 
-    try {
-        // Get active markets
-        const activeMarkets = await contract.getActiveMarkets();
-        console.log("Active markets:", activeMarkets.map(id => id.toString()));
+  const ETHPredictionMarket = await ethers.getContractFactory("ETHPredictionMarket");
+  const market = ETHPredictionMarket.attach(contractAddress);
 
-        if (activeMarkets.length > 0) {
-            const marketId = activeMarkets[0];
-            console.log(`\n📊 Testing buy/sell on market ${marketId.toString()}...`);
-            
-            // Test 1: Get initial market state
-            console.log("\n📋 Initial market state:");
-            const market = await contract.getMarket(marketId);
-            console.log(`Market: ${market.question}`);
-            
-            // Test 2: Get current prices
-            const yesPrice = await contract.getCurrentPrice(marketId, true);
-            const noPrice = await contract.getCurrentPrice(marketId, false);
-            console.log(`Current prices: YES=${(yesPrice.toNumber() / 100).toFixed(0)}¢, NO=${(noPrice.toNumber() / 100).toFixed(0)}¢`);
-            
-            // Test 3: Try to buy YES shares with 0.1 ETH
-            console.log("\n🛒 Testing buy YES shares with 0.1 ETH...");
-            try {
-                const tx = await contract.buyShares(marketId, true, {
-                    value: ethers.utils.parseEther("0.1"),
-                    gasLimit: 500000 // Set explicit gas limit
-                });
-                console.log(`✅ Transaction sent: ${tx.hash}`);
-                
-                const receipt = await tx.wait();
-                console.log(`✅ Transaction confirmed! Gas used: ${receipt.gasUsed.toString()}`);
-                
-                // Check prices after buy
-                const newYesPrice = await contract.getCurrentPrice(marketId, true);
-                const newNoPrice = await contract.getCurrentPrice(marketId, false);
-                console.log(`New prices: YES=${(newYesPrice.toNumber() / 100).toFixed(0)}¢, NO=${(newNoPrice.toNumber() / 100).toFixed(0)}¢`);
-                
-            } catch (error) {
-                console.log(`❌ Buy transaction failed:`, error.message);
-                console.log("Error details:", error);
-            }
-            
-            // Test 4: Try to buy NO shares with 0.1 ETH
-            console.log("\n🛒 Testing buy NO shares with 0.1 ETH...");
-            try {
-                const tx = await contract.buyShares(marketId, false, {
-                    value: ethers.utils.parseEther("0.1"),
-                    gasLimit: 500000 // Set explicit gas limit
-                });
-                console.log(`✅ Transaction sent: ${tx.hash}`);
-                
-                const receipt = await tx.wait();
-                console.log(`✅ Transaction confirmed! Gas used: ${receipt.gasUsed.toString()}`);
-                
-                // Check prices after buy
-                const newYesPrice = await contract.getCurrentPrice(marketId, true);
-                const newNoPrice = await contract.getCurrentPrice(marketId, false);
-                console.log(`New prices: YES=${(newYesPrice.toNumber() / 100).toFixed(0)}¢, NO=${(newNoPrice.toNumber() / 100).toFixed(0)}¢`);
-                
-            } catch (error) {
-                console.log(`❌ Buy transaction failed:`, error.message);
-                console.log("Error details:", error);
-            }
-        }
-    } catch (error) {
-        console.log("❌ Error during testing:", error.message);
-        console.log("Error details:", error);
-    }
+  // Get active markets
+  const activeMarkets = await market.getActiveMarkets();
+  console.log("\n📊 Active markets:", activeMarkets.length);
+
+  if (activeMarkets.length === 0) {
+    console.log("❌ No active markets found!");
+    return;
+  }
+
+  const marketId = activeMarkets[0];
+  console.log("Testing with market ID:", marketId.toString());
+
+  // Get market info
+  const marketInfo = await market.getMarket(marketId);
+  console.log("\n📋 Market Info:");
+  console.log("Question:", marketInfo.question);
+  console.log("Total YES shares:", marketInfo.totalYesShares.toString());
+  console.log("Total NO shares:", marketInfo.totalNoShares.toString());
+  console.log("Total volume:", ethers.utils.formatEther(marketInfo.totalVolume), "ETH");
+
+  // Get current prices
+  const yesPrice = await market.getCurrentPrice(marketId, true);
+  const noPrice = await market.getCurrentPrice(marketId, false);
+  console.log("\n💰 Current Prices:");
+  console.log("YES price:", yesPrice.toString(), "basis points", `(${yesPrice/100}¢)`);
+  console.log("NO price:", noPrice.toString(), "basis points", `(${noPrice/100}¢)`);
+
+  // Try to buy YES shares
+  console.log("\n🛒 Testing buy transaction...");
+  try {
+    const buyAmount = ethers.utils.parseEther("0.1"); // 0.1 ETH
+    console.log("Buying YES shares with", ethers.utils.formatEther(buyAmount), "ETH");
+    
+    const tx = await market.connect(buyer).buyShares(marketId, true, { value: buyAmount });
+    console.log("✅ Transaction sent:", tx.hash);
+    
+    const receipt = await tx.wait();
+    console.log("✅ Transaction confirmed in block:", receipt.blockNumber);
+
+    // Get updated market info
+    const updatedMarketInfo = await market.getMarket(marketId);
+    console.log("\n📊 Updated Market Info:");
+    console.log("Total YES shares:", updatedMarketInfo.totalYesShares.toString());
+    console.log("Total NO shares:", updatedMarketInfo.totalNoShares.toString());
+    console.log("Total volume:", ethers.utils.formatEther(updatedMarketInfo.totalVolume), "ETH");
+
+    // Get new prices
+    const newYesPrice = await market.getCurrentPrice(marketId, true);
+    const newNoPrice = await market.getCurrentPrice(marketId, false);
+    console.log("\n💰 New Prices:");
+    console.log("YES price:", newYesPrice.toString(), "basis points", `(${newYesPrice/100}¢)`);
+    console.log("NO price:", newNoPrice.toString(), "basis points", `(${newNoPrice/100}¢)`);
+
+    console.log("\n✅ Buy/Sell test PASSED!");
+  } catch (error) {
+    console.log("\n❌ Buy transaction failed:", error.message);
+  }
 }
 
 main()
-    .then(() => process.exit(0))
-    .catch((error) => {
-        console.error(error);
-        process.exit(1);
-    });
+  .then(() => process.exit(0))
+  .catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
