@@ -7,11 +7,8 @@ const WormStyleNavbar = () => {
   const { account, isConnected, connectWallet, isConnecting } = useWeb3();
 
   const handleCreateClick = () => {
-    if (!isConnected) {
-      connectWallet();
-      return;
-    }
-    history.push('/admin/create-market');
+    // Always go to public create page
+    history.push('/create');
   };
 
   const handleConnectClick = () => {

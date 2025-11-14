@@ -42,9 +42,9 @@ const AdminLogin = () => {
         
         toast.success('Admin login successful!');
         
-        // Redirect to admin dashboard
+        // Redirect to pending markets (admin dashboard)
         setTimeout(() => {
-          history.push('/admin/create-market');
+          history.push('/admin/pending');
         }, 1000);
       } else {
         toast.error('Invalid username or password');

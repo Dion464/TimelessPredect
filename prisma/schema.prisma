@@ -114,3 +114,31 @@ model OrderFill {
   @@index([marketId, outcomeId], map: "order_fills_market_idx")
   @@map("order_fills")
 }
+
+enum PendingMarketStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model PendingMarket {
+  id              BigInt              @id @default(autoincrement()) @map("id")
+  question        String              @map("question")
+  description     String?             @map("description")
+  category        String              @map("category")
+  imageUrl        String?             @map("image_url")
+  endTime         DateTime            @map("end_time")
+  resolutionTime  DateTime            @map("resolution_time")
+  rules           String?             @map("rules") // JSON string of rules array
+  creator         String              @map("creator")
+  status          PendingMarketStatus @default(PENDING) @map("status")
+  rejectionReason String?             @map("rejection_reason")
+  approvedBy      String?             @map("approved_by")
+  marketId        BigInt?             @map("market_id") // Set when approved and created on-chain
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime            @updatedAt @map("updated_at")
+
+  @@index([creator, status], map: "pending_markets_creator_idx")
+  @@index([status], map: "pending_markets_status_idx")
+  @@map("pending_markets")
+}

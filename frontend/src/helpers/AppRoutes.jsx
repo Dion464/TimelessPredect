@@ -1,16 +1,43 @@
 import React from 'react';
-import { Route, Switch } from 'react-router-dom';
+import { Route, Switch, Redirect } from 'react-router-dom';
 import Markets from '../pages/markets/Markets';
 import About from '../pages/about/About';
 import Stats from '../pages/stats/Stats';
 import HomeWormStyle from '../pages/home/HomeWormStyle';
 import PolymarketStyleTrading from '../pages/market/PolymarketStyleTrading';
 import User from '../pages/user/User';
+import CreateMarket from '../pages/create/CreateMarket';
 import MarketCreation from '../pages/admin/MarketCreation';
+import PendingMarkets from '../pages/admin/PendingMarkets';
 import AdminLogin from '../pages/admin/AdminLogin';
 import RevenueDashboard from '../components/admin/RevenueDashboard';
 import NotFound from '../pages/notfound/NotFound';
-import Web3ErrorBoundary from '../components/fallback/Web3ErrorBoundary';
+import { useWeb3 } from '../hooks/useWeb3';
+
+// Admin addresses (lowercase)
+const ADMIN_ADDRESSES = [
+  '0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266', // Hardhat account #0
+  // Add more admin addresses here
+].map(addr => addr.toLowerCase());
+
+// Protected Admin Route Component
+const AdminRoute = ({ component: Component, ...rest }) => {
+  const { account, isConnected } = useWeb3();
+  const isAdmin = isConnected && account && ADMIN_ADDRESSES.includes(account.toLowerCase());
+
+  return (
+    <Route
+      {...rest}
+      render={(props) =>
+        isAdmin ? (
+          <Component {...props} />
+        ) : (
+          <Redirect to='/admin' />
+        )
+      }
+    />
+  );
+};
 
 const AppRoutes = () => {
   return (
@@ -28,10 +55,14 @@ const AppRoutes = () => {
       
       <Route exact path='/stats' component={Stats} />
 
-      {/* Admin Routes */}
+      {/* Public Market Creation */}
+      <Route exact path='/create' component={CreateMarket} />
+
+      {/* Admin Routes - Protected */}
       <Route exact path='/admin' component={AdminLogin} />
-      <Route exact path='/admin/create-market' component={MarketCreation} />
-      <Route exact path='/admin/revenue' component={RevenueDashboard} />
+      <AdminRoute exact path='/admin/create-market' component={MarketCreation} />
+      <AdminRoute exact path='/admin/pending' component={PendingMarkets} />
+      <AdminRoute exact path='/admin/revenue' component={RevenueDashboard} />
 
       {/* Home Route */}
       <Route exact path='/' component={HomeWormStyle} />
