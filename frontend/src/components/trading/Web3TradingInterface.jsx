@@ -759,8 +759,8 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
 
   if (!isConnected) {
     return (
-      <div className="glass-card rounded-[16px] backdrop-blur-[32px] relative" style={{ background: 'transparent', width: '384px', minHeight: '540px', padding: '17px' }}>
-        <div style={{ width: '350px', minHeight: '474px' }} className="flex items-center justify-center">
+      <div className="glass-card rounded-[16px] backdrop-blur-[32px] relative w-full max-w-[384px] mx-auto" style={{ background: 'transparent', minHeight: '540px', padding: '17px' }}>
+        <div className="w-full min-h-[474px] flex items-center justify-center">
           <button
             className="glass-card rounded-[12px] w-full"
             style={{ 
@@ -783,11 +783,11 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
   }
 
   return (
-    <div className="glass-card rounded-[16px] backdrop-blur-[32px] relative" style={{ background: 'transparent', width: '384px', minHeight: '620px', padding: '17px' }}>
-      <div className="relative" style={{ width: '350px', minHeight: '560px' }}>
+    <div className="glass-card rounded-[16px] backdrop-blur-[32px] relative w-full max-w-[384px] mx-auto" style={{ background: 'transparent', minHeight: '620px', padding: '17px' }}>
+      <div className="relative w-full min-h-[560px]">
         
         {/* Buy/Sell + 2x Badge - Row at y:0 */}
-        <div className="absolute flex items-center justify-between" style={{ left: 0, top: 0, width: '350px', height: '40px' }}>
+        <div className="absolute flex items-center justify-between w-full" style={{ left: 0, top: 0, height: '40px' }}>
           <div className="flex items-center p-1 rounded-[8px]" style={{ border: '0.5px solid rgba(255,255,255,0.72)' }}>
             <button
               onClick={() => setActiveTab('buy')}
