@@ -18,7 +18,7 @@ export const showTransactionToast = ({
   icon = '✨',
   duration = 6000,
 }) => {
-  const explorerLink = txHash && explorerBase ? `${explorerBase}${txHash}` : null;
+  const explorerLink = txHash && explorerBase ? `${explorerBase}tx/${txHash}` : null;
 
   toast.custom(
     (t) => (
