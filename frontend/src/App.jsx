@@ -44,23 +44,29 @@ function App() {
               <Toaster
                 position="top-right"
                 toastOptions={{
-                  duration: 4000,
+                  duration: 4500,
+                  className: 'glass-toast',
                   style: {
-                    background: '#363636',
-                    color: '#fff',
+                    background: 'rgba(10, 10, 14, 0.82)',
+                    color: '#f7f7f5',
+                    border: '1px solid rgba(255, 255, 255, 0.12)',
+                    backdropFilter: 'blur(22px)',
+                    borderRadius: '16px'
                   },
                   success: {
-                    duration: 3000,
+                    duration: 4500,
+                    className: 'glass-toast glass-toast--success',
                     iconTheme: {
-                      primary: '#10b981',
-                      secondary: '#fff',
+                      primary: '#FFE600',
+                      secondary: '#121212',
                     },
                   },
                   error: {
-                    duration: 5000,
+                    duration: 5200,
+                    className: 'glass-toast glass-toast--error',
                     iconTheme: {
-                      primary: '#ef4444',
-                      secondary: '#fff',
+                      primary: '#FF4C4C',
+                      secondary: '#121212',
                     },
                   },
                 }}

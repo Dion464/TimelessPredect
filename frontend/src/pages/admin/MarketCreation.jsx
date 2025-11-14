@@ -4,6 +4,8 @@ import { useWeb3 } from '../../hooks/useWeb3';
 import { useAuth } from '../../helpers/AuthContent';
 import { getCurrencySymbol } from '../../utils/currency';
 import toast from 'react-hot-toast';
+import { showTransactionToast, showGlassToast } from '../../utils/toastUtils.jsx';
+import '../market/MarketDetailGlass.css';
 
 const MarketCreation = () => {
   const history = useHistory();
@@ -27,6 +29,21 @@ const MarketCreation = () => {
   const [imagePreview, setImagePreview] = useState(null);
   const [imageFile, setImageFile] = useState(null);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [ruleInput, setRuleInput] = useState('');
+  const [rules, setRules] = useState([]);
+
+  const resolveApiBase = () => {
+    const envBase = import.meta.env.VITE_API_BASE_URL;
+    const isLocal8080 = envBase && /localhost:8080|127\.0\.0\.1:8080/i.test(envBase);
+    if (envBase && !isLocal8080) {
+      return envBase;
+    }
+    if (typeof window !== 'undefined' && window.location?.origin) {
+      return window.location.origin;
+    }
+    return '';
+  };
+  const API_BASE = resolveApiBase();
 
   const handleLogout = () => {
     localStorage.removeItem('isAdminLoggedIn');
@@ -156,6 +173,20 @@ const MarketCreation = () => {
     }));
   };
 
+  const handleAddRule = () => {
+    const trimmed = ruleInput.trim();
+    if (!trimmed) {
+      toast.error('Rule cannot be empty');
+      return;
+    }
+    setRules(prev => [...prev, trimmed]);
+    setRuleInput('');
+  };
+
+  const handleRemoveRule = (index) => {
+    setRules(prev => prev.filter((_, idx) => idx !== index));
+  };
+
   const calculateTimestamps = () => {
     // Use UTC to avoid timezone issues
     const endDateTime = new Date(`${formData.endDate}T${formData.endTime}:00`);
@@ -272,34 +303,71 @@ const MarketCreation = () => {
         resolutionTime
       );
 
-      // Store image URL mapping if image was uploaded
-      if (formData.imageUrl) {
-        // Extract market ID from events (same pattern as scripts)
-        let marketId = null;
-        
-        if (receipt.events) {
-          const marketCreatedEvent = receipt.events.find(e => e.event === 'MarketCreated');
-          if (marketCreatedEvent && marketCreatedEvent.args) {
-            marketId = marketCreatedEvent.args.marketId?.toString() || 
-                       marketCreatedEvent.args[0]?.toString();
-          }
-        }
-        
-        if (marketId) {
-          // Store image URL in localStorage with market ID as key
-          const marketImages = JSON.parse(localStorage.getItem('marketImages') || '{}');
-          marketImages[marketId] = formData.imageUrl;
-          localStorage.setItem('marketImages', JSON.stringify(marketImages));
-          console.log('✅ Stored image for market:', marketId);
-          toast.success(`Image saved for market #${marketId}`);
-        } else {
-          console.warn('⚠️ Could not extract market ID from transaction receipt');
-          console.log('Receipt events:', receipt.events);
-          toast('Image uploaded but market ID not found. Image will use category-based placeholder.');
+      // Extract market ID from events (same pattern as scripts)
+      let marketId = null;
+      if (receipt.events) {
+        const marketCreatedEvent = receipt.events.find(e => e.event === 'MarketCreated');
+        if (marketCreatedEvent && marketCreatedEvent.args) {
+          marketId = marketCreatedEvent.args.marketId?.toString() || marketCreatedEvent.args[0]?.toString();
         }
       }
 
-      toast.success('Market created successfully!');
+      const txHash = receipt?.transactionHash;
+
+      if (marketId) {
+        if (formData.imageUrl) {
+          try {
+            const response = await fetch(`${API_BASE}/api/market-images`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                marketId,
+                imageUrl: formData.imageUrl,
+                question: formData.question,
+                description: formData.description,
+                category: formData.category,
+              }),
+            });
+
+            if (!response.ok) {
+              const errorText = await response.text();
+              throw new Error(errorText || 'Failed to save market image');
+            }
+
+            toast.success(`Image saved for market #${marketId}`);
+          } catch (imgError) {
+            console.error('Error saving market image:', imgError);
+            toast.error('Image saved locally but failed to sync to database');
+          }
+        }
+
+        if (rules.length > 0) {
+          const storedRules = JSON.parse(localStorage.getItem('marketRules') || '{}');
+          storedRules[marketId] = rules;
+          localStorage.setItem('marketRules', JSON.stringify(storedRules));
+          console.log('✅ Stored rules for market:', marketId, rules);
+        }
+      } else if (formData.imageUrl || rules.length > 0) {
+        console.warn('⚠️ Could not extract market ID from transaction receipt');
+        console.log('Receipt events:', receipt.events);
+        toast('Metadata saved locally but market ID not found. Data will fallback to defaults.');
+      }
+
+      showTransactionToast({
+        icon: '✅',
+        title: 'Market created on-chain',
+        description: marketId
+          ? `Market #${marketId} is live on Incentiv Testnet.`
+          : 'Your market is live—final details will populate shortly.',
+        txHash
+      });
+
+      showGlassToast({
+        icon: '🚀',
+        title: 'Market creation complete',
+        description: 'The new market has been published and added to the marketplace.',
+        duration: 5200
+      });
       
       // Reset form
       setFormData({
@@ -314,6 +382,8 @@ const MarketCreation = () => {
       });
       setImagePreview(null);
       setImageFile(null);
+      setRules([]);
+      setRuleInput('');
 
       // Redirect to markets or new market
       // The new market ID would be in the events
@@ -337,109 +407,99 @@ const MarketCreation = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-4xl mx-auto">
-        {/* Header */}
-        <div className="mb-8 flex items-center justify-between">
+    <div className="min-h-screen bg-[#050505] text-white py-16 px-4 sm:px-8 font-['Clash Grotesk Variable']">
+      <div className="max-w-5xl mx-auto space-y-10">
+        <div className="glass-card border border-white/15 rounded-[28px] px-10 py-8 flex flex-col md:flex-row md:items-center md:justify-between gap-6 bg-transparent">
           <div>
-            <h1 className="text-display-sm font-semibold text-gray-900 mb-2">Create New Market</h1>
-            <p className="text-lg text-gray-600">Create a market for users to trade on</p>
+            <p className="uppercase tracking-[0.32em] text-white/45 text-xs mb-3">Admin Console</p>
+            <h1 className="text-[32px] font-semibold leading-tight">Create New Market</h1>
+            <p className="text-white/60 text-sm max-w-xl mt-3">
+              Launch a new prediction market with the same glass aesthetic used across the app.
+            </p>
           </div>
           <button
             onClick={handleLogout}
-            className="text-gray-600 hover:text-gray-900 text-sm font-medium flex items-center space-x-2"
+            className="text-white/70 hover:text-white text-sm font-medium flex items-center gap-2 transition-colors"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
             </svg>
-            <span>Logout</span>
+            Logout
           </button>
         </div>
 
-        {/* Wallet Connection Banner */}
         {!isConnected && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-6 flex items-center justify-between">
-            <div className="flex items-center">
-              <svg className="w-6 h-6 text-yellow-600 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="glass-card border border-[#FFE600]/40 rounded-[24px] px-8 py-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-[#161616]">
+            <div className="flex items-center gap-3 text-[#FFE600]">
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
-              <p className="text-yellow-800 font-medium">Connect your wallet to create markets</p>
+              <p className="font-medium tracking-wide text-sm">Connect your wallet to create markets</p>
             </div>
             <button
               onClick={connectWallet}
-              className="bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 transition-colors font-medium text-sm"
+              className="px-6 py-2 rounded-full border border-[#FFE600] text-white hover:bg-[#FFE600]/10 transition-colors text-sm"
             >
               Connect Wallet
             </button>
           </div>
         )}
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-lg overflow-hidden">
-          <div className="p-6 space-y-6">
-            {/* Question */}
-            <div>
-              <label htmlFor="question" className="block text-sm font-medium text-gray-700 mb-2">
-                Market Question <span className="text-red-500">*</span>
-              </label>
+        <form onSubmit={handleSubmit} className="space-y-8">
+          <div className="glass-card border border-white/15 rounded-[28px] px-10 py-10 space-y-8 bg-[#111111]/60">
+            <div className="space-y-3">
+              <label htmlFor="question" className="text-xs uppercase tracking-[0.32em] text-white/45">Market Question*</label>
               <input
                 type="text"
                 id="question"
                 name="question"
                 value={formData.question}
                 onChange={handleInputChange}
-                placeholder="e.g., Will Bitcoin reach $100k by end of 2024?"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                placeholder="Will ETH reach $10,000 by Dec 31, 2025?"
+                className="w-full px-5 py-4 bg-transparent border border-white/15 rounded-[18px] text-white placeholder:text-white/35 focus:outline-none focus:border-[#FFE600] transition-all"
                 required
               />
-              <p className="mt-1 text-sm text-gray-500">Make the question clear and specific</p>
             </div>
 
-            {/* Description */}
-            <div>
-              <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
-                Description
-              </label>
+            <div className="space-y-3">
+              <label htmlFor="description" className="text-xs uppercase tracking-[0.32em] text-white/45">Description</label>
               <textarea
                 id="description"
                 name="description"
                 value={formData.description}
                 onChange={handleInputChange}
                 rows="4"
-                placeholder="Provide additional context about the market..."
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-none"
+                placeholder="Provide context or clarification. Markdown supported."
+                className="w-full px-5 py-4 bg-transparent border border-white/15 rounded-[18px] text-white placeholder:text-white/35 focus:outline-none focus:border-[#FFE600] transition-all resize-none"
               />
             </div>
 
-            {/* Market Image */}
-            <div>
-              <label htmlFor="image" className="block text-sm font-medium text-gray-700 mb-2">
-                Market Image
-              </label>
+            <div className="space-y-3">
+              <label className="text-xs uppercase tracking-[0.32em] text-white/45">Market Image</label>
               <div className="space-y-4">
                 {imagePreview ? (
-                  <div className="relative">
-                    <div className="relative w-full h-48 rounded-lg overflow-hidden border-2 border-gray-300">
-                      <img
-                        src={imagePreview}
-                        alt="Market preview"
-                        className="w-full h-full object-cover"
-                      />
-                      <button
-                        type="button"
-                        onClick={removeImage}
-                        className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-2 hover:bg-red-600 transition-colors"
-                        title="Remove image"
-                      >
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </div>
-                    <p className="mt-2 text-sm text-gray-500">Image preview</p>
+                  <div className="relative glass-card border border-white/15 rounded-[20px] overflow-hidden">
+                    <img src={imagePreview} alt="Market preview" className="w-full h-52 object-cover" />
+                    <button
+                      type="button"
+                      onClick={removeImage}
+                      className="absolute top-3 right-3 px-3 py-1.5 rounded-full border border-red-400 text-red-300 text-xs uppercase tracking-[0.2em] hover:bg-red-500/10 transition"
+                    >
+                      Remove
+                    </button>
                   </div>
                 ) : (
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-400 transition-colors">
+                  <label
+                    htmlFor="image"
+                    className="glass-card border border-dashed border-white/20 rounded-[20px] px-8 py-12 flex flex-col items-center justify-center gap-4 text-white/60 cursor-pointer hover:border-[#FFE600] transition-colors"
+                  >
+                    <svg className="w-12 h-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <div className="text-center text-sm">
+                      <p className="font-medium">{uploadingImage ? 'Uploading image...' : 'Drop or click to add artwork'}</p>
+                      <p className="text-white/40 text-xs mt-2">PNG, JPG, GIF up to 5MB</p>
+                    </div>
                     <input
                       type="file"
                       id="image"
@@ -448,50 +508,38 @@ const MarketCreation = () => {
                       onChange={handleImageChange}
                       className="hidden"
                     />
-                    <label
-                      htmlFor="image"
-                      className="cursor-pointer flex flex-col items-center"
-                    >
-                      <svg className="w-12 h-12 text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
-                      <span className="text-sm font-medium text-gray-700">
-                        {uploadingImage ? 'Uploading...' : 'Click to upload image'}
-                      </span>
-                      <span className="text-xs text-gray-500 mt-1">
-                        PNG, JPG, GIF up to 5MB
-                      </span>
-                    </label>
-                  </div>
+                  </label>
                 )}
               </div>
-              <p className="mt-1 text-sm text-gray-500">Add an image to make your market stand out (like Polymarket)</p>
             </div>
 
-            {/* Category */}
-            <div>
-              <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-2">
-                Category
-              </label>
-              <select
-                id="category"
-                name="category"
-                value={formData.category}
-                onChange={handleInputChange}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-              >
-                {categories.map(cat => (
-                  <option key={cat.value} value={cat.value}>{cat.label}</option>
-                ))}
-              </select>
+            <div className="grid md:grid-cols-2 gap-6">
+              <div className="space-y-3">
+                <label htmlFor="category" className="text-xs uppercase tracking-[0.32em] text-white/45">Category</label>
+                <select
+                  id="category"
+                  name="category"
+                  value={formData.category}
+                  onChange={handleInputChange}
+                  className="w-full px-5 py-4 bg-[#121212] border border-white/15 rounded-[18px] text-white focus:outline-none focus:border-[#FFE600]"
+                >
+                  {categories.map(cat => (
+                    <option key={cat.value} value={cat.value} className="bg-[#0B0B0B] text-white">
+                      {cat.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="glass-card border border-white/12 rounded-[18px] px-5 py-4 bg-transparent">
+                <p className="text-xs uppercase tracking-[0.3em] text-white/45 mb-2">Estimated Fee</p>
+                <p className="text-[24px] font-semibold">{estimatedFee} {currencySymbol}</p>
+                <p className="text-white/40 text-xs mt-1">Debited once the market is confirmed on-chain.</p>
+              </div>
             </div>
 
-            {/* End Date & Time */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="endDate" className="block text-sm font-medium text-gray-700 mb-2">
-                  End Date <span className="text-red-500">*</span>
-                </label>
+            <div className="grid md:grid-cols-2 gap-6">
+              <div className="space-y-3">
+                <label htmlFor="endDate" className="text-xs uppercase tracking-[0.32em] text-white/45">End Date*</label>
                 <input
                   type="date"
                   id="endDate"
@@ -499,38 +547,27 @@ const MarketCreation = () => {
                   value={formData.endDate}
                   onChange={handleInputChange}
                   min={new Date().toISOString().split('T')[0]}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  className="w-full px-5 py-4 bg-transparent border border-white/15 rounded-[18px] text-white focus:outline-none focus:border-[#FFE600]"
                   required
                 />
               </div>
-              <div>
-                <label htmlFor="endTime" className="block text-sm font-medium text-gray-700 mb-2">
-                  End Time <span className="text-red-500">*</span>
-                </label>
+              <div className="space-y-3">
+                <label htmlFor="endTime" className="text-xs uppercase tracking-[0.32em] text-white/45">End Time*</label>
                 <input
                   type="time"
                   id="endTime"
                   name="endTime"
                   value={formData.endTime}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  className="w-full px-5 py-4 bg-transparent border border-white/15 rounded-[18px] text-white focus:outline-none focus:border-[#FFE600]"
                   required
                 />
               </div>
             </div>
 
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <p className="text-sm text-blue-800">
-                <strong>End Time:</strong> No new trades can be placed after this time
-              </p>
-            </div>
-
-            {/* Resolution Date & Time */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="resolutionDate" className="block text-sm font-medium text-gray-700 mb-2">
-                  Resolution Date <span className="text-red-500">*</span>
-                </label>
+            <div className="grid md:grid-cols-2 gap-6">
+              <div className="space-y-3">
+                <label htmlFor="resolutionDate" className="text-xs uppercase tracking-[0.32em] text-white/45">Resolution Date*</label>
                 <input
                   type="date"
                   id="resolutionDate"
@@ -538,91 +575,103 @@ const MarketCreation = () => {
                   value={formData.resolutionDate}
                   onChange={handleInputChange}
                   min={new Date().toISOString().split('T')[0]}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  className="w-full px-5 py-4 bg-transparent border border-white/15 rounded-[18px] text-white focus:outline-none focus:border-[#FFE600]"
                   required
                 />
               </div>
-              <div>
-                <label htmlFor="resolutionTime" className="block text-sm font-medium text-gray-700 mb-2">
-                  Resolution Time <span className="text-red-500">*</span>
-                </label>
+              <div className="space-y-3">
+                <label htmlFor="resolutionTime" className="text-xs uppercase tracking-[0.32em] text-white/45">Resolution Time*</label>
                 <input
                   type="time"
                   id="resolutionTime"
                   name="resolutionTime"
                   value={formData.resolutionTime}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  className="w-full px-5 py-4 bg-transparent border border-white/15 rounded-[18px] text-white focus:outline-none focus:border-[#FFE600]"
                   required
                 />
               </div>
             </div>
 
-            <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-              <p className="text-sm text-purple-800">
-                <strong>Resolution Time:</strong> The market must be resolved by this time
-              </p>
-            </div>
-
-            {/* Estimated Fee */}
-            <div className="bg-gray-50 rounded-lg p-4">
+            <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-700">Estimated Creation Fee</p>
-                  <p className="text-xs text-gray-500">In {currencySymbol}</p>
+                  <h3 className="text-xs uppercase tracking-[0.32em] text-white/45">Market Rules</h3>
+                  <p className="text-white/40 text-xs mt-2">These will display on the market detail page.</p>
                 </div>
-                <div className="text-right">
-                  <p className="text-2xl font-bold text-gray-900">{estimatedFee}</p>
-                  <p className="text-xs text-gray-500">{currencySymbol}</p>
+                <span className="text-white/50 text-xs uppercase tracking-[0.28em]">{rules.length} Added</span>
+              </div>
+
+              <div className="glass-card border border-white/15 rounded-[20px] px-5 py-5 bg-transparent space-y-4">
+                <textarea
+                  value={ruleInput}
+                  onChange={(e) => setRuleInput(e.target.value)}
+                  rows="3"
+                  placeholder="Add a new rule…"
+                  className="w-full px-4 py-3 bg-transparent border border-white/12 rounded-[16px] text-white placeholder:text-white/35 focus:outline-none focus:border-[#FFE600]"
+                />
+                <div className="flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={handleAddRule}
+                    className="px-6 py-2 rounded-full border border-[#FFE600] text-white hover:bg-[#FFE600]/10 transition-colors text-xs font-medium tracking-[0.2em]"
+                  >
+                    Add Rule
+                  </button>
+                  <span className="text-white/40 text-xs">Keep rules concise and unambiguous.</span>
                 </div>
               </div>
+
+              {rules.length > 0 && (
+                <div className="space-y-3">
+                  {rules.map((rule, index) => (
+                    <div
+                      key={`${rule}-${index}`}
+                      className="glass-card border border-white/12 rounded-[20px] px-5 py-4 bg-transparent flex items-start gap-4"
+                    >
+                      <div className="w-8 h-8 rounded-full border border-white/20 flex items-center justify-center text-sm text-white/80">
+                        {index + 1}
+                      </div>
+                      <p className="flex-1 text-white/80 leading-relaxed">{rule}</p>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveRule(index)}
+                        className="text-white/45 hover:text-white text-xs uppercase tracking-[0.26em]"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Form Footer */}
-          <div className="bg-gray-50 px-6 py-4 flex items-center justify-between border-t border-gray-200">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <button
               type="button"
               onClick={() => history.push('/markets')}
-              className="px-4 py-2 text-gray-700 hover:text-gray-900 font-medium transition-colors"
+              className="text-white/50 hover:text-white text-sm uppercase tracking-[0.28em] transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={!isConnected || isLoading}
-              className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-8 py-3 rounded-full border border-[#FFE600] text-white text-sm uppercase tracking-[0.3em] hover:bg-[#FFE600]/10 transition disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              {isLoading ? 'Creating...' : 'Create Market'}
+              {isLoading ? 'Creating…' : 'Create Market'}
             </button>
           </div>
         </form>
 
-        {/* Info Section */}
-        <div className="mt-8 bg-blue-50 border border-blue-200 rounded-xl p-6">
-          <h3 className="text-lg font-semibold text-blue-900 mb-3 flex items-center">
-            <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            Market Creation Guidelines
-          </h3>
-          <ul className="space-y-2 text-sm text-blue-800">
-            <li className="flex items-start">
-              <span className="mr-2">•</span>
-              <span>Questions should be specific, measurable, and unambiguous</span>
-            </li>
-            <li className="flex items-start">
-              <span className="mr-2">•</span>
-              <span>Choose appropriate dates to allow sufficient trading activity</span>
-            </li>
-            <li className="flex items-start">
-              <span className="mr-2">•</span>
-              <span>Ensure you have sufficient {currencySymbol} to cover the creation fee</span>
-            </li>
-            <li className="flex items-start">
-              <span className="mr-2">•</span>
-              <span>Markets become active immediately after creation</span>
-            </li>
+        <div className="glass-card border border-white/15 rounded-[24px] px-8 py-8 bg-[#111111]/60">
+          <h3 className="text-sm uppercase tracking-[0.3em] text-white/55 mb-4">Guidelines</h3>
+          <ul className="space-y-2 text-sm text-white/70 leading-relaxed">
+            <li>• Questions must be specific, measurable, and unambiguous.</li>
+            <li>• Choose end and resolution times that allow enough trading activity.</li>
+            <li>• Ensure your wallet holds sufficient {currencySymbol} to cover creation fees.</li>
+            <li>• Markets become active immediately after the transaction is confirmed.</li>
           </ul>
         </div>
       </div>

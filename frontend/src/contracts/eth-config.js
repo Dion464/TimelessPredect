@@ -7,6 +7,7 @@ export const MARKET_CREATION_FEE = import.meta.env.VITE_MARKET_CREATION_FEE;
 export const PLATFORM_FEE_BPS = parseInt(import.meta.env.VITE_PLATFORM_FEE_BPS);
 export const RPC_URL = import.meta.env.VITE_RPC_URL;
 export const NETWORK_NAME = import.meta.env.VITE_NETWORK_NAME;
+export const BLOCK_EXPLORER_URL = (import.meta.env.VITE_BLOCK_EXPLORER_URL || 'https://explorer.incentiv.io/tx/').trim();
 
 export const CONTRACT_ABI = [
   "function createMarket(string memory _question, string memory _description, string memory _category, uint256 _endTime, uint256 _resolutionTime) payable returns (uint256)",

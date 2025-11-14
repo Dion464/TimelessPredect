@@ -1,14 +1,20 @@
 const { ethers } = require("hardhat");
 
 async function main() {
-    console.log("🏗️  Creating Simple Prediction Markets...");
+    console.log("🏗️  Creating Prediction Markets on Incentiv Testnet...");
 
     const [deployer] = await ethers.getSigners();
     console.log("Creating markets with account:", deployer.address);
+    console.log("Account balance:", ethers.utils.formatEther(await deployer.getBalance()), "ETH");
 
+    // Incentiv Testnet contract address - NEWLY DEPLOYED
+    const contractAddress = "0x8cF17Ff1Abe81B5c74f78edb62b0AeF31936642C";
+    
     // Get the deployed contract
     const ETHPredictionMarket = await ethers.getContractFactory("ETHPredictionMarket");
-    const contract = await ETHPredictionMarket.attach("0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6");
+    const contract = await ETHPredictionMarket.attach(contractAddress);
+
+    console.log("Connected to contract at:", contractAddress);
 
     const marketCreationFee = await contract.marketCreationFee();
     console.log("Market creation fee:", ethers.utils.formatEther(marketCreationFee), "ETH");
@@ -55,7 +61,7 @@ async function main() {
         }
     ];
 
-    console.log(`\n📊 Creating ${simpleMarkets.length} simple prediction markets...\n`);
+    console.log(`\n📊 Creating ${simpleMarkets.length} prediction markets...\n`);
 
     for (let i = 0; i < simpleMarkets.length; i++) {
         const market = simpleMarkets[i];
@@ -71,10 +77,11 @@ async function main() {
                 market.resolutionTime,
                 {
                     value: marketCreationFee,
-                    gasLimit: 3000000 // Increased gas limit
+                    gasLimit: 3000000
                 }
             );
             
+            console.log(`   ⏳ Transaction sent: ${tx.hash}`);
             const receipt = await tx.wait();
             const marketId = receipt.events?.find(e => e.event === 'MarketCreated')?.args?.marketId;
             
@@ -96,7 +103,7 @@ async function main() {
         console.log(`   ${marketId}: ${market.question}`);
     }
 
-    console.log("\n🎉 Markets created! Connect wallet and refresh frontend to trade!");
+    console.log("\n🎉 Markets created! Refresh your frontend to see them!");
 }
 
 main()
@@ -105,3 +112,4 @@ main()
         console.error(error);
         process.exit(1);
     });
+

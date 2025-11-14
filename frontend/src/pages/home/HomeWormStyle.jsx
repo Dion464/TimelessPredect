@@ -16,6 +16,18 @@ const HomeWormStyle = () => {
   const [trendingMarkets, setTrendingMarkets] = useState([]);
   
   const currencySymbol = getCurrencySymbol(chainId);
+  const resolveApiBase = () => {
+    const envBase = import.meta.env.VITE_API_BASE_URL;
+    const isLocal8080 = envBase && /localhost:8080|127\.0\.0\.1:8080/i.test(envBase);
+    if (envBase && !isLocal8080) {
+      return envBase;
+    }
+    if (typeof window !== 'undefined' && window.location?.origin) {
+      return window.location.origin;
+    }
+    return '';
+  };
+  const API_BASE = resolveApiBase();
 
   const categories = ['All', 'Politics', 'Sports', 'Crypto', 'Tech', 'WTF'];
 
@@ -45,6 +57,22 @@ const HomeWormStyle = () => {
 
       const activeMarkets = await contractToUse.getActiveMarkets();
       
+      let persistedImages = {};
+      try {
+        const imageResponse = await fetch(`${API_BASE}/api/market-images`);
+        if (imageResponse.ok) {
+          const imageData = await imageResponse.json();
+          const imagesArray = Array.isArray(imageData.images) ? imageData.images : [];
+          imagesArray.forEach((img) => {
+            if (img.marketId && img.imageUrl) {
+              persistedImages[img.marketId.toString()] = img.imageUrl;
+            }
+          });
+        }
+      } catch (imgErr) {
+        console.warn('Unable to load market images from API:', imgErr);
+      }
+
       const marketsData = await Promise.all(
         activeMarkets.map(async (marketId) => {
           try {
@@ -69,8 +97,10 @@ const HomeWormStyle = () => {
             const totalNo = parseFloat(ethers.utils.formatEther(market.totalNoShares));
             const volume = totalYes + totalNo;
 
+            const marketIdStr = marketId.toString();
+
             return {
-              id: marketId.toString(),
+              id: marketIdStr,
               question: market.question,
               category: market.category || 'General',
               yesPrice: Math.round(yesPrice), // Round to whole number for display
@@ -82,6 +112,7 @@ const HomeWormStyle = () => {
               resolved: market.resolved,
               active: market.active,
               createdAt: market.createdAt ? new Date(market.createdAt.toNumber() * 1000) : new Date(),
+              imageUrl: persistedImages[marketIdStr] || (market.imageUrl ?? null),
             };
           } catch (err) {
             console.error(`Error fetching market ${marketId}:`, err);
@@ -118,39 +149,29 @@ const HomeWormStyle = () => {
   });
 
   const getMarketImage = (market) => {
-    const marketId = market.id || '0';
-    
-    // First, check if there's a stored image URL in localStorage
-    try {
-      const marketImages = JSON.parse(localStorage.getItem('marketImages') || '{}');
-      if (marketImages[marketId]) {
-        return marketImages[marketId];
-      }
-    } catch (err) {
-      console.log('Error reading market images from localStorage');
-    }
-    
-    // If market has an imageUrl prop, use it
     if (market.imageUrl) {
       return market.imageUrl;
     }
-    
-    // Otherwise, generate a dynamic image based on category with unique seed
+
+    if (market.description && market.description.startsWith('data:image')) {
+      return market.description;
+    }
+
     const category = market.category || 'General';
     
-    // Use Unsplash API for category-based images with higher quality
     const categoryKeywords = {
       'Politics': 'politics,government,election',
       'Sports': 'sports,athlete,competition',
       'Crypto': 'cryptocurrency,bitcoin,blockchain',
       'Tech': 'technology,innovation,digital',
+      'AI': 'artificial-intelligence,robot,future',
+      'Stocks': 'stock-market,trading,finance',
       'WTF': 'abstract,surreal,unusual',
       'General': 'abstract,gradient,modern'
     };
     
     const keywords = categoryKeywords[category] || categoryKeywords['General'];
-    // Use a deterministic seed based on market ID for consistent but varied images
-    const seed = parseInt(marketId) % 1000;
+    const seed = parseInt(market.id || '0', 10) % 1000;
     
     return `https://source.unsplash.com/600x400/?${keywords}&sig=${seed}`;
   };

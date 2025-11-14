@@ -376,6 +376,14 @@ export const Web3Provider = ({ children }) => {
   }, [provider, signer, account]);
 
   // Buy shares with ETH
+  const normalizeDecimal = (value) => {
+    if (value === null || value === undefined) return '0';
+    if (typeof value === 'number') return value.toString();
+    const trimmed = value.toString().trim();
+    if (!trimmed) return '0';
+    return trimmed.replace(/,/g, '.');
+  };
+
   // Buy shares with retry logic
   const buyShares = useCallback(async (marketId, isYes, ethAmount) => {
     if (!contracts.predictionMarket || !signer) {
@@ -403,12 +411,12 @@ export const Web3Provider = ({ children }) => {
         // Try with gas estimation first
         try {
           const gasEstimate = await contracts.predictionMarket.estimateGas.buyShares(marketId, isYes, {
-            value: ethers.utils.parseEther(ethAmount.toString())
+            value: ethers.utils.parseUnits(normalizeDecimal(ethAmount), 18)
           });
           console.log(`⛽ Gas estimate: ${gasEstimate.toString()}`);
 
           const tx = await contracts.predictionMarket.buyShares(marketId, isYes, {
-            value: ethers.utils.parseEther(ethAmount.toString()),
+            value: ethers.utils.parseUnits(normalizeDecimal(ethAmount), 18),
             gasLimit: gasEstimate.mul(120).div(100) // Add 20% buffer
           });
 
@@ -423,7 +431,7 @@ export const Web3Provider = ({ children }) => {
           
           // Fallback to fixed gas limit
           const tx = await contracts.predictionMarket.buyShares(marketId, isYes, {
-            value: ethers.utils.parseEther(ethAmount.toString()),
+            value: ethers.utils.parseUnits(normalizeDecimal(ethAmount), 18),
             gasLimit: 500000 // Fixed gas limit
           });
 
@@ -472,12 +480,21 @@ export const Web3Provider = ({ children }) => {
 
         // Try with gas estimation first
         try {
-          const gasEstimate = await contracts.predictionMarket.estimateGas.sellShares(marketId, isYes, ethers.utils.parseEther(shares.toString()));
+          const gasEstimate = await contracts.predictionMarket.estimateGas.sellShares(
+            marketId,
+            isYes,
+            ethers.utils.parseUnits(normalizeDecimal(shares), 18)
+          );
           console.log(`⛽ Gas estimate: ${gasEstimate.toString()}`);
 
-          const tx = await contracts.predictionMarket.sellShares(marketId, isYes, ethers.utils.parseEther(shares.toString()), {
+          const tx = await contracts.predictionMarket.sellShares(
+            marketId,
+            isYes,
+            ethers.utils.parseUnits(normalizeDecimal(shares), 18),
+            {
             gasLimit: gasEstimate.mul(120).div(100) // Add 20% buffer
-          });
+            }
+          );
 
           console.log('Sell transaction sent:', tx.hash);
           const receipt = await tx.wait();
@@ -489,9 +506,14 @@ export const Web3Provider = ({ children }) => {
           console.log(`⛽ Gas estimation failed, trying with fixed gas limit...`);
           
           // Fallback to fixed gas limit
-          const tx = await contracts.predictionMarket.sellShares(marketId, isYes, ethers.utils.parseEther(shares.toString()), {
+          const tx = await contracts.predictionMarket.sellShares(
+            marketId,
+            isYes,
+            ethers.utils.parseUnits(normalizeDecimal(shares), 18),
+            {
             gasLimit: 300000 // Fixed gas limit
-          });
+            }
+          );
 
           console.log('Sell transaction sent (fixed gas):', tx.hash);
           const receipt = await tx.wait();
@@ -565,7 +587,7 @@ export const Web3Provider = ({ children }) => {
             isYes,
             priceBps,
             {
-              value: ethers.utils.parseEther(ethAmount.toString())
+              value: ethers.utils.parseUnits(normalizeDecimal(ethAmount), 18)
             }
           );
           console.log(`⛽ Gas estimate: ${gasEstimate.toString()}`);
@@ -575,7 +597,7 @@ export const Web3Provider = ({ children }) => {
             isYes,
             priceBps,
             {
-              value: ethers.utils.parseEther(ethAmount.toString()),
+              value: ethers.utils.parseUnits(normalizeDecimal(ethAmount), 18),
               gasLimit: gasEstimate.mul(120).div(100)
             }
           );
@@ -594,7 +616,7 @@ export const Web3Provider = ({ children }) => {
             isYes,
             priceBps,
             {
-              value: ethers.utils.parseEther(ethAmount.toString()),
+              value: ethers.utils.parseUnits(normalizeDecimal(ethAmount), 18),
               gasLimit: 500000
             }
           );
@@ -624,8 +646,18 @@ export const Web3Provider = ({ children }) => {
     }
 
     try {
-      // Use hybrid order system API instead of contract
-      const API_BASE = import.meta.env.VITE_API_BASE_URL || window.location.origin;
+      const resolveApiBase = () => {
+        const envBase = import.meta.env.VITE_API_BASE_URL;
+        const isLocal8080 = envBase && /localhost:8080|127\.0\.0\.1:8080/i.test(envBase);
+        if (envBase && !isLocal8080) {
+          return envBase;
+        }
+        if (typeof window !== 'undefined' && window.location?.origin) {
+          return window.location.origin;
+        }
+        return '';
+      };
+      const API_BASE = resolveApiBase();
       const response = await fetch(
         `${API_BASE}/api/orders?user=${account}&marketId=${marketId}`
       );
@@ -636,16 +668,25 @@ export const Web3Provider = ({ children }) => {
       }
 
       const data = await response.json();
-      const orders = (data.orders || []).map(order => ({
-        orderId: order.id,
-        marketId: order.marketId.toString(),
-        isYes: order.outcomeId === '0' || order.outcomeId === 0,
-        price: parseFloat(order.price) / 100, // Convert ticks to cents
-        amount: parseFloat(ethers.utils.formatEther(order.size || '0')),
-        filled: order.filled ? parseFloat(ethers.utils.formatEther(order.filled)) : 0,
-        timestamp: order.createdAt || new Date().toISOString(),
-        status: order.status
-      }));
+      const orders = (data.orders || []).map(order => {
+        const priceTicks = order.priceTicks ?? order.price_ticks ?? order.priceTicks;
+        const priceCents = typeof priceTicks === 'number' ? priceTicks / 100 : 0;
+        const totalAmount = order.amount ?? (order.sizeWei ? parseFloat(ethers.utils.formatEther(order.sizeWei)) : 0);
+        const remainingAmount = order.remainingAmount ?? (order.remainingWei ? parseFloat(ethers.utils.formatEther(order.remainingWei)) : totalAmount);
+        const filledAmount = totalAmount - remainingAmount;
+
+        return {
+          orderId: order.id?.toString?.() ?? order.orderId ?? '',
+          marketId: order.marketId?.toString?.() ?? '',
+          isYes: order.outcomeId === '0' || order.outcomeId === 0,
+          price: priceCents,
+          amount: Number.isFinite(totalAmount) ? totalAmount : 0,
+          filled: Number.isFinite(filledAmount) ? filledAmount : 0,
+          remaining: Number.isFinite(remainingAmount) ? remainingAmount : 0,
+          timestamp: order.createdAt || new Date().toISOString(),
+          status: order.status || 'open'
+        };
+      });
 
       // Filter to only open and partially filled orders
       return orders.filter(o => o.status === 'open' || o.status === 'partially_filled');

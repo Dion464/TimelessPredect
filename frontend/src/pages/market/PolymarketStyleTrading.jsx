@@ -5,53 +5,25 @@ import Web3TradingInterface from '../../components/trading/Web3TradingInterface'
 import WormStyleNavbar from '../../components/modern/WormStyleNavbar';
 import { useWeb3 } from '../../hooks/useWeb3';
 import { getCurrencySymbol } from '../../utils/currency';
+import { CONTRACT_ADDRESS, CONTRACT_ABI, RPC_URL } from '../../contracts/eth-config';
 import { ethers } from 'ethers';
+import './MarketDetailGlass.css'; // Import glassmorphism styles
 
 // Generate image URL based on category and market ID (Polymarket-style)
 const getMarketImage = (market, marketIdParam) => {
   if (!market) return 'https://source.unsplash.com/200x200/?abstract,pattern,design';
-  
-  // Get market ID - handle both string and number formats
-  const marketId = market.id?.toString() || 
-                   market.marketId?.toString() || 
-                   marketIdParam?.toString() || 
-                   String(market.id) ||
-                   '0';
-  
-  // First, check if there's a stored image URL in localStorage
-  try {
-    const marketImages = JSON.parse(localStorage.getItem('marketImages') || '{}');
-    
-    // Try exact match first
-    if (marketImages[marketId]) {
-      return marketImages[marketId];
-    }
-    
-    // Try number format
-    const numId = parseInt(marketId);
-    if (!isNaN(numId) && marketImages[numId.toString()]) {
-      return marketImages[numId.toString()];
-    }
-    
-    // Try all keys to find a match
-    for (const key in marketImages) {
-      if (parseInt(key) === numId || key === marketId) {
-        return marketImages[key];
-      }
-    }
-  } catch (err) {
-    console.log('Error reading market images from localStorage:', err);
-  }
-  
-  // If market has an imageUrl prop, use it
+
   if (market?.imageUrl) {
     return market.imageUrl;
   }
-  
-  // Otherwise, generate a placeholder based on category
+
+  if (market?.description && market.description.startsWith('data:image')) {
+    return market.description;
+  }
+
+  const marketId = market.id?.toString?.() || market.marketId?.toString?.() || marketIdParam?.toString?.() || '0';
   const category = market?.category || 'General';
-  
-  // Use Unsplash API for category-based images
+
   const categoryKeywords = {
     'Technology': 'technology,computer,digital',
     'Crypto': 'cryptocurrency,bitcoin,blockchain',
@@ -62,11 +34,9 @@ const getMarketImage = (market, marketIdParam) => {
     'Science': 'science,research,laboratory',
     'General': 'abstract,pattern,design'
   };
-  
   const keywords = categoryKeywords[category] || categoryKeywords['General'];
-  // Use a deterministic seed based on market ID for consistent images
-  const seed = parseInt(marketId) % 1000;
-  
+  const seed = parseInt(marketId, 10) % 1000;
+
   return `https://source.unsplash.com/200x200/?${keywords}&sig=${seed}`;
 };
 
@@ -85,27 +55,144 @@ const PolymarketStyleTrading = () => {
   
   const { isConnected, contracts, getMarketData, chainId } = web3Context;
   const currencySymbol = getCurrencySymbol(chainId);
+  const resolveApiBase = () => {
+    const envBase = import.meta.env.VITE_API_BASE_URL;
+    const isLocal8080 = envBase && /localhost:8080|127\.0\.0\.1:8080/i.test(envBase);
+    if (envBase && !isLocal8080) {
+      return envBase;
+    }
+    if (typeof window !== 'undefined' && window.location?.origin) {
+      return window.location.origin;
+    }
+    return '';
+  };
   // Use current origin for API calls if VITE_API_BASE_URL is not set
-  const API_BASE = import.meta.env.VITE_API_BASE_URL || (typeof window !== 'undefined' ? window.location.origin : '');
+  const API_BASE = resolveApiBase();
   const [market, setMarket] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('trade');
+  const [activeTab, setActiveTab] = useState('market');
   const [selectedSide, setSelectedSide] = useState('yes');
   const [amount, setAmount] = useState('');
-  const [priceHistory, setPriceHistory] = useState([]);
-  const [yesPriceHistory, setYesPriceHistory] = useState([]);
-  const [noPriceHistory, setNoPriceHistory] = useState([]);
   const [recentTrades, setRecentTrades] = useState([]);
-  const [orderBook, setOrderBook] = useState({ yes: [], no: [] });
+  const [orderBook, setOrderBook] = useState({
+    yes: { bids: [], asks: [] },
+    no: { bids: [], asks: [] }
+  });
   const [uniqueTraders, setUniqueTraders] = useState(0);
   const [liquidity, setLiquidity] = useState(0);
   const [timeframe, setTimeframe] = useState('1d');
   const refreshTriggerRef = useRef(0); // Force refresh counter
+  const [customRules, setCustomRules] = useState([]);
+  const fallbackContractRef = useRef(null);
+
+  const safeToNumber = (value) => {
+    if (value === null || value === undefined) return 0;
+    if (ethers.BigNumber.isBigNumber(value)) {
+      return Number(value.toString());
+    }
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+
+  const formatEtherNumber = (value) => {
+    if (value === null || value === undefined) return 0;
+    try {
+      if (ethers.BigNumber.isBigNumber(value)) {
+        return parseFloat(ethers.utils.formatEther(value));
+      }
+      if (typeof value === 'string') {
+        const numeric = parseFloat(value);
+        return Number.isFinite(numeric) ? numeric : 0;
+      }
+      const numeric = Number(value);
+      return Number.isFinite(numeric) ? numeric : 0;
+    } catch (err) {
+      const numeric = parseFloat(value);
+      return Number.isFinite(numeric) ? numeric : 0;
+    }
+  };
+
+  const getStoredRules = useCallback((id) => {
+    try {
+      if (!id) return [];
+      const rulesMap = JSON.parse(localStorage.getItem('marketRules') || '{}');
+      const key = id.toString();
+      if (Array.isArray(rulesMap[key]) && rulesMap[key].length > 0) {
+        return rulesMap[key];
+      }
+      const numericKey = parseInt(key, 10);
+      if (!isNaN(numericKey)) {
+        const altKey = numericKey.toString();
+        if (Array.isArray(rulesMap[altKey]) && rulesMap[altKey].length > 0) {
+          return rulesMap[altKey];
+        }
+      }
+    } catch (err) {
+      console.warn('Error reading stored rules:', err);
+    }
+    return [];
+  }, []);
+
+  const getPredictionMarketContract = useCallback(async () => {
+    if (contracts?.predictionMarket) {
+      return contracts.predictionMarket;
+    }
+    if (fallbackContractRef.current) {
+      return fallbackContractRef.current;
+    }
+    if (!RPC_URL || !CONTRACT_ADDRESS) {
+      return null;
+    }
+    try {
+      const provider = new ethers.providers.JsonRpcProvider(RPC_URL);
+      const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
+      fallbackContractRef.current = contract;
+      return contract;
+    } catch (err) {
+      console.error('Failed to initialize fallback contract:', err);
+      return null;
+    }
+  }, [contracts?.predictionMarket]);
+
+  const fetchMarketDataDirect = useCallback(async () => {
+    const contract = await getPredictionMarketContract();
+    if (!contract) {
+      throw new Error('Prediction market contract unavailable');
+    }
+    const normalizedMarketId = ethers.BigNumber.from(marketId);
+    const market = await contract.getMarket(normalizedMarketId);
+    const yesPrice = await contract.getCurrentPrice(normalizedMarketId, true);
+    const noPrice = await contract.getCurrentPrice(normalizedMarketId, false);
+
+    return {
+      id: Number(market.id),
+      question: market.question,
+      description: market.description,
+      category: market.category,
+      resolutionTime: market.resolutionTime?.toString?.() ?? '0',
+      createdAt: market.createdAt?.toString?.() ?? '0',
+      endTime: market.endTime?.toString?.() ?? '0',
+      creator: market.creator,
+      resolved: market.resolved,
+      totalVolume: market.totalVolume ? ethers.utils.formatEther(market.totalVolume) : '0',
+      yesPrice: yesPrice?.toNumber?.() ? yesPrice.toNumber() / 100 : 50,
+      noPrice: noPrice?.toNumber?.() ? noPrice.toNumber() / 100 : 50
+    };
+  }, [getPredictionMarketContract, marketId]);
 
   // These functions need to be defined before refreshAllData
   const fetchRecentTrades = useCallback(async () => {
     if (!contracts?.predictionMarket) {
       console.warn('Prediction market contract not available, skipping recent trades fetch');
+      setRecentTrades([]);
+      setUniqueTraders(0);
+      return;
+    }
+
+    if (typeof contracts.predictionMarket.getRecentTrades !== 'function') {
+      console.warn('getRecentTrades() not available on this contract. Skipping trades tab population.');
+      setRecentTrades([]);
+      setUniqueTraders(0);
       return;
     }
 
@@ -160,253 +247,102 @@ const PolymarketStyleTrading = () => {
   }, [contracts?.predictionMarket, marketId]);
 
   const fetchOrderBook = useCallback(async () => {
-    if (!contracts?.predictionMarket || !contracts?.pricingAMM) return;
-    
+    if (!marketId || !API_BASE) return;
+
     try {
-      // Get current prices from PricingAMM
-      const [yesPrice, noPrice] = await contracts.pricingAMM.calculatePrice(marketId);
-      const currentYesPrice = yesPrice.toNumber(); // Basis points (5000 = 50%)
-      const currentNoPrice = noPrice.toNumber();
-      
-      // Get market state from PricingAMM
-      const marketState = await contracts.pricingAMM.getMarketState(marketId);
-      const yesShares = parseFloat(ethers.utils.formatEther(marketState.yesShares));
-      const noShares = parseFloat(ethers.utils.formatEther(marketState.noShares));
-      
-      // Create order book based on actual market state
-      const yesOrders = [];
-      const noOrders = [];
-      
-      // Calculate order amounts based on actual shares
-      for (let i = 0; i < 5; i++) {
-        // YES orders: prices slightly below current (bids)
-        const priceOffset = i * 10; // 10 basis points = 0.1%
-        const yesPriceBasis = Math.max(100, currentYesPrice - priceOffset); // Min 1%
-        const yesPriceCents = Math.round(yesPriceBasis / 100); // Convert to cents
-        
-        // Amount based on YES shares available
-        const yesAmount = (yesShares * (currentYesPrice - priceOffset) / currentYesPrice) || 0;
-        
-        yesOrders.push({ 
-          price: yesPriceCents,
-          amount: yesAmount.toFixed(2)
-        });
-        
-        // NO orders: prices slightly below current (bids)
-        const noPriceBasis = Math.max(100, currentNoPrice - priceOffset);
-        const noPriceCents = Math.round(noPriceBasis / 100);
-        
-        // Amount based on NO shares available
-        const noAmount = (noShares * (currentNoPrice - priceOffset) / currentNoPrice) || 0;
-        
-        noOrders.push({ 
-          price: noPriceCents,
-          amount: noAmount.toFixed(2)
-        });
-      }
-      
-      setOrderBook({ yes: yesOrders, no: noOrders });
-      console.log('✅ Loaded real order book from market state');
-    } catch (error) {
-      console.error('Error fetching order book:', error);
-      setOrderBook({ yes: [], no: [] });
-    }
-  }, [contracts?.predictionMarket, contracts?.pricingAMM, marketId]);
+      const [yesResponse, noResponse] = await Promise.all([
+        fetch(`${API_BASE}/api/orders?marketId=${marketId}&outcomeId=0&depth=20`),
+        fetch(`${API_BASE}/api/orders?marketId=${marketId}&outcomeId=1&depth=20`)
+      ]);
 
-  const fetchLiquidity = useCallback(async () => {
-    if (!contracts?.predictionMarket || !contracts?.pricingAMM) return;
-    
-    try {
-      // Get market state for liquidity info
-      const marketState = await contracts.pricingAMM.getMarketState(marketId);
-      const liquidity = parseFloat(ethers.utils.formatEther(marketState.liquidity || '0'));
-      
-      // Also get contract balance as additional liquidity measure
-      const provider = contracts.predictionMarket.provider;
-      const contractAddress = contracts.predictionMarket.address;
-      const contractBalance = await provider.getBalance(contractAddress);
-      const balanceEth = parseFloat(ethers.utils.formatEther(contractBalance));
-      
-      // Use the higher of the two, or AMM liquidity if available
-      const totalLiquidity = liquidity > 0 ? liquidity : balanceEth;
-      
-      setLiquidity(totalLiquidity);
-      console.log('✅ Fetched liquidity:', totalLiquidity.toFixed(4), currencySymbol);
-    } catch (error) {
-      console.error('Error fetching liquidity:', error);
-      setLiquidity(0);
-    }
-  }, [contracts?.predictionMarket, contracts?.pricingAMM, marketId]);
-
-  // Function to record price snapshot to database
-  const recordPriceSnapshot = useCallback(async (yesPriceBps, noPriceBps) => {
-    try {
-      if (!marketId || !API_BASE) {
-        console.warn('Cannot record price snapshot: missing marketId or API_BASE');
-        return;
+      if (!yesResponse.ok || !noResponse.ok) {
+        throw new Error('Failed to load order book from API');
       }
 
-      // Validate prices before recording
-      // Ensure prices are reasonable (between 10 bps = 0.1% and 9990 bps = 99.9%)
-      if (yesPriceBps < 10 || yesPriceBps > 9990 || noPriceBps < 10 || noPriceBps > 9990) {
-        console.warn('⚠️  Invalid prices detected, skipping price snapshot:', {
-          marketId: marketId.toString(),
-          yesPriceBps,
-          noPriceBps,
-          yesPricePercent: (yesPriceBps / 100).toFixed(2),
-          noPricePercent: (noPriceBps / 100).toFixed(2)
-        });
-        return;
-      }
+      const yesData = await yesResponse.json();
+      const noData = await noResponse.json();
 
-      // Ensure YES + NO = 10000 (within rounding tolerance)
-      const total = yesPriceBps + noPriceBps;
-      if (Math.abs(total - 10000) > 100) { // Allow 1% tolerance
-        console.warn('⚠️  Price sum mismatch, normalizing before recording:', {
-          yesPriceBps,
-          noPriceBps,
-          total
-        });
-        // Normalize to ensure they sum to 10000
-        const scale = 10000 / total;
-        yesPriceBps = Math.round(yesPriceBps * scale);
-        noPriceBps = 10000 - yesPriceBps;
-      }
-
-      console.log('📊 Recording price snapshot to DB:', {
-        marketId: marketId.toString(),
-        yesPriceBps: yesPriceBps,
-        noPriceBps: noPriceBps,
-        yesPriceCents: (yesPriceBps / 100).toFixed(2),
-        noPriceCents: (noPriceBps / 100).toFixed(2),
-        sum: yesPriceBps + noPriceBps
+      setOrderBook({
+        yes: {
+          bids: yesData.bids || [],
+          asks: yesData.asks || []
+        },
+        no: {
+          bids: noData.bids || [],
+          asks: noData.asks || []
+        }
       });
-
-      const response = await fetch(`${API_BASE}/api/record-price`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          marketId: marketId.toString(),
-          yesPriceBps: yesPriceBps,
-          noPriceBps: noPriceBps
-        })
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ Failed to record price snapshot:', errorText);
-      } else {
-        const result = await response.json();
-        console.log('✅ Price snapshot recorded successfully:', result);
-      }
     } catch (error) {
-      console.error('❌ Error recording price snapshot:', error);
-      // Don't throw - this is non-critical
+      console.error('Error fetching order book from API:', error);
+      setOrderBook({
+        yes: { bids: [], asks: [] },
+        no: { bids: [], asks: [] }
+      });
     }
   }, [API_BASE, marketId]);
 
-  const fetchPriceHistoryFromDb = useCallback(async (range = timeframe) => {
-    try {
-      if (!marketId) {
-        return;
-      }
+  const fetchLiquidity = useCallback(async () => {
+    // Liquidity is no longer sourced from an AMM
+    setLiquidity(0);
+  }, []);
 
-      const response = await fetch(`${API_BASE}/api/price-history?marketId=${marketId}&timeframe=${range}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch price history');
-      }
+  const recordPriceSnapshot = useCallback(async () => {
+    // Price snapshots are no longer recorded in the serverless workflow
+    return;
+  }, []);
 
-      const raw = await response.text();
-      let data;
-      try {
-        data = JSON.parse(raw);
-      } catch (err) {
-        throw new Error('Price history endpoint did not return JSON. Ensure the API backend is running.');
-      }
-      const intervals = Array.isArray(data.intervals) ? data.intervals : [];
-
-      if (intervals.length === 0) {
-        setYesPriceHistory([]);
-        setNoPriceHistory([]);
-        setPriceHistory([]);
-        return;
-      }
-
-      // Use all actual timestamps from database - don't fill gaps, show real price history
-      const sorted = intervals
-        .map(entry => ({
-          yesPrice: entry.yesPrice, // Already in decimal (0-1) from API
-          noPrice: entry.noPrice,   // Already in decimal (0-1) from API
-          timestamp: new Date(entry.intervalStart).getTime()
-        }))
-        .sort((a, b) => a.timestamp - b.timestamp);
-
-      // Convert to chart format - prices are already in decimal (0-1) from database
-      // Chart expects prices in decimal format (0-1), not cents
-      const yesHistory = sorted.map(point => ({
-        price: point.yesPrice, // Already decimal, e.g., 0.50 = 50%
-        timestamp: new Date(point.timestamp).toISOString()
-      }));
-
-      const noHistory = sorted.map(point => ({
-        price: point.noPrice, // Already decimal, e.g., 0.50 = 50%
-        timestamp: new Date(point.timestamp).toISOString()
-      }));
-
-      console.log('📊 Loaded price history from database:', {
-        intervals: intervals.length,
-        yesHistory: yesHistory.length,
-        noHistory: noHistory.length,
-        yesPrices: yesHistory.map(p => (p.price * 100).toFixed(2) + '%').slice(0, 5),
-        noPrices: noHistory.map(p => (p.price * 100).toFixed(2) + '%').slice(0, 5)
-      });
-
-      setYesPriceHistory(yesHistory);
-      setNoPriceHistory(noHistory);
-      setPriceHistory(yesHistory);
-
-      // Don't update market prices from DB - prices come from chain
-    } catch (error) {
-      console.error('Error fetching price history from database:', error);
-      setYesPriceHistory([]);
-      setNoPriceHistory([]);
-      setPriceHistory([]);
-    }
-  }, [API_BASE, marketId, timeframe]);
+  const fetchPriceHistoryFromDb = useCallback(async () => {
+    // Price history storage removed in serverless workflow
+    return;
+  }, []);
 
   const fetchMarketData = useCallback(async () => {
     try {
       setLoading(true);
 
-      if (!isConnected || !contracts?.predictionMarket) {
-        console.warn('Wallet not connected or contracts unavailable. Connect wallet to view market data.');
-        setMarket(null);
-        setOrderBook({ yes: [], no: [] });
-        setLiquidity(0);
-        setRecentTrades([]);
-        setUniqueTraders(0);
-        return;
+      let marketData = null;
+      if (isConnected && contracts?.predictionMarket && typeof getMarketData === 'function') {
+        try {
+          marketData = await getMarketData(marketId);
+        } catch (primaryError) {
+          console.warn('Primary market fetch failed, falling back to direct provider:', primaryError);
+        }
       }
-
-      const marketData = await getMarketData(marketId);
+      if (!marketData) {
+        marketData = await fetchMarketDataDirect();
+      }
 
       const processedMarket = {
         id: Number(marketData.id),
         questionTitle: marketData.question,
         description: marketData.description,
         category: marketData.category || 'General',
-        resolutionDateTime: new Date(Number(marketData.resolutionTime) * 1000).toISOString(),
-        createdAt: new Date(Number(marketData.createdAt) * 1000).toISOString(),
-        endTime: Number(marketData.endTime),
+        resolutionDateTime: new Date(safeToNumber(marketData.resolutionTime) * 1000).toISOString(),
+        createdAt: new Date(safeToNumber(marketData.createdAt) * 1000).toISOString(),
+        endTime: safeToNumber(marketData.endTime),
         creatorUsername: marketData.creator,
         isResolved: marketData.resolved,
-        totalVolume: parseFloat(ethers.utils.formatEther(marketData.totalVolume)),
-        yesPrice: marketData.yesPrice ?? 50,
-        noPrice: marketData.noPrice ?? 50,
-        currentProbability: (marketData.yesPrice ?? 50) / 100
+        totalVolume: formatEtherNumber(marketData.totalVolume),
+        yesPrice: Number(marketData.yesPrice ?? 50),
+        noPrice: Number(marketData.noPrice ?? 50),
+        currentProbability: Number(marketData.yesPrice ?? 50) / 100
       };
 
+      try {
+        const imageResponse = await fetch(`${API_BASE}/api/market-images?marketId=${processedMarket.id}`);
+        if (imageResponse.ok) {
+          const imageData = await imageResponse.json();
+          if (imageData?.imageUrl) {
+            processedMarket.imageUrl = imageData.imageUrl;
+          }
+        }
+      } catch (imageErr) {
+        console.warn('Unable to load market image from API:', imageErr);
+      }
+
       setMarket(processedMarket);
+      const storedRules = getStoredRules(processedMarket.id);
+      setCustomRules(storedRules);
 
       // Fetch all data in parallel for better performance
       await Promise.all([
@@ -418,10 +354,11 @@ const PolymarketStyleTrading = () => {
     } catch (error) {
       console.error('Error fetching market data:', error);
       setMarket(null);
+      setCustomRules([]);
     } finally {
       setLoading(false);
     }
-  }, [contracts?.predictionMarket, fetchLiquidity, fetchOrderBook, fetchPriceHistoryFromDb, fetchRecentTrades, getMarketData, isConnected, marketId]);
+  }, [contracts?.predictionMarket, fetchLiquidity, fetchOrderBook, fetchPriceHistoryFromDb, fetchRecentTrades, fetchMarketDataDirect, getMarketData, getStoredRules, isConnected, marketId]);
 
   const handleTimeframeChange = useCallback(async (range) => {
     setTimeframe(range);
@@ -436,16 +373,13 @@ const PolymarketStyleTrading = () => {
 
   useEffect(() => {
     fetchMarketData();
-    
-    // Auto-refresh market data every 60 seconds only if connected (reduced from 10 seconds)
+
     const refreshInterval = setInterval(() => {
-      if (isConnected && contracts?.predictionMarket && marketId) {
-        fetchMarketData();
-      }
+      fetchMarketData();
     }, 60000); // 60 seconds
-    
+
     return () => clearInterval(refreshInterval);
-  }, [fetchMarketData, isConnected, contracts?.predictionMarket, marketId]);
+  }, [fetchMarketData]);
 
   // Set up event listeners for real-time updates
   useEffect(() => {
@@ -689,20 +623,20 @@ const PolymarketStyleTrading = () => {
       <div className="min-h-screen bg-[#171717]" style={{ fontFamily: 'gilroy, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
         <WormStyleNavbar />
         <div className="flex items-center justify-center" style={{ minHeight: 'calc(100vh - 80px)' }}>
-          <div className="text-center">
-            <div className="text-gray-400 mb-4">
-              <svg className="mx-auto h-12 w-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
+        <div className="text-center">
+          <div className="text-gray-400 mb-4">
+            <svg className="mx-auto h-12 w-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
             <h3 className="text-lg font-medium text-white mb-2">Market Not Found</h3>
             <p className="text-gray-400 mb-4">The market you're looking for doesn't exist.</p>
-            <button
-              onClick={() => history.push('/markets')}
+          <button
+            onClick={() => history.push('/markets')}
               className="bg-white text-[#171717] px-6 py-3 rounded-full font-bold hover:bg-gray-100 transition-all"
-            >
-              Back to Markets
-            </button>
+          >
+            Back to Markets
+          </button>
           </div>
         </div>
       </div>
@@ -734,6 +668,19 @@ const PolymarketStyleTrading = () => {
     return `${day} ${month} ${year}`;
   };
 
+  const defaultRules = [
+    "This market will resolve to 'Yes' if the stated outcome occurs before the resolution time; otherwise it resolves to 'No'.",
+    'Official confirmation must be available from a reputable public source (press release, official website, or governing body).',
+    'If the event is postponed beyond the resolution time, the market resolves to the most recent verifiable outcome.',
+    'If no definitive information can be found, the admin team will determine the result using best available evidence.'
+  ];
+
+  const rulesToRender = customRules.length > 0
+    ? customRules
+    : (Array.isArray(market?.rules) && market.rules.length > 0 ? market.rules : defaultRules);
+
+  const tradesToDisplay = Array.isArray(recentTrades) ? recentTrades.slice(0, 12) : [];
+
   return (
     <div className="min-h-screen bg-[#0E0E0E]" style={{ fontFamily: 'gilroy, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
       <WormStyleNavbar />
@@ -753,35 +700,11 @@ const PolymarketStyleTrading = () => {
           {/* Right Section - Market Info (2/3 width) */}
           <div className="lg:col-span-8 space-y-6">
             {/* Market Header */}
-            <div className="bg-white/[0.08] backdrop-blur-xl rounded-[24px] p-6 border border-white/20 shadow-lg">
+            <div className="glass-card rounded-[24px] p-8 border border-white/20 bg-transparent shadow-lg">
               <div className="flex items-start justify-between gap-6">
-                <div className="flex-1">
-                  {/* Creator Info */}
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-2 text-sm text-gray-400">
-                      <span>Creator:</span>
-                      <div className="flex items-center gap-1.5 bg-white/15 backdrop-blur-md px-3 py-1.5 rounded-lg border border-white/10">
-                        <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-                        </svg>
-                        <span className="text-white font-semibold">@{market.creator ? market.creator.slice(2, 8) : 'creator'}</span>
-                      </div>
-                      <div className="bg-white/15 backdrop-blur-md px-3 py-1.5 rounded-lg border border-white/10">
-                        <span className="text-white text-xs font-semibold">UMA</span>
-                      </div>
-                    </div>
-                    <button className="p-2 hover:bg-white/15 rounded-lg transition-colors backdrop-blur-md">
-                      <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-                      </svg>
-                    </button>
-                  </div>
-
-                  {/* Question */}
-                  <h1 className="text-2xl font-bold text-white leading-tight">
-                    {market.questionTitle}
-                  </h1>
-                </div>
+                <h1 className="text-2xl font-bold text-white leading-tight flex-1">
+                  {market.questionTitle}
+                </h1>
 
                 {/* Market Image - Right Side */}
                 <div className="relative rounded-[16px] overflow-hidden flex-shrink-0 border border-white/20 shadow-lg" style={{ width: '200px', height: '150px' }}>
@@ -796,108 +719,213 @@ const PolymarketStyleTrading = () => {
                   />
                 </div>
               </div>
-            </div>
+                </div>
 
             {/* Percentage Display */}
-            <div className="bg-white/[0.08] backdrop-blur-xl rounded-[24px] p-8 border border-white/20 shadow-lg">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-4">
-                  <div className="text-6xl font-bold text-white font-space-grotesk">{market?.yesPrice ? `${market.yesPrice.toFixed(0)}%` : '50%'}</div>
-                  <div className="text-gray-400 text-lg">chance</div>
-                </div>
-                <button className="p-2 hover:bg-white/15 rounded-lg transition-colors backdrop-blur-md">
-                  <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-                  </svg>
-                </button>
-              </div>
-            </div>
+            <div className="flex items-baseline gap-2">
+              <span
+                className="text-[32px] font-semibold text-white"
+                style={{ fontFamily: "'Clash Grotesk Variable', 'Clash Grotesk', sans-serif" }}
+              >
+                {market?.yesPrice ? `${market.yesPrice.toFixed(0)}%` : '50%'}
+                    </span>
+              <span className="text-gray-400 text-base" style={{ fontFamily: "'Clash Grotesk Variable', 'Clash Grotesk', sans-serif" }}>
+                chance
+                    </span>
+                  </div>
 
             {/* Tabs */}
-            <div className="bg-white/[0.08] backdrop-blur-xl rounded-[24px] border border-white/20 overflow-hidden shadow-lg">
-              <div className="flex border-b border-white/20">
-                {['market', 'rules', 'holders'].map((tab) => (
-                  <button
-                    key={tab}
-                    onClick={() => setActiveTab(tab)}
-                    className={`flex-1 py-4 text-sm font-semibold capitalize transition-all backdrop-blur-md ${
-                      activeTab === tab
-                        ? 'bg-white/15 text-white'
-                        : 'text-gray-400 hover:text-gray-300 hover:bg-white/10'
-                    }`}
-                  >
-                    {tab === 'holders' ? 'Top Holders' : tab}
-                  </button>
-                ))}
-              </div>
+            <div className="space-y-6">
+              <div className="flex items-center justify-between border border-white/25 rounded-[22px] px-2 py-1">
+                {['market', 'rules', 'trades'].map((tab) => {
+                  const isActive = activeTab === tab;
+                  return (
+                    <button
+                      key={tab}
+                      onClick={() => setActiveTab(tab)}
+                      className={`flex-1 text-center text-sm font-medium transition-all duration-200 ${
+                        isActive
+                          ? 'text-white border border-[#FFE600]'
+                          : 'text-[#9F9F9F] border border-transparent hover:text-white'
+                      }`}
+                      style={{
+                        fontFamily: "'Clash Grotesk Variable', 'Clash Grotesk', sans-serif",
+                        padding: '10px 0',
+                        borderRadius: '18px',
+                        background: isActive ? 'rgba(255,255,255,0.04)' : 'transparent'
+                      }}
+                    >
+                      {tab === 'trades' ? 'Trades' : tab.charAt(0).toUpperCase() + tab.slice(1)}
+                    </button>
+                  );
+                })}
+                </div>
 
               {/* Tab Content */}
-              <div className="p-6">
-              {activeTab === 'market' && (
-                <div className="space-y-4">
-                  <div className="bg-white/10 backdrop-blur-lg rounded-xl p-4 border border-white/15">
-                    <p className="text-sm text-gray-400 mb-4">
-                      This market was created on X. Create a market yourself below
-                    </p>
+              <div className="glass-card rounded-[24px] border border-white/20 backdrop-blur-2xl px-9 pb-12 pt-10" style={{ background: 'rgba(12,12,12,0.55)' }}>
+                {activeTab === 'market' && (
+                  <div className="space-y-8 text-[#E4E4E4]" style={{ fontFamily: "'Clash Grotesk Variable', sans-serif" }}>
                     <div className="space-y-3">
-                      <div className="flex items-start gap-3">
-                        <div className="w-6 h-6 rounded-full bg-white/15 backdrop-blur-md flex items-center justify-center text-xs font-bold flex-shrink-0 text-white">
-                          1
-                        </div>
-                        <p className="text-sm text-gray-300">Click create on X</p>
-                      </div>
-                      <div className="flex items-start gap-3">
-                        <div className="w-6 h-6 rounded-full bg-white/15 backdrop-blur-md flex items-center justify-center text-xs font-bold flex-shrink-0 text-white">
-                          2
-                        </div>
-                        <p className="text-sm text-gray-300">Tag @WormPredict and make your prediction</p>
+                      <h3 className="text-[12px] font-semibold uppercase tracking-[0.3em] text-[#969696] letter-[0.32em]">Description</h3>
+                      <p className="text-[16px] leading-7 text-[#EFEFEF]">
+                        {market.description ||
+                          "Will the Phoenix Suns defeat the Dallas Mavericks in the NBA game held at the American Airlines Center, Dallas, Texas, on 12 November 2025? Market resolves to 'Yes' if the Suns are the official winner. Outcome certified by the NBA's official box score."}
+                      </p>
+              </div>
+
+                    <div className="space-y-3">
+                      <h3 className="text-[12px] font-semibold uppercase tracking-[0.3em] text-[#969696]">Outcomes</h3>
+                      <div className="flex items-center gap-4">
+                        {['Yes', 'No'].map((outcome) => (
+                          <div
+                            key={outcome}
+                            className="px-7 py-2 rounded-full border border-white/10 text-white text-sm"
+                            style={{ fontFamily: "'Clash Grotesk Variable', sans-serif" }}
+                          >
+                            {outcome}
+                  </div>
+                        ))}
+                </div>
+                  </div>
+
+                    <div className="space-y-3">
+                      <h3 className="text-[12px] font-semibold uppercase tracking-[0.3em] text-[#969696]">Order Book</h3>
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        {[
+                          { label: 'Yes Market', book: orderBook.yes },
+                          { label: 'No Market', book: orderBook.no }
+                        ].map(({ label, book }) => (
+                          <div
+                            key={label}
+                            className="glass-card border border-white/12 rounded-[20px] px-5 py-4 bg-transparent"
+                          >
+                            <div className="flex items-center justify-between mb-3">
+                              <span className="text-sm font-semibold text-white/80 tracking-[0.28em] uppercase">
+                                {label}
+                              </span>
+                              <span className="text-[11px] text-white/40 tracking-[0.3em] uppercase">Top Levels</span>
+                            </div>
+
+                            {(!book?.bids?.length && !book?.asks?.length) ? (
+                              <div className="text-white/40 text-xs text-center py-6">
+                                No orders yet. Add liquidity to seed this market.
+                              </div>
+                            ) : (
+                              <div className="grid grid-cols-2 gap-4 text-xs text-white/70">
+                                <div>
+                                  <div className="text-white/40 tracking-[0.28em] uppercase mb-2">Bids</div>
+                                  <div className="space-y-2">
+                                    {(book?.bids || []).slice(0, 6).map((level, idx) => (
+                                      <div key={`bid-${label}-${idx}`} className="flex justify-between">
+                                        <span>{level.price?.toFixed?.(2) ?? level.price}¢</span>
+                                        <span>{parseFloat(level.amount ?? 0).toFixed(2)}</span>
+                                      </div>
+                                    ))}
+                                    {(!book?.bids || book.bids.length === 0) && (
+                                      <div className="text-white/30">—</div>
+                                    )}
+                                  </div>
+                                </div>
+
+                                <div>
+                                  <div className="text-white/40 tracking-[0.28em] uppercase mb-2">Asks</div>
+                                  <div className="space-y-2">
+                                    {(book?.asks || []).slice(0, 6).map((level, idx) => (
+                                      <div key={`ask-${label}-${idx}`} className="flex justify-between">
+                                        <span>{level.price?.toFixed?.(2) ?? level.price}¢</span>
+                                        <span>{parseFloat(level.amount ?? 0).toFixed(2)}</span>
+                                      </div>
+                                    ))}
+                                    {(!book?.asks || book.asks.length === 0) && (
+                                      <div className="text-white/30">—</div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ))}
                       </div>
                     </div>
+
+                    <div className="space-y-6">
+                      <h3 className="text-[12px] font-semibold uppercase tracking-[0.3em] text-[#969696]">Rules</h3>
+                      <div className="space-y-4 text-[#D8D8D8] text-[15px] leading-7">
+                        {rulesToRender.map((rule, index) => (
+                          <div key={index} className="flex gap-5 items-start">
+                            <div
+                              className="w-10 h-10 rounded-full border border-white/15 bg-[rgba(45,45,45,0.4)] flex items-center justify-center text-sm font-medium text-white"
+                              style={{ boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)' }}
+                            >
+                              {index + 1}
+                </div>
+                            <p className="pt-1">{rule}</p>
+                  </div>
+                        ))}
+                </div>
                   </div>
                 </div>
-              )}
+                )}
 
-              {activeTab === 'rules' && (
-                <div className="space-y-4">
-                  <div className="bg-white/10 backdrop-blur-lg rounded-xl p-4 border border-white/15">
-                    <p className="text-sm text-gray-400 mb-4">
-                      This market will resolve based on verifiable information and predetermined criteria.
-                    </p>
-                    <div className="space-y-3">
-                      <div className="flex items-start gap-3">
-                        <div className="w-6 h-6 rounded-full bg-white/15 backdrop-blur-md flex items-center justify-center text-xs font-bold flex-shrink-0 text-white">
-                          1
+                {activeTab === 'rules' && (
+                  <div className="space-y-6 text-[#E4E4E4]" style={{ fontFamily: "'Clash Grotesk Variable', sans-serif" }}>
+                    <p className="text-sm text-white/45 tracking-[0.2em] uppercase">Creator Rules</p>
+                    <div className="space-y-4 text-[#D8D8D8] text-[15px] leading-7">
+                      {rulesToRender.map((rule, index) => (
+                        <div key={`rules-tab-${index}`} className="flex gap-5 items-start">
+                          <div
+                            className="w-10 h-10 rounded-full border border-white/15 bg-[rgba(45,45,45,0.4)] flex items-center justify-center text-sm font-medium text-white"
+                            style={{ boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)' }}
+                          >
+                            {index + 1}
+                          </div>
+                          <p className="pt-1">{rule}</p>
                         </div>
-                        <p className="text-sm text-gray-300">The outcome must be verifiable through official sources</p>
-                      </div>
-                      <div className="flex items-start gap-3">
-                        <div className="w-6 h-6 rounded-full bg-white/15 backdrop-blur-md flex items-center justify-center text-xs font-bold flex-shrink-0 text-white">
-                          2
-                        </div>
-                        <p className="text-sm text-gray-300">Resolution will occur after the event date has passed</p>
-                      </div>
-                      <div className="flex items-start gap-3">
-                        <div className="w-6 h-6 rounded-full bg-white/15 backdrop-blur-md flex items-center justify-center text-xs font-bold flex-shrink-0 text-white">
-                          3
-                        </div>
-                        <p className="text-sm text-gray-300">In case of ambiguity, the market creator's interpretation will be final</p>
-                      </div>
+                      ))}
                     </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {activeTab === 'holders' && (
-                <div className="bg-white/10 backdrop-blur-lg rounded-xl p-8 border border-white/15 text-center">
-                  <p className="text-gray-400 text-sm">No positions yet. Be the first to trade!</p>
+                {activeTab === 'trades' && (
+                  <div className="space-y-4" style={{ fontFamily: "'Clash Grotesk Variable', sans-serif" }}>
+                    {tradesToDisplay.length === 0 ? (
+                      <div className="text-white/50 text-sm text-center py-16">
+                        No trades yet. Activity will appear here once trading begins.
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {tradesToDisplay.map((trade, index) => (
+                          <div
+                            key={`${trade.timestamp}-${index}`}
+                            className="glass-card border border-white/12 rounded-[20px] px-5 py-4 bg-transparent flex flex-col gap-2"
+                          >
+                            <div className="flex items-center justify-between text-sm">
+                              <span className={`uppercase tracking-[0.28em] ${trade.side === 'yes' ? 'text-[#FFE600]' : 'text-white/60'}`}>
+                                {trade.side === 'yes' ? 'Yes' : 'No'}
+                              </span>
+                              <span className="text-white/70">{(trade.price * 100).toFixed(1)}%</span>
+                            </div>
+                            <div className="flex items-center justify-between text-xs text-white/50">
+                              <span>{parseFloat(trade.amount).toFixed(2)} shares</span>
+                              <span>{new Date(trade.timestamp).toLocaleString()}</span>
+                            </div>
+                            {trade.trader && (
+                              <span className="text-white/30 text-[11px] tracking-[0.3em] uppercase">
+                                {trade.trader.slice(0, 6)}…{trade.trader.slice(-4)}
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  )}
                 </div>
-              )}
+                </div>
               </div>
             </div>
-          </div>
-        </div>
-      </div>
-
+              </div>
+              
       {/* Footer */}
       <footer className="border-t border-white/10 mt-20">
         <div className="max-w-7xl mx-auto px-4 py-8">
@@ -909,7 +937,7 @@ const PolymarketStyleTrading = () => {
               <button className="text-gray-400 hover:text-white transition-colors font-medium">
                 Privacy Policy
               </button>
-            </div>
+                  </div>
             
             <button className="text-gray-400 hover:text-white transition-colors text-sm font-medium">
               How it Works?
@@ -931,9 +959,9 @@ const PolymarketStyleTrading = () => {
                   <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12a12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472c-.18 1.898-.962 6.502-1.36 8.627c-.168.9-.499 1.201-.82 1.23c-.696.065-1.225-.46-1.9-.902c-1.056-.693-1.653-1.124-2.678-1.8c-1.185-.78-.417-1.21.258-1.91c.177-.184 3.247-2.977 3.307-3.23c.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345c-.48.33-.913.49-1.302.48c-.428-.008-1.252-.241-1.865-.44c-.752-.245-1.349-.374-1.297-.789c.027-.216.325-.437.893-.663c3.498-1.524 5.83-2.529 6.998-3.014c3.332-1.386 4.025-1.627 4.476-1.635z"/>
                 </svg>
               </a>
-            </div>
-          </div>
-        </div>
+                            </div>
+                            </div>
+                          </div>
       </footer>
     </div>
   );

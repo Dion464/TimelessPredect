@@ -9,8 +9,16 @@ async function main() {
 
     // Deploy ETH Prediction Market
     console.log("\n📊 Deploying ETH Prediction Market...");
+    
+    // Constructor parameters
+    const marketCreationFeeAmount = ethers.utils.parseEther("0.01"); // 0.01 ETH
+    const platformFeePercentAmount = 200; // 2% (200 basis points)
+    
+    console.log("Market Creation Fee:", ethers.utils.formatEther(marketCreationFeeAmount), "ETH");
+    console.log("Platform Fee:", platformFeePercentAmount, "basis points (", platformFeePercentAmount / 100, "%)");
+    
     const ETHPredictionMarket = await ethers.getContractFactory("ETHPredictionMarket");
-    const ethPredictionMarket = await ETHPredictionMarket.deploy();
+    const ethPredictionMarket = await ETHPredictionMarket.deploy(marketCreationFeeAmount, platformFeePercentAmount);
     await ethPredictionMarket.deployed();
 
     console.log("✅ ETH Prediction Market deployed to:", ethPredictionMarket.address);
