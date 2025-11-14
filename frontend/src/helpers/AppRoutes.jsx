@@ -19,9 +19,7 @@ const AppRoutes = () => {
       <Route exact path='/about' component={About} />
       
       <Route exact path='/markets/:marketId'>
-        <Web3ErrorBoundary>
-          <PolymarketStyleTrading />
-        </Web3ErrorBoundary>
+        <PolymarketStyleTrading />
       </Route>
       
       <Route exact path='/markets' component={Markets} />

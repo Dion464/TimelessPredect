@@ -17,6 +17,9 @@ class Web3ErrorBoundary extends React.Component {
 
   render() {
     if (this.state.hasError) {
+      const networkName = import.meta.env.VITE_NETWORK_NAME || 'the correct network';
+      const chainId = import.meta.env.VITE_CHAIN_ID || '';
+      
       return (
         <div className="min-h-screen bg-gray-50 flex items-center justify-center">
           <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-6">
@@ -34,7 +37,7 @@ class Web3ErrorBoundary extends React.Component {
                 </div>
                 <div className="flex items-center space-x-2">
                   <span className="text-blue-500">2.</span>
-                  <span>Switch to Localhost 8545 network</span>
+                  <span>Switch to {networkName} {chainId && `(Chain ID: ${chainId})`}</span>
                 </div>
                 <div className="flex items-center space-x-2">
                   <span className="text-blue-500">3.</span>
