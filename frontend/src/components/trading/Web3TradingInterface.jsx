@@ -759,20 +759,20 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
 
   if (!isConnected) {
     return (
-      <div className="glass-card rounded-[12px] sm:rounded-[16px] backdrop-blur-[32px] relative w-full max-w-[384px] mx-auto px-3 sm:px-4" style={{ background: 'transparent', minHeight: '300px', paddingTop: '17px', paddingBottom: '17px' }}>
-        <div className="w-full h-full flex items-center justify-center py-8">
+      <div className="glass-card rounded-[12px] sm:rounded-[16px] backdrop-blur-[32px] relative w-full max-w-[384px] mx-auto px-3 sm:px-4" style={{ background: 'transparent', minHeight: '200px', paddingTop: '17px', paddingBottom: '17px' }}>
+        <div className="w-full h-full flex items-center justify-center py-6">
           <button
             onClick={connectWallet}
-            className="glass-card rounded-[12px] w-full max-w-[280px]"
+            className="glass-card rounded-[10px] w-full max-w-[200px] sm:max-w-[280px]"
             style={{ 
-              height: '48px',
+              height: '44px',
               background: 'transparent',
               border: '1px solid #FFE600',
               backdropFilter: 'blur(32px)',
               fontFamily: clashFont,
               fontWeight: 600,
-              fontSize: '14px',
-              lineHeight: '20px',
+              fontSize: '13px',
+              lineHeight: '18px',
               color: '#FFFFFF'
             }}
           >
@@ -993,29 +993,29 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
         </div>
 
         {/* Separator + Entry/Liquidation - y:399 for Limit, y:271 for Market */}
-        <div className="absolute" style={{ left: 0, top: orderType === 'limit' ? '399px' : '271px', width: '100%' }}>
-          <div style={{ width: '100%', height: '1px', borderTop: '1px solid rgba(255,255,255,0.72)', marginBottom: '12px' }}></div>
+        <div className="absolute" style={{ left: 0, top: orderType === 'limit' ? '399px' : '290px', width: '100%' }}>
+          <div style={{ width: '100%', height: '1px', borderTop: '1px solid rgba(255,255,255,0.05)', marginBottom: '16px' }}></div>
           
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-3">
             <div className="flex items-center justify-between">
               <span style={{ fontFamily: clashFont, fontWeight: 300, fontSize: '12px', lineHeight: '16px', color: '#8B8B8B' }}>Entry Price</span>
-              <span style={{ fontFamily: clashFont, fontWeight: 300, fontSize: '12px', lineHeight: '16px', color: '#FFFFFF' }}>${(currentPrice / 100).toFixed(2)}</span>
+              <span style={{ fontFamily: clashFont, fontWeight: 400, fontSize: '13px', lineHeight: '16px', color: '#FFFFFF' }}>${(currentPrice / 100).toFixed(2)}</span>
             </div>
             <div className="flex items-center justify-between">
               <span style={{ fontFamily: clashFont, fontWeight: 300, fontSize: '12px', lineHeight: '16px', color: '#8B8B8B' }}>Liquidation Price</span>
-              <span style={{ fontFamily: clashFont, fontWeight: 300, fontSize: '12px', lineHeight: '16px', color: '#FFFFFF' }}>${((currentPrice / 100) * 0.5).toFixed(2)}</span>
+              <span style={{ fontFamily: clashFont, fontWeight: 400, fontSize: '13px', lineHeight: '16px', color: '#FFFFFF' }}>${((currentPrice / 100) * 0.5).toFixed(2)}</span>
             </div>
           </div>
         </div>
 
-        {/* Place Order Button - y:476 (same for both) */}
+        {/* Place Order Button - adjusted position */}
         <button
           onClick={activeTab === 'buy' ? handleBuy : handleSell}
           disabled={loading || !tradeAmount || parseFloat(tradeAmount) <= 0}
           className="glass-card rounded-[12px] absolute"
           style={{ 
             left: 0,
-            top: '476px',
+            top: orderType === 'limit' ? '476px' : '390px',
             width: '100%',
             height: '56px',
             background: 'linear-gradient(180deg, rgba(15,15,15,0.92) 0%, rgba(8,8,8,0.78) 100%)',
