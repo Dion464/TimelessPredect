@@ -9,6 +9,50 @@ import { CONTRACT_ADDRESS, CONTRACT_ABI, RPC_URL } from '../../contracts/eth-con
 import { ethers } from 'ethers';
 import './MarketDetailGlass.css'; // Import glassmorphism styles
 
+const SkeletonBlock = ({ className = '', style = {} }) => (
+  <div
+    className={`bg-white/5 animate-pulse rounded-[12px] ${className}`}
+    style={{
+      minHeight: '16px',
+      ...style
+    }}
+  />
+);
+
+const MarketDetailSkeleton = () => (
+  <div className="min-h-screen bg-[#0E0E0E] text-white" style={{ fontFamily: "'Clash Grotesk Variable', 'Space Grotesk', sans-serif" }}>
+    <WormStyleNavbar />
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 sm:pt-24 pb-12 space-y-8">
+      <div className="glass-card rounded-[20px] p-6 sm:p-8 backdrop-blur-[32px] border border-white/10">
+        <div className="flex flex-col lg:flex-row gap-6">
+          <div className="flex-1 space-y-4">
+            <SkeletonBlock className="h-6 w-32" />
+            <SkeletonBlock className="h-10 w-3/4" />
+            <div className="grid grid-cols-2 gap-4">
+              <SkeletonBlock className="h-20" />
+              <SkeletonBlock className="h-20" />
+            </div>
+          </div>
+          <SkeletonBlock className="w-full lg:w-[240px] h-[160px]" />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <div className="lg:col-span-7 space-y-6">
+          <SkeletonBlock className="h-[320px]" />
+          <div className="space-y-4">
+            <SkeletonBlock className="h-12 w-5/6 mx-auto rounded-full" />
+            <SkeletonBlock className="h-[260px]" />
+          </div>
+        </div>
+        <div className="lg:col-span-5">
+          <SkeletonBlock className="h-[540px]" />
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
 // Generate image URL based on category and market ID (Polymarket-style)
 const getMarketImage = (market, marketIdParam) => {
   if (!market) return 'https://source.unsplash.com/200x200/?abstract,pattern,design';
@@ -582,14 +626,7 @@ const PolymarketStyleTrading = () => {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-lg text-gray-600">Loading market data from blockchain...</p>
-        </div>
-      </div>
-    );
+    return <MarketDetailSkeleton />;
   }
 
   // Remove the wallet connection check - allow viewing without wallet
