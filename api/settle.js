@@ -6,10 +6,15 @@ import { verifyOrderSignature } from '../lib/eip712.js';
 import prisma from '../lib/prismaClient.js';
 import 'dotenv/config';
 
-const EXCHANGE_CONTRACT = process.env.EXCHANGE_CONTRACT_ADDRESS || '0x0000000000000000000000000000000000000000';
-const PREDICTION_MARKET_ADDRESS = process.env.ETHPREDICTIONMARKET_ADDRESS || '0x0000000000000000000000000000000000000000';
-const RPC_URL = process.env.RPC_URL || 'http://localhost:8545';
-const CHAIN_ID = parseInt(process.env.CHAIN_ID || '1337', 10);
+const INCENTIV_EXCHANGE_ADDRESS = '0x8cF17Ff1Abe81B5c74f78edb62b0AeF31936642C';
+const INCENTIV_MARKET_ADDRESS = '0x8cF17Ff1Abe81B5c74f78edb62b0AeF31936642C';
+const INCENTIV_RPC_URL = 'https://rpc-testnet.incentiv.io/';
+const INCENTIV_CHAIN_ID = 28802;
+
+const EXCHANGE_CONTRACT = process.env.EXCHANGE_CONTRACT_ADDRESS || INCENTIV_EXCHANGE_ADDRESS;
+const PREDICTION_MARKET_ADDRESS = process.env.ETHPREDICTIONMARKET_ADDRESS || INCENTIV_MARKET_ADDRESS;
+const RPC_URL = process.env.RPC_URL || INCENTIV_RPC_URL;
+const CHAIN_ID = parseInt(process.env.CHAIN_ID || String(INCENTIV_CHAIN_ID), 10);
 
 const orderBook = getOrderBook();
 

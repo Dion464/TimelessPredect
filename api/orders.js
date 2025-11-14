@@ -5,8 +5,11 @@ import { verifyOrderSignature, computeOrderHash } from '../lib/eip712.js';
 import { ethers } from 'ethers';
 
 // Contract addresses - should be in env
-const EXCHANGE_CONTRACT = process.env.EXCHANGE_CONTRACT_ADDRESS || '0x0000000000000000000000000000000000000000';
-const CHAIN_ID = parseInt(process.env.CHAIN_ID || '1337', 10);
+const INCENTIV_EXCHANGE_ADDRESS = '0x8cF17Ff1Abe81B5c74f78edb62b0AeF31936642C';
+const INCENTIV_CHAIN_ID = 28802;
+
+const EXCHANGE_CONTRACT = process.env.EXCHANGE_CONTRACT_ADDRESS || INCENTIV_EXCHANGE_ADDRESS;
+const CHAIN_ID = parseInt(process.env.CHAIN_ID || String(INCENTIV_CHAIN_ID), 10);
 const PORT = process.env.PORT || 8080;
 
 // Broadcast function will be set by api-server.js
@@ -55,7 +58,9 @@ async function handlePostOrder(req, res) {
       orderMaker: order.maker,
       chainId: CHAIN_ID,
       exchangeContract: EXCHANGE_CONTRACT,
-      orderKeys: Object.keys(order)
+      orderKeys: Object.keys(order),
+      orderPayload: order,
+      signaturePreview: `${signature.slice(0, 10)}...${signature.slice(-6)}`
     });
     
     const isValid = verifyOrderSignature(
