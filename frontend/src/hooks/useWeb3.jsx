@@ -266,7 +266,16 @@ export const Web3Provider = ({ children }) => {
       return false;
     }
     
+    // Check if MetaMask is available
     if (typeof window.ethereum === 'undefined') {
+      // On mobile, try to open MetaMask app
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      if (isMobile) {
+        const dappUrl = window.location.href.replace(/^https?:\/\//, '');
+        const metamaskAppDeepLink = `https://metamask.app.link/dapp/${dappUrl}`;
+        window.location.href = metamaskAppDeepLink;
+        return false;
+      }
       setError('MetaMask not detected. Please install MetaMask.');
       return false;
     }
