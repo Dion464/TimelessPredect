@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@prisma/client": "^5.17.0",
     "@canvasjs/react-charts": "^1.0.2",
     "@testing-library/jest-dom": "^5.17.0",
     "@testing-library/react": "^13.4.0",
@@ -30,8 +31,10 @@
   },
   "scripts": {
     "start": "vite --host",
-    "build": "vite build",
-    "serve": "vite preview"
+    "build": "prisma generate --schema=../prisma/schema.prisma && vite build",
+    "serve": "vite preview",
+    "prisma:generate": "prisma generate --schema=../prisma/schema.prisma",
+    "vercel-build": "prisma generate --schema=../prisma/schema.prisma && prisma db push --schema=../prisma/schema.prisma --accept-data-loss && vite build"
   },
   "eslintConfig": {
     "extends": [
@@ -57,6 +60,7 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "prisma": "^5.17.0",
     "@tailwindcss/typography": "^0.5.16",
     "@vitejs/plugin-react": "^4.7.0",
     "autoprefixer": "^10.4.17",
