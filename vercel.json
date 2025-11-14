@@ -5,11 +5,6 @@
   "framework": null,
   "installCommand": "cd frontend && npm install",
   "devCommand": "cd frontend && npm start",
-  "functions": {
-    "frontend/api/**/*.js": {
-      "runtime": "nodejs20.x"
-    }
-  },
   "rewrites": [
     {
       "source": "/api/(.*)",
