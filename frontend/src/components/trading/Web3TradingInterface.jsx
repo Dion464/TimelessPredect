@@ -47,6 +47,9 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
       getUserLimitOrders: null,
       signer: null,
       ethBalance: '0',
+      connectWallet: () => {
+        console.warn('connectWallet is unavailable outside Web3 provider context.');
+      },
     };
   }
   
@@ -61,6 +64,7 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
     getUserLimitOrders,
     signer,
     ethBalance,
+    connectWallet,
     chainId
   } = web3Context;
   
