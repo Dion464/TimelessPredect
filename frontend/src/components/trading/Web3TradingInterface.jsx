@@ -126,7 +126,7 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
 
   const amountInputStyle = orderType === 'market'
     ? {
-        width: '350px',
+        width: '100%',
         height: '68px',
         padding: '0 24px',
         background: 'linear-gradient(180deg, rgba(32,32,32,0.92) 0%, rgba(14,14,14,0.68) 100%)',
@@ -134,7 +134,7 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
         backdropFilter: 'blur(32px)'
       }
     : {
-        width: '350px',
+        width: '100%',
         height: '48px',
         padding: '0 18px',
         background: 'linear-gradient(180deg, rgba(32,32,32,0.92) 0%, rgba(14,14,14,0.68) 100%)',
@@ -759,7 +759,7 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
 
   if (!isConnected) {
     return (
-      <div className="glass-card rounded-[16px] backdrop-blur-[32px] relative w-full max-w-[384px] mx-auto" style={{ background: 'transparent', minHeight: '540px', padding: '17px' }}>
+      <div className="glass-card rounded-[12px] sm:rounded-[16px] backdrop-blur-[32px] relative w-full max-w-[384px] mx-auto px-3 sm:px-4" style={{ background: 'transparent', minHeight: '540px', paddingTop: '17px', paddingBottom: '17px' }}>
         <div className="w-full min-h-[474px] flex items-center justify-center">
           <button
             className="glass-card rounded-[12px] w-full"
@@ -783,7 +783,7 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
   }
 
   return (
-    <div className="glass-card rounded-[16px] backdrop-blur-[32px] relative w-full max-w-[384px] mx-auto" style={{ background: 'transparent', minHeight: '620px', padding: '17px' }}>
+    <div className="glass-card rounded-[12px] sm:rounded-[16px] backdrop-blur-[32px] relative w-full max-w-[384px] mx-auto px-3 sm:px-4" style={{ background: 'transparent', minHeight: '620px', paddingTop: '17px', paddingBottom: '17px' }}>
       <div className="relative w-full min-h-[560px]">
         
         {/* Buy/Sell + 2x Badge - Row at y:0 */}
@@ -824,13 +824,13 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
         </div>
 
         {/* Separator at y:56 */}
-        <div className="absolute" style={{ left: 0, top: '56px', width: '350px', height: '1px', borderTop: '1px solid rgba(255,255,255,0.05)' }}></div>
+        <div className="absolute" style={{ left: 0, top: '56px', width: '100%', height: '1px', borderTop: '1px solid rgba(255,255,255,0.05)' }}></div>
 
         {/* Yes/No Toggle at y:73 */}
         <div className="glass-card absolute flex items-center gap-1" style={{ 
           left: 0, 
           top: '73px', 
-          width: '350px', 
+          width: '100%', 
           height: '48px', 
           padding: '4px',
           background: 'rgba(255,255,255,0.04)', 
@@ -840,8 +840,8 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
         }}>
           <button
             onClick={() => setTradeSide('yes')}
-            className="transition-all"
-            style={getOutcomeButtonStyle(tradeSide === 'yes', '169.58px')}
+            className="transition-all flex-1"
+            style={getOutcomeButtonStyle(tradeSide === 'yes', 'auto')}
           >
             <span style={{ fontFamily: clashFont, fontWeight: 400, fontSize: '14px', lineHeight: '20px', color: '#F3F3F3' }}>Yes</span>
             <span style={{ fontFamily: clashFont, fontWeight: 400, fontSize: '14px', lineHeight: '20px', color: '#F3F3F3' }}>{Math.round(yesPrice)}%</span>
@@ -849,8 +849,8 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
           
           <button
             onClick={() => setTradeSide('no')}
-            className="transition-all"
-            style={getOutcomeButtonStyle(tradeSide === 'no', '168.42px')}
+            className="transition-all flex-1"
+            style={getOutcomeButtonStyle(tradeSide === 'no', 'auto')}
           >
             <span style={{ fontFamily: clashFont, fontWeight: 400, fontSize: '14px', lineHeight: '20px', color: '#F3F3F3' }}>No</span>
             <span style={{ fontFamily: clashFont, fontWeight: 400, fontSize: '14px', lineHeight: '20px', color: '#F3F3F3' }}>{Math.round(noPrice)}%</span>
@@ -858,12 +858,11 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
         </div>
 
         {/* Market/Limit Tabs at y:137 */}
-          <div className="absolute flex items-center" style={{ left: 0, top: '137px', width: '350px', height: '40px', gap: '12px' }}>
+          <div className="absolute flex items-center w-full" style={{ left: 0, top: '137px', height: '40px', gap: '8px' }}>
           <button
             onClick={() => { setOrderType('market'); setLimitPrice(''); setActiveLimitButton('market'); }}
-            className="glass-card flex items-center justify-center rounded-[12px]"
+            className="glass-card flex-1 flex items-center justify-center rounded-[12px]"
             style={{ 
-              width: '170px', 
               height: '40px', 
               background: orderType === 'market' ? 'rgba(255,255,255,0.04)' : 'transparent',
               backdropFilter: orderType === 'market' ? 'blur(32px)' : 'none',
@@ -881,9 +880,8 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
           
           <button
             onClick={() => { setOrderType('limit'); setLimitPrice((currentPrice).toFixed(2)); setActiveLimitButton('market'); }}
-            className="glass-card flex items-center justify-center rounded-[12px]"
+            className="glass-card flex-1 flex items-center justify-center rounded-[12px]"
             style={{ 
-              width: '162px', 
               height: '40px', 
               background: orderType === 'limit' ? 'rgba(255,255,255,0.04)' : 'transparent',
               backdropFilter: orderType === 'limit' ? 'blur(32px)' : 'none',
@@ -902,7 +900,7 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
         {/* LIMIT ORDER ONLY - Limit Price Section at y:186 */}
         {orderType === 'limit' && (
           <>
-            <div className="absolute" style={{ left: 0, top: '186px', width: '350px' }}>
+            <div className="absolute" style={{ left: 0, top: '186px', width: '100%' }}>
               <div className="flex items-center justify-between mb-1">
                 <span style={{ fontFamily: clashFont, fontWeight: 300, fontSize: '14px', lineHeight: '20px', color: '#FFFFFF' }}>Limit Price</span>
                 <span style={{ fontFamily: clashFont, fontWeight: 300, fontSize: '14px', lineHeight: '20px', color: '#FFFFFF' }}>Current: {(currentPrice / 100).toFixed(2)}TCENT</span>
@@ -911,7 +909,7 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
               <div
                 className="glass-card flex items-center rounded-[12px]"
                 style={{
-                  width: '350px',
+                  width: '100%',
                   height: '48px',
                   padding: '0 18px',
                   background: 'linear-gradient(180deg, rgba(32,32,32,0.92) 0%, rgba(14,14,14,0.68) 100%)',
@@ -972,7 +970,7 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
         <div className="absolute" style={{ 
           left: 0, 
           top: orderType === 'limit' ? '314px' : '186px', 
-          width: '350px'
+          width: '100%'
         }}>
           <div className="flex items-center justify-between mb-1">
             <span style={{ fontFamily: clashFont, fontWeight: 300, fontSize: '14px', lineHeight: '20px', color: '#FFFFFF' }}>Amount</span>
@@ -994,7 +992,7 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
         </div>
 
         {/* Separator + Entry/Liquidation - y:399 for Limit, y:271 for Market */}
-        <div className="absolute" style={{ left: 0, top: orderType === 'limit' ? '399px' : '271px', width: '350px' }}>
+        <div className="absolute" style={{ left: 0, top: orderType === 'limit' ? '399px' : '271px', width: '100%' }}>
           <div style={{ width: '100%', height: '1px', borderTop: '1px solid rgba(255,255,255,0.72)', marginBottom: '12px' }}></div>
           
           <div className="flex flex-col gap-2">
@@ -1017,7 +1015,7 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
           style={{ 
             left: 0,
             top: '476px',
-            width: '350px',
+            width: '100%',
             height: '56px',
             background: 'linear-gradient(180deg, rgba(15,15,15,0.92) 0%, rgba(8,8,8,0.78) 100%)',
             border: '1px solid #FFE600',
