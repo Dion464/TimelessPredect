@@ -1,14 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useHistory } from 'react-router-dom';
+import { ethers } from 'ethers';
 import WormStyleNavbar from '../../components/modern/WormStyleNavbar';
 import { useWeb3 } from '../../hooks/useWeb3';
 import toast from 'react-hot-toast';
 import { showGlassToast } from '../../utils/toastUtils';
+import { CONTRACT_ADDRESS } from '../../contracts/eth-config';
 
 const CreateMarket = () => {
   const history = useHistory();
-  const { account, isConnected } = useWeb3();
+  const { account, isConnected, signer } = useWeb3();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isPayingFee, setIsPayingFee] = useState(false);
 
   const [formData, setFormData] = useState({
     question: '',
@@ -23,6 +26,11 @@ const CreateMarket = () => {
   });
 
   const [currentRule, setCurrentRule] = useState('');
+  const [dragActive, setDragActive] = useState(false);
+  const [imagePreview, setImagePreview] = useState('');
+  const fileInputRef = useRef(null);
+
+  const SUBMISSION_FEE_TCENT = '1';
 
   const clashFont = {
     fontFamily: 'Clash Grotesk Variable, -apple-system, BlinkMacSystemFont, sans-serif'
@@ -38,6 +46,54 @@ const CreateMarket = () => {
     'Economics',
     'Science'
   ];
+
+  const handleImageFile = (file) => {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      showGlassToast('Please upload an image file (PNG/JPG/GIF)', '⚠️', 'warning');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      showGlassToast('Image too large. Max 5MB.', '⚠️', 'warning');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const result = reader.result;
+      setFormData(prev => ({ ...prev, imageUrl: result }));
+      setImagePreview(result);
+      showGlassToast('Image attached successfully!', '🖼️', 'success');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleDrag = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (e.type === 'dragenter' || e.type === 'dragover') {
+      setDragActive(true);
+    } else if (e.type === 'dragleave') {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleImageFile(e.dataTransfer.files[0]);
+    }
+  };
+
+  const handleManualImageUrl = (value) => {
+    setFormData(prev => ({ ...prev, imageUrl: value }));
+    setImagePreview(value);
+  };
 
   const handleAddRule = () => {
     if (currentRule.trim()) {
@@ -59,7 +115,7 @@ const CreateMarket = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!isConnected) {
+    if (!isConnected || !signer) {
       showGlassToast('Please connect your wallet to submit a market', '⚠️', 'warning');
       return;
     }
@@ -91,6 +147,29 @@ const CreateMarket = () => {
 
     setIsSubmitting(true);
 
+    const submissionFeeWei = ethers.utils.parseEther(SUBMISSION_FEE_TCENT);
+    let feeTxHash = null;
+
+    try {
+      setIsPayingFee(true);
+      showGlassToast(`Paying ${SUBMISSION_FEE_TCENT} TCENT submission fee...`, '⏳', 'info');
+      const feeTx = await signer.sendTransaction({
+        to: CONTRACT_ADDRESS,
+        value: submissionFeeWei
+      });
+      feeTxHash = feeTx.hash;
+      await feeTx.wait();
+      showGlassToast('Submission fee paid!', '✅', 'success');
+    } catch (feeError) {
+      console.error('Fee payment failed:', feeError);
+      showGlassToast(feeError?.message || 'Failed to pay submission fee', '❌', 'error');
+      setIsSubmitting(false);
+      setIsPayingFee(false);
+      return;
+    } finally {
+      setIsPayingFee(false);
+    }
+
     try {
       const apiBaseUrl = window.location.origin;
       const response = await fetch(`${apiBaseUrl}/api/pending-markets`, {
@@ -106,7 +185,9 @@ const CreateMarket = () => {
           endTime: endTime.toISOString(),
           resolutionTime: resolutionTime.toISOString(),
           rules: formData.rules.length > 0 ? formData.rules : null,
-          creator: account.toLowerCase()
+          creator: account.toLowerCase(),
+          feeTxHash,
+          feeAmountWei: submissionFeeWei.toString()
         })
       });
 
@@ -130,6 +211,7 @@ const CreateMarket = () => {
         resolutionTime: '23:59',
         rules: []
       });
+      setImagePreview('');
 
       // Redirect to home after 2 seconds
       setTimeout(() => {
@@ -217,22 +299,56 @@ const CreateMarket = () => {
               </select>
             </div>
 
-            {/* Image URL */}
+            {/* Image Upload */}
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
-                Image URL (optional)
+                Market Image (drag & drop or paste URL)
               </label>
-              <input
-                type="url"
-                value={formData.imageUrl}
-                onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
-                placeholder="https://example.com/image.jpg"
-                className="w-full px-4 py-3 rounded-[12px] glass-card text-white placeholder-gray-500"
+
+              <div
+                onDragEnter={handleDrag}
+                onDragOver={handleDrag}
+                onDragLeave={handleDrag}
+                onDrop={handleDrop}
+                onClick={() => fileInputRef.current?.click()}
+                className={`w-full border rounded-[16px] px-4 py-6 text-center transition-all cursor-pointer ${
+                  dragActive ? 'border-[#FFE600] bg-white/5' : 'border-white/10 bg-white/5/0'
+                }`}
                 style={{
-                  background: 'linear-gradient(180deg, rgba(32,32,32,0.92) 0%, rgba(14,14,14,0.68) 100%)',
-                  border: '1px solid rgba(255,255,255,0.05)'
+                  background: 'linear-gradient(180deg, rgba(24,24,24,0.6) 0%, rgba(8,8,8,0.5) 100%)'
                 }}
-              />
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => handleImageFile(e.target.files?.[0])}
+                />
+                <p className="text-sm text-gray-300">
+                  Drop an image here or <span className="text-[#FFE600]">browse</span>
+                </p>
+                <p className="text-xs text-gray-500 mt-1">Max 5MB • PNG/JPG/GIF</p>
+                {imagePreview && (
+                  <div className="mt-4 flex justify-center">
+                    <img src={imagePreview} alt="Preview" className="w-40 h-24 object-cover rounded-[12px] border border-white/10" />
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-3">
+                <input
+                  type="url"
+                  value={formData.imageUrl}
+                  onChange={(e) => handleManualImageUrl(e.target.value)}
+                  placeholder="https://example.com/image.jpg"
+                  className="w-full px-4 py-3 rounded-[12px] glass-card text-white placeholder-gray-500"
+                  style={{
+                    background: 'linear-gradient(180deg, rgba(32,32,32,0.92) 0%, rgba(14,14,14,0.68) 100%)',
+                    border: '1px solid rgba(255,255,255,0.05)'
+                  }}
+                />
+              </div>
             </div>
 
             {/* End Date & Time */}
@@ -364,6 +480,12 @@ const CreateMarket = () => {
               </div>
             </div>
 
+            {/* Submission Fee Info */}
+            <div className="rounded-[16px] border border-white/5 bg-white/5 px-4 py-3 text-sm text-gray-300">
+              <p className="font-semibold text-white">Submission Fee</p>
+              <p className="text-gray-400">A refundable {SUBMISSION_FEE_TCENT} TCENT deposit is required when submitting new markets. This helps prevent spam listings.</p>
+            </div>
+
             {/* Submit Button */}
             <div className="flex gap-4 pt-4">
               <button
@@ -386,7 +508,7 @@ const CreateMarket = () => {
                   border: '1px solid #FFE600'
                 }}
               >
-                {isSubmitting ? 'Submitting...' : isConnected ? 'Submit for Approval' : 'Connect Wallet'}
+                {isSubmitting ? (isPayingFee ? 'Paying fee...' : 'Submitting...') : isConnected ? 'Submit for Approval' : 'Connect Wallet'}
               </button>
             </div>
           </form>

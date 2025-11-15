@@ -22,13 +22,15 @@ module.exports = async (req, res) => {
         endTime,
         resolutionTime,
         rules,
-        creator
+        creator,
+        feeTxHash,
+        feeAmountWei
       } = req.body;
 
       // Validation
-      if (!question || !category || !endTime || !resolutionTime || !creator) {
+      if (!question || !category || !endTime || !resolutionTime || !creator || !feeTxHash || !feeAmountWei) {
         return res.status(400).json({
-          error: 'Missing required fields: question, category, endTime, resolutionTime, creator'
+          error: 'Missing required fields: question, category, endTime, resolutionTime, creator, feeTxHash, feeAmountWei'
         });
       }
 
@@ -43,7 +45,9 @@ module.exports = async (req, res) => {
           resolutionTime: new Date(resolutionTime),
           rules: rules ? JSON.stringify(rules) : null,
           creator,
-          status: 'PENDING'
+          status: 'PENDING',
+          feeTxHash,
+          feeAmountWei
         }
       });
 

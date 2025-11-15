@@ -135,6 +135,8 @@ model PendingMarket {
   rejectionReason String?             @map("rejection_reason")
   approvedBy      String?             @map("approved_by")
   marketId        BigInt?             @map("market_id") // Set when approved and created on-chain
+  feeTxHash       String?             @map("fee_tx_hash")
+  feeAmountWei    String?             @map("fee_amount_wei")
   createdAt       DateTime            @default(now()) @map("created_at")
   updatedAt       DateTime            @updatedAt @map("updated_at")
 

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useHistory } from 'react-router-dom';
 import { useWeb3 } from '../../hooks/useWeb3';
 import { ethers } from 'ethers';
-import { CONTRACT_ADDRESS, CONTRACT_ABI } from '../../contracts/eth-config';
+import { CONTRACT_ADDRESS, CONTRACT_ABI, BLOCK_EXPLORER_URL } from '../../contracts/eth-config';
 import { showGlassToast, showTransactionToast } from '../../utils/toastUtils';
 
 const ADMIN_ADDRESSES = [
@@ -21,6 +21,8 @@ const PendingMarkets = () => {
   const clashFont = {
     fontFamily: 'Clash Grotesk Variable, -apple-system, BlinkMacSystemFont, sans-serif'
   };
+
+  const explorerBase = (BLOCK_EXPLORER_URL || 'https://explorer.incentiv.io/').replace(/\/?$/, '/');
 
   // Check if user is admin
   const isAdmin = isConnected && account && ADMIN_ADDRESSES.includes(account.toLowerCase());
@@ -263,6 +265,25 @@ const PendingMarkets = () => {
 
                     {market.description && (
                       <p className="text-gray-400 text-sm mb-3">{market.description}</p>
+                    )}
+
+                    {market.feeAmountWei && (
+                      <div className="mb-4 flex flex-col gap-2 text-sm">
+                        <div className="flex items-center justify-between bg-white/5 border border-white/10 rounded-[12px] px-4 py-2">
+                          <span className="text-gray-400">Submission Fee</span>
+                          <span className="text-white font-medium">{Number(ethers.utils.formatEther(market.feeAmountWei)).toFixed(4)} TCENT</span>
+                        </div>
+                        {market.feeTxHash && (
+                          <a
+                            href={`${explorerBase}tx/${market.feeTxHash}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-xs text-[#FFE600] hover:underline"
+                          >
+                            View fee transaction
+                          </a>
+                        )}
+                      </div>
                     )}
 
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4 text-sm">
