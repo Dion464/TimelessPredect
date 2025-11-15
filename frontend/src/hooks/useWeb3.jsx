@@ -886,7 +886,7 @@ export const Web3Provider = ({ children }) => {
 
   // Get user markets
   const getUserMarkets = useCallback(async () => {
-    if (!contracts.predictionMarket || !account) {
+    if (!contracts.predictionMarket || !account || typeof contracts.predictionMarket.getUserMarkets !== 'function') {
       return [];
     }
 
