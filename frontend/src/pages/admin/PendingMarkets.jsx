@@ -5,7 +5,6 @@ import { ethers } from 'ethers';
 import { CONTRACT_ADDRESS, CONTRACT_ABI, BLOCK_EXPLORER_URL } from '../../contracts/eth-config';
 import { showGlassToast, showTransactionToast } from '../../utils/toastUtils';
 import WormStyleNavbar from '../../components/modern/WormStyleNavbar';
-import WormStyleNavbar from '../../components/modern/WormStyleNavbar';
 
 const ADMIN_ADDRESSES = [
   '0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266', // Hardhat account #0
@@ -370,7 +369,6 @@ const PendingMarkets = () => {
       </div>
     </div>
   );
-
+};
 
 export default PendingMarkets;
-
