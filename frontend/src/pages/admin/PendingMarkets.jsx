@@ -4,6 +4,7 @@ import { useWeb3 } from '../../hooks/useWeb3';
 import { ethers } from 'ethers';
 import { CONTRACT_ADDRESS, CONTRACT_ABI, BLOCK_EXPLORER_URL } from '../../contracts/eth-config';
 import { showGlassToast, showTransactionToast } from '../../utils/toastUtils';
+import WormStyleNavbar from '../../components/modern/WormStyleNavbar';
 
 const ADMIN_ADDRESSES = [
   '0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266', // Hardhat account #0
@@ -190,87 +191,100 @@ const PendingMarkets = () => {
     return null;
   }
 
+  const statusOptions = ['PENDING', 'APPROVED', 'REJECTED', 'ALL'];
+  const summary = statusOptions.map(status => ({
+    status,
+    count:
+      status === 'ALL'
+        ? pendingMarkets.length
+        : pendingMarkets.filter(pm => pm.status === status).length
+  }));
+
   return (
-    <div className="min-h-screen bg-[#0E0E0E]" style={clashFont}>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">Pending Markets</h1>
-          <p className="text-gray-400">Review and approve market submissions</p>
+    <div className="min-h-screen bg-[#050505] text-white" style={clashFont}>
+      <WormStyleNavbar />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-12 space-y-8">
+        <div className="glass-card rounded-[24px] border border-white/10 bg-white/5 px-6 sm:px-8 py-8">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+            <div>
+              <p className="text-xs uppercase tracking-[0.3em] text-white/60 mb-2">Admin Control</p>
+              <h1 className="text-3xl sm:text-4xl font-semibold text-white mb-3">Market Review Console</h1>
+              <p className="text-gray-300 max-w-2xl">Review community submissions, apply the rulebook, and deploy only the highest confidence markets on-chain.</p>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full lg:w-auto">
+              {summary.map(item => (
+                <div key={item.status} className="rounded-[16px] border border-white/10 bg-white/5 px-4 py-3 text-center">
+                  <p className="text-xs uppercase tracking-widest text-white/60">{item.status}</p>
+                  <p className="text-2xl font-semibold">{item.count}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-6 flex flex-wrap gap-3">
+            {statusOptions.map(status => (
+              <button
+                key={status}
+                onClick={() => setFilter(status)}
+                className={`px-6 py-2 rounded-full text-sm font-medium transition-all ${
+                  filter === status
+                    ? 'bg-[#FFE600] text-black shadow-lg'
+                    : 'text-white/70 border border-white/10 hover:text-white bg-white/5'
+                }`}
+              >
+                {status}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* Filter Tabs */}
-        <div className="flex gap-2 mb-6">
-          {['PENDING', 'APPROVED', 'REJECTED', 'ALL'].map(status => (
-            <button
-              key={status}
-              onClick={() => setFilter(status)}
-              className={`px-6 py-2 rounded-[12px] font-medium transition-all ${
-                filter === status
-                  ? 'bg-[#FFE600] text-black'
-                  : 'text-gray-400 hover:text-white'
-              }`}
-              style={filter !== status ? {
-                background: 'linear-gradient(180deg, rgba(32,32,32,0.92) 0%, rgba(14,14,14,0.68) 100%)',
-                border: '1px solid rgba(255,255,255,0.1)'
-              } : {}}
-            >
-              {status}
-            </button>
-          ))}
-        </div>
-
-        {/* Markets List */}
         {loading ? (
-          <div className="text-center py-12">
+          <div className="glass-card rounded-[20px] border border-white/10 bg-white/5 text-center py-16">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FFE600] mx-auto mb-4"></div>
-            <p className="text-gray-400">Loading markets...</p>
+            <p className="text-gray-300">Loading markets...</p>
           </div>
         ) : pendingMarkets.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-gray-400 text-lg">No {filter.toLowerCase()} markets found</p>
+          <div className="glass-card rounded-[20px] border border-white/10 bg-white/5 text-center py-16">
+            <p className="text-gray-300 text-lg">No {filter.toLowerCase()} markets found</p>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="grid grid-cols-1 gap-6">
             {pendingMarkets.map(market => (
               <div
                 key={market.id}
-                className="glass-card rounded-[16px] p-6"
-                style={{
-                  background: 'linear-gradient(180deg, rgba(15,15,15,0.92) 0%, rgba(8,8,8,0.78) 100%)',
-                  backdropFilter: 'blur(32px)'
-                }}
+                className="glass-card rounded-[20px] border border-white/10 bg-gradient-to-br from-white/10 via-white/5 to-transparent p-6 sm:p-7 backdrop-blur-[30px]"
               >
                 <div className="flex flex-col md:flex-row gap-6">
-                  {/* Image */}
                   {market.imageUrl && (
                     <img
                       src={market.imageUrl}
                       alt={market.question}
-                      className="w-full md:w-32 h-32 object-cover rounded-[12px]"
+                      className="w-full md:w-36 h-36 object-cover rounded-[16px] border border-white/10"
                     />
                   )}
-
-                  {/* Content */}
                   <div className="flex-1">
-                    <div className="flex items-start justify-between mb-2">
-                      <h3 className="text-xl font-bold text-white">{market.question}</h3>
-                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                        market.status === 'PENDING' ? 'bg-yellow-500/20 text-yellow-400' :
-                        market.status === 'APPROVED' ? 'bg-green-500/20 text-green-400' :
-                        'bg-red-500/20 text-red-400'
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
+                      <div>
+                        <p className="text-xs tracking-widest text-white/50 uppercase">{market.category}</p>
+                        <h3 className="text-2xl font-semibold text-white">{market.question}</h3>
+                      </div>
+                      <span className={`px-4 py-1.5 rounded-full text-xs font-semibold tracking-wide ${
+                        market.status === 'PENDING' ? 'bg-yellow-500/20 text-yellow-300' :
+                        market.status === 'APPROVED' ? 'bg-green-500/20 text-green-300' :
+                        'bg-red-500/20 text-red-300'
                       }`}>
                         {market.status}
                       </span>
                     </div>
 
                     {market.description && (
-                      <p className="text-gray-400 text-sm mb-3">{market.description}</p>
+                      <p className="text-gray-300 text-sm mb-4">{market.description}</p>
                     )}
 
                     {market.feeAmountWei && (
-                      <div className="mb-4 flex flex-col gap-2 text-sm">
-                        <div className="flex items-center justify-between bg-white/5 border border-white/10 rounded-[12px] px-4 py-2">
-                          <span className="text-gray-400">Submission Fee</span>
+                      <div className="mb-5 flex flex-col gap-2 text-sm">
+                        <div className="flex items-center justify-between bg-white/5 border border-white/10 rounded-[14px] px-4 py-2">
+                          <span className="text-white/60">Submission Fee</span>
                           <span className="text-white font-medium">{Number(ethers.utils.formatEther(market.feeAmountWei)).toFixed(4)} TCENT</span>
                         </div>
                         {market.feeTxHash && (
@@ -286,29 +300,17 @@ const PendingMarkets = () => {
                       </div>
                     )}
 
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4 text-sm">
-                      <div>
-                        <span className="text-gray-500">Category:</span>
-                        <span className="text-white ml-2">{market.category}</span>
-                      </div>
-                      <div>
-                        <span className="text-gray-500">Creator:</span>
-                        <span className="text-white ml-2">{market.creator.slice(0, 6)}...{market.creator.slice(-4)}</span>
-                      </div>
-                      <div>
-                        <span className="text-gray-500">End Date:</span>
-                        <span className="text-white ml-2">{new Date(market.endTime).toLocaleDateString()}</span>
-                      </div>
-                      <div>
-                        <span className="text-gray-500">Resolution:</span>
-                        <span className="text-white ml-2">{new Date(market.resolutionTime).toLocaleDateString()}</span>
-                      </div>
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4 text-sm text-white/80">
+                      <div><span className="text-white/40">Creator</span><p className="text-white">{market.creator.slice(0, 6)}...{market.creator.slice(-4)}</p></div>
+                      <div><span className="text-white/40">End Date</span><p className="text-white">{new Date(market.endTime).toLocaleDateString()}</p></div>
+                      <div><span className="text-white/40">Resolution</span><p className="text-white">{new Date(market.resolutionTime).toLocaleDateString()}</p></div>
+                      <div><span className="text-white/40">Rules</span><p className="text-white">{market.rules?.length || 0}</p></div>
                     </div>
 
                     {market.rules && market.rules.length > 0 && (
-                      <div className="mb-4">
-                        <p className="text-gray-500 text-sm mb-2">Rules:</p>
-                        <ul className="list-disc list-inside text-gray-400 text-sm space-y-1">
+                      <div className="mb-4 bg-white/5 border border-white/10 rounded-[14px] px-4 py-3">
+                        <p className="text-white/60 text-xs uppercase tracking-wide mb-2">Rules</p>
+                        <ul className="space-y-1 text-sm text-white/80 list-disc list-inside">
                           {market.rules.map((rule, idx) => (
                             <li key={idx}>{rule}</li>
                           ))}
@@ -317,35 +319,34 @@ const PendingMarkets = () => {
                     )}
 
                     {market.rejectionReason && (
-                      <div className="mb-4 p-3 rounded-[8px] bg-red-500/10 border border-red-500/20">
-                        <p className="text-red-400 text-sm">
+                      <div className="mb-4 p-3 rounded-[12px] bg-red-500/10 border border-red-500/20">
+                        <p className="text-red-300 text-sm">
                           <strong>Rejection Reason:</strong> {market.rejectionReason}
                         </p>
                       </div>
                     )}
 
                     {market.status === 'APPROVED' && market.marketId && (
-                      <div className="mb-4 p-3 rounded-[8px] bg-green-500/10 border border-green-500/20">
-                        <p className="text-green-400 text-sm">
+                      <div className="mb-4 p-3 rounded-[12px] bg-green-500/10 border border-green-500/20">
+                        <p className="text-green-300 text-sm">
                           <strong>Market ID:</strong> {market.marketId.toString()}
                         </p>
                       </div>
                     )}
 
-                    {/* Actions */}
                     {market.status === 'PENDING' && (
-                      <div className="flex gap-3">
+                      <div className="flex flex-col sm:flex-row gap-3">
                         <button
                           onClick={() => handleApprove(market)}
                           disabled={processingId === market.id}
-                          className="px-6 py-2 rounded-[12px] bg-green-500 text-white font-medium hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="flex-1 px-6 py-3 rounded-[14px] bg-gradient-to-r from-green-400 to-green-500 text-black font-semibold shadow-lg disabled:opacity-50"
                         >
                           {processingId === market.id ? 'Processing...' : 'Approve & Deploy'}
                         </button>
                         <button
                           onClick={() => handleReject(market)}
                           disabled={processingId === market.id}
-                          className="px-6 py-2 rounded-[12px] bg-red-500 text-white font-medium hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="flex-1 px-6 py-3 rounded-[14px] border border-red-500/50 text-red-300 hover:bg-red-500/10 disabled:opacity-50"
                         >
                           Reject
                         </button>
