@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useHistory } from 'react-router-dom';
 import { useWeb3 } from '../../hooks/useWeb3';
 import { ethers } from 'ethers';
 import { CONTRACT_ADDRESS, CONTRACT_ABI, BLOCK_EXPLORER_URL } from '../../contracts/eth-config';
 import { showGlassToast, showTransactionToast } from '../../utils/toastUtils';
+import WormStyleNavbar from '../../components/modern/WormStyleNavbar';
 import WormStyleNavbar from '../../components/modern/WormStyleNavbar';
 
 const ADMIN_ADDRESSES = [
@@ -192,33 +193,41 @@ const PendingMarkets = () => {
   }
 
   const statusOptions = ['PENDING', 'APPROVED', 'REJECTED', 'ALL'];
-  const summary = statusOptions.map(status => ({
-    status,
-    count:
-      status === 'ALL'
-        ? pendingMarkets.length
-        : pendingMarkets.filter(pm => pm.status === status).length
-  }));
+  const summary = useMemo(() => (
+    statusOptions.map(status => ({
+      status,
+      count:
+        status === 'ALL'
+          ? pendingMarkets.length
+          : pendingMarkets.filter(pm => pm.status === status).length
+    }))
+  ), [pendingMarkets]);
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white" style={clashFont}>
+    <div className="min-h-screen bg-[#050505]" style={clashFont}>
       <WormStyleNavbar />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-12 space-y-8">
         <div className="glass-card rounded-[24px] border border-white/10 bg-white/5 px-6 sm:px-8 py-8">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
             <div>
-              <p className="text-xs uppercase tracking-[0.3em] text-white/60 mb-2">Admin Control</p>
-              <h1 className="text-3xl sm:text-4xl font-semibold text-white mb-3">Market Review Console</h1>
-              <p className="text-gray-300 max-w-2xl">Review community submissions, apply the rulebook, and deploy only the highest confidence markets on-chain.</p>
+              <p className="text-xs uppercase tracking-[0.3em] text-white/60 mb-2">Admin Console</p>
+              <h1 className="text-3xl sm:text-4xl font-semibold text-white mb-3">Community Market Submissions</h1>
+              <p className="text-gray-300 max-w-2xl">Review user-created markets, verify their rule sets, and push the best ones on-chain. Each submission includes a 1&nbsp;TCENT bond to discourage spam.</p>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full lg:w-auto">
-              {summary.map(item => (
-                <div key={item.status} className="rounded-[16px] border border-white/10 bg-white/5 px-4 py-3 text-center">
-                  <p className="text-xs uppercase tracking-widest text-white/60">{item.status}</p>
-                  <p className="text-2xl font-semibold">{item.count}</p>
-                </div>
-              ))}
-            </div>
+            <button
+              onClick={() => history.push('/admin/resolve')}
+              className="px-5 py-2.5 rounded-full border border-white/10 bg-white/5 text-sm font-medium text-white hover:text-black hover:bg-white/90 transition-all"
+            >
+              Go to Resolution Desk
+            </button>
+          </div>
+          <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {summary.map(item => (
+              <div key={item.status} className="rounded-[16px] border border-white/10 bg-white/5 px-4 py-3 text-center">
+                <p className="text-xs uppercase tracking-widest text-white/60">{item.status}</p>
+                <p className="text-2xl font-semibold text-white">{item.count}</p>
+              </div>
+            ))}
           </div>
 
           <div className="mt-6 flex flex-wrap gap-3">
@@ -241,11 +250,11 @@ const PendingMarkets = () => {
         {loading ? (
           <div className="glass-card rounded-[20px] border border-white/10 bg-white/5 text-center py-16">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FFE600] mx-auto mb-4"></div>
-            <p className="text-gray-300">Loading markets...</p>
+            <p className="text-gray-300">Loading submissions...</p>
           </div>
         ) : pendingMarkets.length === 0 ? (
           <div className="glass-card rounded-[20px] border border-white/10 bg-white/5 text-center py-16">
-            <p className="text-gray-300 text-lg">No {filter.toLowerCase()} markets found</p>
+            <p className="text-gray-300 text-lg">No {filter.toLowerCase()} markets right now.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-6">
@@ -266,7 +275,7 @@ const PendingMarkets = () => {
                     <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
                       <div>
                         <p className="text-xs tracking-widest text-white/50 uppercase">{market.category}</p>
-                        <h3 className="text-2xl font-semibold text-white">{market.question}</h3>
+                        <h3 className="text-2xl font-semibold">{market.question}</h3>
                       </div>
                       <span className={`px-4 py-1.5 rounded-full text-xs font-semibold tracking-wide ${
                         market.status === 'PENDING' ? 'bg-yellow-500/20 text-yellow-300' :
@@ -339,14 +348,14 @@ const PendingMarkets = () => {
                         <button
                           onClick={() => handleApprove(market)}
                           disabled={processingId === market.id}
-                          className="flex-1 px-6 py-3 rounded-[14px] bg-gradient-to-r from-green-400 to-green-500 text-black font-semibold shadow-lg disabled:opacity-50"
+                          className="flex-1 px-6 py-3 rounded-[14px] bg-gradient-to-r from-green-400 to-green-500 text-black font-semibold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           {processingId === market.id ? 'Processing...' : 'Approve & Deploy'}
                         </button>
                         <button
                           onClick={() => handleReject(market)}
                           disabled={processingId === market.id}
-                          className="flex-1 px-6 py-3 rounded-[14px] border border-red-500/50 text-red-300 hover:bg-red-500/10 disabled:opacity-50"
+                          className="flex-1 px-6 py-3 rounded-[14px] border border-red-500/40 text-red-300 hover:bg-red-500/10 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           Reject
                         </button>
@@ -361,7 +370,7 @@ const PendingMarkets = () => {
       </div>
     </div>
   );
-};
+
 
 export default PendingMarkets;
 

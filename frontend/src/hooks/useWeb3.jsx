@@ -746,6 +746,15 @@ export const Web3Provider = ({ children }) => {
         }
       }
 
+      const toNumber = (value) => {
+        if (value === null || value === undefined) return 0;
+        if (ethers.BigNumber.isBigNumber(value)) {
+          return Number(value.toString());
+        }
+        const parsed = Number(value);
+        return Number.isFinite(parsed) ? parsed : 0;
+      };
+
       return {
         id: market.id.toString(),
         question: market.question,
@@ -754,7 +763,7 @@ export const Web3Provider = ({ children }) => {
         endTime: market.endTime.toString(),
         resolutionTime: market.resolutionTime.toString(),
         resolved: market.resolved,
-        outcome: market.outcome,
+        outcome: toNumber(market.outcome),
         totalYesShares: market.totalYesShares.toString(),
         totalNoShares: market.totalNoShares.toString(),
         totalVolume: market.totalVolume.toString(),
@@ -875,6 +884,36 @@ export const Web3Provider = ({ children }) => {
     }
   }, [contracts.predictionMarket, signer, updateEthBalance, isWalletReady]);
 
+  // Get user markets
+  const getUserMarkets = useCallback(async () => {
+    if (!contracts.predictionMarket || !account) {
+      return [];
+    }
+
+    try {
+      const marketsForUser = await contracts.predictionMarket.getUserMarkets(account);
+      return marketsForUser.map(id => Number(id.toString()));
+    } catch (err) {
+      console.error('Failed to get user markets:', err);
+      return [];
+    }
+  }, [contracts.predictionMarket, account]);
+
+  // Get active markets
+  const getActiveMarkets = useCallback(async () => {
+    if (!contracts.predictionMarket) {
+      return [];
+    }
+
+    try {
+      const ids = await contracts.predictionMarket.getActiveMarkets();
+      return ids.map(id => Number(id.toString()));
+    } catch (err) {
+      console.error('Failed to get active markets:', err);
+      return [];
+    }
+  }, [contracts.predictionMarket]);
+
   // Claim winnings
   const claimWinnings = useCallback(async (marketId) => {
     if (!contracts.predictionMarket || !signer) {
@@ -982,6 +1021,8 @@ export const Web3Provider = ({ children }) => {
     sellShares,
     getUserPosition,
     getMarketData,
+    getUserMarkets,
+    getActiveMarkets,
     createMarket,
     claimWinnings,
     placeLimitOrder,

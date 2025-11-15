@@ -9,6 +9,7 @@ import User from '../pages/user/User';
 import CreateMarket from '../pages/create/CreateMarket';
 import MarketCreation from '../pages/admin/MarketCreation';
 import PendingMarkets from '../pages/admin/PendingMarkets';
+import AdminResolution from '../pages/admin/AdminResolution';
 import AdminLogin from '../pages/admin/AdminLogin';
 import RevenueDashboard from '../components/admin/RevenueDashboard';
 import NotFound from '../pages/notfound/NotFound';
@@ -62,6 +63,7 @@ const AppRoutes = () => {
       <Route exact path='/admin' component={AdminLogin} />
       <AdminRoute exact path='/admin/create-market' component={MarketCreation} />
       <AdminRoute exact path='/admin/pending' component={PendingMarkets} />
+      <AdminRoute exact path='/admin/resolve' component={AdminResolution} />
       <AdminRoute exact path='/admin/revenue' component={RevenueDashboard} />
 
       {/* Home Route */}
