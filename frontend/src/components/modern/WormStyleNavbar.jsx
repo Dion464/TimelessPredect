@@ -332,18 +332,18 @@ const WormStyleNavbar = () => {
                   <>
                     {/* Backdrop for mobile */}
                     <div 
-                      className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 sm:hidden"
+                      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 sm:hidden"
                       onClick={() => setNotificationsOpen(false)}
                     />
                     {/* Notification dropdown */}
-                    <div className="fixed sm:absolute right-0 left-0 sm:left-auto top-[72px] sm:top-auto sm:mt-3 sm:w-80 w-full sm:max-w-[90vw] rounded-t-[20px] sm:rounded-[16px] border border-white/10 bg-[#050505]/98 backdrop-blur-xl shadow-2xl z-50 p-4 sm:p-4 space-y-3 max-h-[calc(100vh-88px)] sm:max-h-[80vh] overflow-y-auto">
+                    <div className="fixed sm:absolute right-0 left-0 sm:left-auto top-[72px] sm:top-auto sm:mt-3 sm:w-80 w-full sm:max-w-[90vw] rounded-t-[20px] sm:rounded-[16px] border border-white/20 bg-[#0a0a0a] backdrop-blur-xl shadow-2xl z-50 p-4 sm:p-4 space-y-3 max-h-[calc(100vh-88px)] sm:max-h-[80vh] overflow-y-auto" style={{ backgroundColor: 'rgba(10, 10, 10, 0.98)' }}>
                       <div className="flex items-center justify-between mb-2 sm:mb-0">
                         <p className="text-base sm:text-sm font-semibold text-white">Notifications</p>
                         <div className="flex items-center gap-3">
                           {loadingNotifications && <span className="text-xs text-white/50">Refreshing...</span>}
                           <button
                             onClick={() => setNotificationsOpen(false)}
-                            className="sm:hidden text-white/60 hover:text-white p-1 -mr-2"
+                            className="sm:hidden text-white/70 hover:text-white p-1 -mr-2"
                             aria-label="Close notifications"
                           >
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -353,17 +353,17 @@ const WormStyleNavbar = () => {
                         </div>
                       </div>
                       {notifications.length === 0 ? (
-                        <p className="text-sm sm:text-xs text-white/60 py-6 sm:py-4 text-center">No updates yet.</p>
+                        <p className="text-sm sm:text-xs text-white/70 py-6 sm:py-4 text-center">No updates yet.</p>
                       ) : (
                         <div className="space-y-2.5 sm:space-y-3">
                           {notifications.map((notif) => (
-                            <div key={notif.id || `${notif.marketId}-${notif.status}`} className="rounded-[14px] sm:rounded-[12px] border border-white/10 bg-white/5 px-4 sm:px-4 py-3.5 sm:py-3 space-y-2.5 sm:space-y-2 active:bg-white/10 transition-colors">
+                            <div key={notif.id || `${notif.marketId}-${notif.status}`} className="rounded-[14px] sm:rounded-[12px] border border-white/20 bg-[#1a1a1a]/80 backdrop-blur-sm px-4 sm:px-4 py-3.5 sm:py-3 space-y-2.5 sm:space-y-2 active:bg-[#252525] transition-colors" style={{ backgroundColor: 'rgba(26, 26, 26, 0.9)' }}>
                               <div className="flex items-start justify-between gap-3">
                                 <div className="flex-1 min-w-0">
                                   <p className="text-base sm:text-sm font-semibold text-white leading-tight break-words">
                                     {notif.title || notif.question}
                                   </p>
-                                  <p className={`text-sm sm:text-xs mt-1.5 sm:mt-1 leading-relaxed break-words ${statusStyles[notif.status] || 'text-white/70'}`}>
+                                  <p className={`text-sm sm:text-xs mt-1.5 sm:mt-1 leading-relaxed break-words ${statusStyles[notif.status] || 'text-white/80'}`}>
                                     {notif.message}
                                   </p>
                                 </div>
