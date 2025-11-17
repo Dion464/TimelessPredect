@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useHistory } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useWeb3 } from '../../hooks/useWeb3';
@@ -11,6 +11,7 @@ const ADMIN_ADDRESSES = [
 const AdminLogin = () => {
   const history = useHistory();
   const { account, isConnected } = useWeb3();
+  const hasRedirectedRef = useRef(false);
   const [credentials, setCredentials] = useState({
     username: '',
     password: ''
@@ -66,14 +67,21 @@ const AdminLogin = () => {
 
   // Check if user is admin (wallet-based or localStorage-based)
   const isAdminLoggedIn = localStorage.getItem('isAdminLoggedIn') === 'true';
-  const isWalletAdmin = isConnected && account && ADMIN_ADDRESSES.includes(account.toLowerCase());
+  const isWalletAdmin = isConnected && account && ADMIN_ADDRESSES.includes(account?.toLowerCase() || '');
   
   useEffect(() => {
+    // Prevent infinite redirect loop
+    if (hasRedirectedRef.current) return;
+    
     // Auto-redirect if already logged in via localStorage OR if wallet is admin
-    if ((isAdminLoggedIn && localStorage.getItem('usertype') === 'admin') || isWalletAdmin) {
+    const shouldRedirect = (isAdminLoggedIn && localStorage.getItem('usertype') === 'admin') || 
+                          (isConnected && account && isWalletAdmin);
+    
+    if (shouldRedirect) {
+      hasRedirectedRef.current = true;
       history.push('/admin/pending');
     }
-  }, [history, isAdminLoggedIn, isWalletAdmin, isConnected, account]);
+  }, [history, isAdminLoggedIn, isConnected, account, isWalletAdmin]);
 
   // Show loading while checking redirect
   if ((isAdminLoggedIn && localStorage.getItem('usertype') === 'admin') || isWalletAdmin) {
