@@ -142,10 +142,14 @@ const PendingMarkets = () => {
         icon: '✅'
       });
 
+      // Get API base URL for saving image and updating status
+      const apiBaseUrl = resolveApiBase();
+
       // Save image if exists
       if (pendingMarket.imageUrl) {
         try {
-          await fetch(`${apiBaseUrl}/api/market-images`, {
+          console.log('Saving image for market:', marketId, 'Image URL:', pendingMarket.imageUrl?.substring(0, 50) + '...');
+          const imageResponse = await fetch(`${apiBaseUrl}/api/market-images`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -153,8 +157,19 @@ const PendingMarkets = () => {
               imageUrl: pendingMarket.imageUrl
             })
           });
+
+          if (!imageResponse.ok) {
+            const errorText = await imageResponse.text();
+            console.error('Failed to save image:', imageResponse.status, errorText);
+            throw new Error(`Failed to save image: ${errorText.substring(0, 100)}`);
+          }
+
+          const imageData = await imageResponse.json();
+          console.log('✅ Image saved successfully:', imageData);
         } catch (imgError) {
           console.error('Error saving image:', imgError);
+          // Don't throw - image save failure shouldn't block approval
+          showGlassToast({ title: 'Market created but image save failed', icon: '⚠️' });
         }
       }
 
@@ -170,7 +185,6 @@ const PendingMarkets = () => {
       }
 
       // Update pending market status in database
-      const apiBaseUrl = resolveApiBase();
       const approveResponse = await fetch(`${apiBaseUrl}/api/pending-markets/${pendingMarket.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
