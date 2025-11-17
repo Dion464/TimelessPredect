@@ -18,13 +18,17 @@ import { useWeb3 } from '../hooks/useWeb3';
 // Admin addresses (lowercase)
 const ADMIN_ADDRESSES = [
   '0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266', // Hardhat account #0
+  '0xed27c34a8434adc188a2d7503152024f64967b61', // User's admin wallet
   // Add more admin addresses here
 ].map(addr => addr.toLowerCase());
 
 // Protected Admin Route Component
 const AdminRoute = ({ component: Component, ...rest }) => {
   const { account, isConnected } = useWeb3();
-  const isAdmin = isConnected && account && ADMIN_ADDRESSES.includes(account.toLowerCase());
+  // Check both wallet-based AND localStorage-based admin
+  const isWalletAdmin = isConnected && account && ADMIN_ADDRESSES.includes(account.toLowerCase());
+  const isLocalStorageAdmin = localStorage.getItem('isAdminLoggedIn') === 'true' && localStorage.getItem('usertype') === 'admin';
+  const isAdmin = isWalletAdmin || isLocalStorageAdmin;
 
   return (
     <Route

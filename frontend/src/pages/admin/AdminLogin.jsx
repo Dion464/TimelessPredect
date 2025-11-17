@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import { useHistory } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useWeb3 } from '../../hooks/useWeb3';
@@ -11,7 +11,6 @@ const ADMIN_ADDRESSES = [
 const AdminLogin = () => {
   const history = useHistory();
   const { account, isConnected } = useWeb3();
-  const hasRedirectedRef = useRef(false);
   const [credentials, setCredentials] = useState({
     username: '',
     password: ''
@@ -32,7 +31,6 @@ const AdminLogin = () => {
 
     try {
       // Simple admin authentication
-      // Default credentials: admin / admin123
       const adminUsers = [
         { username: 'admin', password: 'admin123' },
         { username: 'administrator', password: 'admin' }
@@ -50,7 +48,7 @@ const AdminLogin = () => {
         
         toast.success('Admin login successful!');
         
-        // Redirect to pending markets (admin dashboard)
+        // Redirect manually after login
         setTimeout(() => {
           history.push('/admin/pending');
         }, 1000);
@@ -65,36 +63,41 @@ const AdminLogin = () => {
     }
   };
 
-  // Check if user is admin (wallet-based or localStorage-based)
-  const isAdminLoggedIn = localStorage.getItem('isAdminLoggedIn') === 'true';
+  // Check wallet-based admin (NO AUTO-REDIRECT - prevents loops)
   const isWalletAdmin = isConnected && account && ADMIN_ADDRESSES.includes(account?.toLowerCase() || '');
-  
-  useEffect(() => {
-    // Prevent infinite redirect loop
-    if (hasRedirectedRef.current) return;
-    
-    // Auto-redirect if already logged in via localStorage OR if wallet is admin
-    const shouldRedirect = (isAdminLoggedIn && localStorage.getItem('usertype') === 'admin') || 
-                          (isConnected && account && isWalletAdmin);
-    
-    if (shouldRedirect) {
-      hasRedirectedRef.current = true;
-      history.push('/admin/pending');
-    }
-  }, [history, isAdminLoggedIn, isConnected, account, isWalletAdmin]);
 
-  // Show loading while checking redirect
-  if ((isAdminLoggedIn && localStorage.getItem('usertype') === 'admin') || isWalletAdmin) {
+  // If wallet is admin, show button to navigate (NO AUTO-REDIRECT)
+  if (isWalletAdmin) {
     return (
-      <div className="min-h-screen bg-[#050505] flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FFE600] mx-auto mb-4"></div>
-          <p className="text-gray-300">Redirecting to admin panel...</p>
+      <div className="min-h-screen bg-[#050505] flex items-center justify-center px-4 py-12" style={{ fontFamily: "'Clash Grotesk Variable', sans-serif" }}>
+        <div className="max-w-md w-full text-center">
+          <div className="glass-card rounded-[24px] border border-white/10 bg-white/5 backdrop-blur-xl p-8">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-[#FFE600] to-yellow-400 rounded-full mb-4">
+              <svg className="w-8 h-8 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+              </svg>
+            </div>
+            <h1 className="text-3xl font-semibold text-white mb-2">Admin Access Granted</h1>
+            <p className="text-gray-300 mb-6">Your wallet is authorized for admin access.</p>
+            <button
+              onClick={() => history.push('/admin/pending')}
+              className="w-full bg-[#FFE600] text-black py-3 rounded-full hover:bg-yellow-400 transition-all font-semibold mb-4"
+            >
+              Go to Admin Panel
+            </button>
+            <button
+              onClick={() => history.push('/')}
+              className="text-sm text-gray-300 hover:text-white font-medium"
+            >
+              ← Back to Home
+            </button>
+          </div>
         </div>
       </div>
     );
   }
 
+  // Show login form for everyone else
   return (
     <div className="min-h-screen bg-[#050505] flex items-center justify-center px-4 py-12" style={{ fontFamily: "'Clash Grotesk Variable', sans-serif" }}>
       <div className="max-w-md w-full">
@@ -196,4 +199,3 @@ const AdminLogin = () => {
 };
 
 export default AdminLogin;
-

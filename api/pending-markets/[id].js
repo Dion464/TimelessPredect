@@ -93,10 +93,48 @@ module.exports = async (req, res) => {
         updateData.rejectionReason = rejectionReason;
       }
 
+      // Get the pending market first to access creator address
+      const pendingMarket = await prisma.pendingMarket.findUnique({
+        where: { id: BigInt(id) }
+      });
+
+      if (!pendingMarket) {
+        return res.status(404).json({ error: 'Pending market not found' });
+      }
+
       const updatedMarket = await prisma.pendingMarket.update({
         where: { id: BigInt(id) },
         data: updateData
       });
+
+      // Create notification for the market creator
+      try {
+        if (action === 'approve') {
+          await prisma.notification.create({
+            data: {
+              recipient: pendingMarket.creator.toLowerCase(),
+              type: 'MARKET_APPROVED',
+              title: 'Market Approved! 🎉',
+              message: `Your market "${pendingMarket.question}" has been approved and is now live on-chain.`,
+              marketId: marketId ? BigInt(marketId) : null,
+              pendingMarketId: BigInt(id)
+            }
+          });
+        } else if (action === 'reject') {
+          await prisma.notification.create({
+            data: {
+              recipient: pendingMarket.creator.toLowerCase(),
+              type: 'MARKET_REJECTED',
+              title: 'Market Rejected',
+              message: `Your market "${pendingMarket.question}" was rejected. Reason: ${rejectionReason}`,
+              pendingMarketId: BigInt(id)
+            }
+          });
+        }
+      } catch (notifError) {
+        // Log but don't fail the request if notification creation fails
+        console.error('Error creating notification:', notifError);
+      }
 
       // Serialize BigInt values and parse rules
       const serializedMarket = serializeBigInt(updatedMarket);

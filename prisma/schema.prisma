@@ -144,3 +144,27 @@ model PendingMarket {
   @@index([status], map: "pending_markets_status_idx")
   @@map("pending_markets")
 }
+
+enum NotificationType {
+  MARKET_APPROVED
+  MARKET_REJECTED
+  MARKET_RESOLVED
+  WINNINGS_CLAIMABLE
+}
+
+model Notification {
+  id              BigInt            @id @default(autoincrement()) @map("id")
+  recipient       String            @map("recipient") // Wallet address
+  type            NotificationType  @map("type")
+  title           String            @map("title")
+  message         String            @map("message")
+  marketId        BigInt?           @map("market_id")
+  pendingMarketId BigInt?           @map("pending_market_id")
+  read            Boolean           @default(false) @map("read")
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  @@index([recipient, read], map: "notifications_recipient_idx")
+  @@index([recipient, createdAt], map: "notifications_recipient_created_idx")
+  @@map("notifications")
+}

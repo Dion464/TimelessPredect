@@ -57,12 +57,7 @@ const ModernNavbar = () => {
           {/* Logo and primary nav */}
           <div className="flex">
             <div className="flex-shrink-0 flex items-center">
-              <button
-                onClick={() => history.push('/')}
-                className="text-2xl font-bold text-gray-900 hover:text-gray-700"
-              >
-                DegenPoly
-              </button>
+            <img src="/public/POlydegenlogo.svg" alt="Logo" className="w-10 h-10" />
             </div>
             <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
               {navigation.map((item) => {

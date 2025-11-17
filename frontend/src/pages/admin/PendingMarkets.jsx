@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useHistory } from 'react-router-dom';
 import { useWeb3 } from '../../hooks/useWeb3';
 import { ethers } from 'ethers';
@@ -8,6 +8,7 @@ import WormStyleNavbar from '../../components/modern/WormStyleNavbar';
 
 const ADMIN_ADDRESSES = [
   '0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266', // Hardhat account #0
+  '0xed27c34a8434adc188a2d7503152024f64967b61', // User's admin wallet
   // Add more admin addresses here
 ].map(addr => addr.toLowerCase());
 
@@ -25,37 +26,38 @@ const PendingMarkets = () => {
 
   const explorerBase = (BLOCK_EXPLORER_URL || 'https://explorer.incentiv.io/').replace(/\/?$/, '/');
 
-  // Check if user is admin
-  const isAdmin = isConnected && account && ADMIN_ADDRESSES.includes(account.toLowerCase());
+  // Resolve API base URL (use deployed Vercel API for local dev)
+  const resolveApiBase = () => {
+    const envBase = import.meta.env.VITE_API_BASE_URL;
+    const looksLocal = envBase && /localhost:8080|127\.0\.0\.1:8080/i.test(envBase);
+    if (envBase && !looksLocal) return envBase;
 
-  useEffect(() => {
-    // Wait for Web3 to initialize (account might be null initially)
-    if (isConnected === false && account === null) {
-      // Still initializing, wait a bit
-      return;
+    if (typeof window !== 'undefined' && window.location?.origin) {
+      const origin = window.location.origin;
+      // In production, use same origin (Vercel will serve /api)
+      if (!/localhost|127\.0\.0\.1/i.test(origin)) {
+        return origin;
+      }
+      // In local dev, always hit the deployed API
+      return 'https://polydegen.vercel.app';
     }
+    return '';
+  };
 
-    if (!isConnected || !account) {
-      history.push('/admin');
-      return;
-    }
+  // Check if user is admin (wallet-based OR localStorage-based)
+  const isWalletAdmin = isConnected && account && ADMIN_ADDRESSES.includes(account.toLowerCase());
+  const isLocalStorageAdmin = localStorage.getItem('isAdminLoggedIn') === 'true' && localStorage.getItem('usertype') === 'admin';
+  const isAdmin = isWalletAdmin || isLocalStorageAdmin;
 
-    if (!isAdmin) {
-      showGlassToast({ title: 'Access denied. Admin only.', icon: '🚫' });
-      history.push('/');
-      return;
-    }
-
-    fetchPendingMarkets();
-  }, [isConnected, account, isAdmin, filter, history]);
-
-  const fetchPendingMarkets = async () => {
+  const fetchPendingMarkets = useCallback(async () => {
     try {
       setLoading(true);
-      const apiBaseUrl = window.location.origin;
+      const apiBaseUrl = resolveApiBase();
       const url = filter === 'ALL' 
         ? `${apiBaseUrl}/api/pending-markets`
         : `${apiBaseUrl}/api/pending-markets?status=${filter}`;
+      
+      console.log('Fetching pending markets from:', url);
       
       const response = await fetch(url);
       const data = await response.json();
@@ -69,7 +71,33 @@ const PendingMarkets = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filter]);
+
+  useEffect(() => {
+    // Allow localStorage admin even without wallet connected
+    if (isLocalStorageAdmin) {
+      fetchPendingMarkets();
+      return;
+    }
+
+    // Wait for Web3 to initialize (account might be null initially)
+    if (isConnected === false && account === null) {
+      // Still initializing, wait a bit
+      return;
+    }
+
+    // If wallet is connected but not admin, redirect
+    if (isConnected && account && !isWalletAdmin && !isLocalStorageAdmin) {
+      showGlassToast({ title: 'Access denied. Admin only.', icon: '🚫' });
+      history.push('/');
+      return;
+    }
+
+    // If wallet admin, fetch markets
+    if (isWalletAdmin) {
+      fetchPendingMarkets();
+    }
+  }, [isConnected, account, isWalletAdmin, isLocalStorageAdmin, filter, history, fetchPendingMarkets]);
 
   const handleApprove = async (pendingMarket) => {
     if (!signer) {
@@ -108,12 +136,16 @@ const PendingMarkets = () => {
         throw new Error('Failed to get market ID from transaction');
       }
 
-      showTransactionToast('Market created on-chain!', receipt.transactionHash, 'success');
+      showTransactionToast({ 
+        title: 'Market created on-chain!', 
+        txHash: receipt.transactionHash,
+        icon: '✅'
+      });
 
       // Save image if exists
       if (pendingMarket.imageUrl) {
         try {
-          await fetch(`${window.location.origin}/api/market-images`, {
+          await fetch(`${apiBaseUrl}/api/market-images`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -138,8 +170,8 @@ const PendingMarkets = () => {
       }
 
       // Update pending market status in database
-      const apiBaseUrl = window.location.origin;
-      await fetch(`${apiBaseUrl}/api/pending-markets/${pendingMarket.id}`, {
+      const apiBaseUrl = resolveApiBase();
+      const approveResponse = await fetch(`${apiBaseUrl}/api/pending-markets/${pendingMarket.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -148,6 +180,11 @@ const PendingMarkets = () => {
           marketId: marketId
         })
       });
+
+      if (!approveResponse.ok) {
+        const errorData = await approveResponse.json().catch(() => ({ error: 'Failed to update pending market status' }));
+        throw new Error(errorData.error || 'Failed to update pending market status');
+      }
 
       showGlassToast({ title: 'Market approved and deployed! 🎉', icon: '✅' });
       fetchPendingMarkets();
@@ -167,7 +204,9 @@ const PendingMarkets = () => {
     setProcessingId(pendingMarket.id);
 
     try {
-      const apiBaseUrl = window.location.origin;
+      const apiBaseUrl = resolveApiBase();
+      console.log('Rejecting market via:', `${apiBaseUrl}/api/pending-markets/${pendingMarket.id}`);
+      
       const response = await fetch(`${apiBaseUrl}/api/pending-markets/${pendingMarket.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -177,25 +216,27 @@ const PendingMarkets = () => {
         })
       });
 
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Rejection response error:', response.status, errorText);
+        throw new Error(`HTTP ${response.status}: ${errorText.substring(0, 100)}`);
+      }
+
       const data = await response.json();
 
       if (data.success) {
         showGlassToast({ title: 'Market rejected', icon: '✅' });
         fetchPendingMarkets();
       } else {
-        throw new Error(data.error);
+        throw new Error(data.error || 'Failed to reject market');
       }
     } catch (error) {
       console.error('Error rejecting market:', error);
-      showGlassToast({ title: 'Failed to reject market', icon: '❌' });
+      showGlassToast({ title: error.message || 'Failed to reject market', icon: '❌' });
     } finally {
       setProcessingId(null);
     }
   };
-
-  if (!isConnected || !isAdmin) {
-    return null;
-  }
 
   const statusOptions = ['PENDING', 'APPROVED', 'REJECTED', 'ALL'];
   const summary = useMemo(() => (
@@ -208,8 +249,8 @@ const PendingMarkets = () => {
     }))
   ), [pendingMarkets]);
 
-  // Show loading state while Web3 initializes
-  if (isConnected === false && account === null) {
+  // Show loading state while checking admin status (only if wallet is connecting, not for localStorage admin)
+  if (!isLocalStorageAdmin && isConnected === false && account === null) {
     return (
       <div className="min-h-screen bg-[#050505]" style={clashFont}>
         <WormStyleNavbar />
@@ -223,27 +264,7 @@ const PendingMarkets = () => {
     );
   }
 
-  // Show login prompt if not connected
-  if (!isConnected || !account) {
-    return (
-      <div className="min-h-screen bg-[#050505]" style={clashFont}>
-        <WormStyleNavbar />
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-12">
-          <div className="glass-card rounded-[20px] border border-white/10 bg-white/5 text-center py-16">
-            <p className="text-gray-300 text-lg mb-4">Please connect your wallet to access admin panel</p>
-            <button
-              onClick={() => history.push('/admin')}
-              className="px-6 py-3 rounded-full bg-[#FFE600] text-black font-semibold"
-            >
-              Go to Admin Login
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Show access denied if not admin
+  // Show access denied if not admin (only if not localStorage admin AND not wallet admin)
   if (!isAdmin) {
     return (
       <div className="min-h-screen bg-[#050505]" style={clashFont}>
@@ -252,10 +273,10 @@ const PendingMarkets = () => {
           <div className="glass-card rounded-[20px] border border-white/10 bg-white/5 text-center py-16">
             <p className="text-red-300 text-lg mb-4">Access denied. Admin only.</p>
             <button
-              onClick={() => history.push('/')}
+              onClick={() => history.push('/admin')}
               className="px-6 py-3 rounded-full bg-[#FFE600] text-black font-semibold"
             >
-              Go to Home
+              Go to Admin Login
             </button>
           </div>
         </div>
