@@ -308,7 +308,7 @@ const WormStyleNavbar = () => {
               className="flex-shrink-0 flex items-center hover:opacity-80 transition-opacity"
             >
               <img
-                src="/POlydegenlogo.svg"
+                src="/poly.svg"
                 alt="PolyDegen"
                 className="h-6 sm:h-8 md:h-10 w-auto"
                 style={{ maxWidth: '200px' }}
