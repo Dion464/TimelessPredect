@@ -27,10 +27,10 @@ module.exports = async (req, res) => {
         feeAmountWei
       } = req.body;
 
-      // Validation
-      if (!question || !category || !endTime || !resolutionTime || !creator || !feeTxHash || !feeAmountWei) {
+      // Validation – fee fields are optional, core market fields are required
+      if (!question || !category || !endTime || !resolutionTime || !creator) {
         return res.status(400).json({
-          error: 'Missing required fields: question, category, endTime, resolutionTime, creator, feeTxHash, feeAmountWei'
+          error: 'Missing required fields: question, category, endTime, resolutionTime, creator'
         });
       }
 
@@ -46,8 +46,8 @@ module.exports = async (req, res) => {
           rules: rules ? JSON.stringify(rules) : null,
           creator,
           status: 'PENDING',
-          feeTxHash,
-          feeAmountWei
+          feeTxHash: feeTxHash || null,
+          feeAmountWei: feeAmountWei || null
         }
       });
 

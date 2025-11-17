@@ -31,6 +31,24 @@ const CreateMarket = () => {
   const fileInputRef = useRef(null);
 
   const SUBMISSION_FEE_TCENT = '1';
+  const submissionFeeRecipient = import.meta.env.VITE_SUBMISSION_FEE_RECIPIENT;
+
+  const resolveApiBase = () => {
+    const envBase = import.meta.env.VITE_API_BASE_URL;
+    const looksLocal = envBase && /localhost:8080|127\.0\.0\.1:8080/i.test(envBase);
+    if (envBase && !looksLocal) return envBase;
+
+    if (typeof window !== 'undefined' && window.location?.origin) {
+      const origin = window.location.origin;
+      // In production, use same origin (Vercel will serve /api)
+      if (!/localhost|127\.0\.0\.1/i.test(origin)) {
+        return origin;
+      }
+      // In local dev, always hit the deployed API
+      return 'https://polydegen.vercel.app';
+    }
+    return '';
+  };
 
   const clashFont = {
     fontFamily: 'Clash Grotesk Variable, -apple-system, BlinkMacSystemFont, sans-serif'
@@ -150,28 +168,27 @@ const CreateMarket = () => {
     const submissionFeeWei = ethers.utils.parseEther(SUBMISSION_FEE_TCENT);
     let feeTxHash = null;
 
-    try {
-      setIsPayingFee(true);
-      showGlassToast(`Paying ${SUBMISSION_FEE_TCENT} TCENT submission fee...`, '⏳', 'info');
-      const feeTx = await signer.sendTransaction({
-        to: CONTRACT_ADDRESS,
-        value: submissionFeeWei
-      });
-      feeTxHash = feeTx.hash;
-      await feeTx.wait();
-      showGlassToast('Submission fee paid!', '✅', 'success');
-    } catch (feeError) {
-      console.error('Fee payment failed:', feeError);
-      showGlassToast(feeError?.message || 'Failed to pay submission fee', '❌', 'error');
-      setIsSubmitting(false);
-      setIsPayingFee(false);
-      return;
-    } finally {
-      setIsPayingFee(false);
+    if (submissionFeeRecipient) {
+      try {
+        setIsPayingFee(true);
+        showGlassToast(`Paying ${SUBMISSION_FEE_TCENT} TCENT submission fee...`, '⏳', 'info');
+        const feeTx = await signer.sendTransaction({
+          to: submissionFeeRecipient,
+          value: submissionFeeWei
+        });
+        feeTxHash = feeTx.hash;
+        await feeTx.wait();
+        showGlassToast('Submission fee paid!', '✅', 'success');
+      } catch (feeError) {
+        console.error('Fee payment failed (continuing without fee):', feeError);
+        showGlassToast('Fee payment failed, but your market will still be submitted.', '⚠️', 'warning');
+      } finally {
+        setIsPayingFee(false);
+      }
     }
 
     try {
-      const apiBaseUrl = window.location.origin;
+      const apiBaseUrl = resolveApiBase();
       const response = await fetch(`${apiBaseUrl}/api/pending-markets`, {
         method: 'POST',
         headers: {
