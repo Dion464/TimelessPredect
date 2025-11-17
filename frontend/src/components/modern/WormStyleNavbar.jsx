@@ -150,18 +150,30 @@ const WormStyleNavbar = () => {
           if (dbData.success && dbData.notifications) {
             const dbNotifs = dbData.notifications
               .filter(n => !n.read)
-              .map(n => ({
-                id: n.id,
-                type: 'db',
-                title: n.title,
-                message: n.message,
-                question: n.message.split('"')[1] || n.title,
-                status: n.type === 'MARKET_APPROVED' ? 'approved' : n.type === 'MARKET_REJECTED' ? 'rejected' : 'info',
-                claimable: false,
-                marketId: n.marketId ? Number(n.marketId) : null,
-                pendingMarketId: n.pendingMarketId ? Number(n.pendingMarketId) : null,
-                updatedAt: new Date(n.createdAt).getTime()
-              }));
+              .map((n) => {
+                let shares = 0;
+                // Extract shares from message for MARKET_RESOLVED notifications
+                if (n.type === 'MARKET_RESOLVED' && n.message) {
+                  const sharesMatch = n.message.match(/have (\d+\.?\d*) winning shares/);
+                  if (sharesMatch) {
+                    shares = parseFloat(sharesMatch[1]) || 0;
+                  }
+                }
+                
+                return {
+                  id: n.id,
+                  type: 'db',
+                  title: n.title,
+                  message: n.message,
+                  question: n.message.split('"')[1] || n.title,
+                  status: n.type === 'MARKET_RESOLVED' ? (n.message.includes('won') ? 'won' : 'lost') : n.type === 'MARKET_APPROVED' ? 'approved' : n.type === 'MARKET_REJECTED' ? 'rejected' : 'info',
+                  claimable: n.type === 'MARKET_RESOLVED' && n.message.includes('won'),
+                  shares: shares,
+                  marketId: n.marketId ? Number(n.marketId) : null,
+                  pendingMarketId: n.pendingMarketId ? Number(n.pendingMarketId) : null,
+                  updatedAt: new Date(n.createdAt).getTime()
+                };
+              });
             allNotifications.push(...dbNotifs);
           }
         }
@@ -401,7 +413,7 @@ const WormStyleNavbar = () => {
                                   }}
                                   className="w-full text-sm sm:text-xs font-semibold text-black bg-[#FFE600] hover:bg-[#FFD700] active:bg-[#FFC700] rounded-full py-2.5 sm:py-2 touch-manipulation transition-colors"
                                 >
-                                  Claim {notif.shares.toFixed(2)} TCENT
+                                  Claim {((notif.shares || 0) > 0 ? notif.shares.toFixed(2) : '0.00')} TCENT
                                 </button>
                               )}
                             </div>

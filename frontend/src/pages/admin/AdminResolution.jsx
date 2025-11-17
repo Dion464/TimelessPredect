@@ -11,6 +11,32 @@ const AdminResolution = () => {
   const [loading, setLoading] = useState(true);
   const [resolvingId, setResolvingId] = useState(null);
 
+  // Resolve API base URL
+  const resolveApiBase = () => {
+    const envBase = import.meta.env.VITE_API_BASE_URL;
+    
+    // Ignore placeholder URLs
+    if (envBase && (envBase.includes('your-backend-api.com') || envBase.includes('example.com') || envBase.includes('placeholder'))) {
+      console.warn('Ignoring placeholder API URL:', envBase);
+    } else if (envBase && !/localhost:8080|127\.0\.0\.1:8080/i.test(envBase)) {
+      return envBase;
+    }
+
+    if (typeof window !== 'undefined' && window.location?.origin) {
+      const origin = window.location.origin;
+      if (!/localhost|127\.0\.0\.1/i.test(origin)) {
+        return origin;
+      }
+      return 'https://polydegen.vercel.app';
+    }
+    
+    if (typeof window !== 'undefined' && window.location?.origin) {
+      return window.location.origin;
+    }
+    
+    return '';
+  };
+
   const loadMarkets = useCallback(async () => {
     if (!contracts?.predictionMarket) {
       setMarkets([]);
@@ -101,10 +127,91 @@ const AdminResolution = () => {
     try {
       setResolvingId(marketId);
       showGlassToast({ title: 'Submitting resolution...', icon: '⏳' });
+      
+      // Get market data for notifications
+      const market = await getMarketData(marketId);
+      if (!market) {
+        throw new Error('Market not found');
+      }
+
+      // Resolve market on-chain
       const tx = await contracts.predictionMarket.resolveMarket(marketId, outcome);
       showTransactionToast({ title: 'Resolution submitted', txHash: tx.hash });
-      await tx.wait();
-      showGlassToast({ title: `Market resolved as ${outcome === 1 ? 'YES' : 'NO'}`, icon: '✅' });
+      const receipt = await tx.wait();
+
+      // Get all participants with positions in this market
+      const apiBaseUrl = resolveApiBase();
+      let participants = [];
+      try {
+        const participantsResponse = await fetch(`${apiBaseUrl}/api/markets/${marketId}/participants`);
+        if (participantsResponse.ok) {
+          const participantsData = await participantsResponse.json();
+          if (participantsData.success) {
+            participants = participantsData.participants || [];
+            console.log('Found participants for market:', participants.length);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch participants:', err);
+        // Continue even if fetching participants fails
+      }
+
+      // Create notifications for all participants
+      const outcomeName = outcome === 1 ? 'YES' : outcome === 2 ? 'NO' : 'INVALID';
+      let notificationsCreated = 0;
+
+      for (const participant of participants) {
+        const yesShares = BigInt(participant.yesShares || '0');
+        const noShares = BigInt(participant.noShares || '0');
+        const hasYesShares = yesShares > 0n;
+        const hasNoShares = noShares > 0n;
+
+        let won = false;
+        let shares = '0';
+        
+        if (outcome === 1 && hasYesShares) {
+          // YES won and user has YES shares
+          won = true;
+          shares = (yesShares / BigInt(1e18)).toString();
+        } else if (outcome === 2 && hasNoShares) {
+          // NO won and user has NO shares
+          won = true;
+          shares = (noShares / BigInt(1e18)).toString();
+        } else if ((outcome === 1 && hasNoShares) || (outcome === 2 && hasYesShares)) {
+          // User lost
+          won = false;
+          shares = outcome === 1 
+            ? (noShares / BigInt(1e18)).toString() 
+            : (yesShares / BigInt(1e18)).toString();
+        }
+
+        // Create notification
+        try {
+          await fetch(`${apiBaseUrl}/api/notifications`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              recipient: participant.userAddress,
+              type: 'MARKET_RESOLVED',
+              title: won ? `You Won! 🎉` : 'Market Resolved - You Lost',
+              message: won
+                ? `Market "${market.question}" resolved: ${outcomeName} won! You have ${shares} winning shares. Claim your winnings (1 TCENT per share).`
+                : `Market "${market.question}" resolved: ${outcomeName} won. Your ${shares} shares lost.`,
+              marketId: marketId.toString()
+            })
+          });
+          notificationsCreated++;
+        } catch (notifErr) {
+          console.error('Failed to create notification for', participant.userAddress, ':', notifErr);
+        }
+      }
+
+      console.log(`Created ${notificationsCreated} notifications for market ${marketId}`);
+
+      showGlassToast({ 
+        title: `Market resolved as ${outcomeName}. ${notificationsCreated} notifications sent.`, 
+        icon: '✅' 
+      });
       await loadMarkets();
     } catch (err) {
       console.error('Failed to resolve market', err);

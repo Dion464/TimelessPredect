@@ -37,6 +37,36 @@ module.exports = async (req, res) => {
   }
 
   try {
+    if (req.method === 'POST') {
+      // Create a new notification
+      const { recipient, type, title, message, marketId, pendingMarketId, claimable } = req.body;
+
+      if (!recipient || !type || !title || !message) {
+        return res.status(400).json({ error: 'recipient, type, title, and message are required' });
+      }
+
+      if (!['MARKET_APPROVED', 'MARKET_REJECTED', 'MARKET_RESOLVED', 'WINNINGS_CLAIMABLE'].includes(type)) {
+        return res.status(400).json({ error: 'Invalid notification type' });
+      }
+
+      const notification = await prisma.notification.create({
+        data: {
+          recipient: recipient.toLowerCase(),
+          type: type,
+          title: title,
+          message: message,
+          marketId: marketId ? BigInt(marketId) : null,
+          pendingMarketId: pendingMarketId ? BigInt(pendingMarketId) : null,
+          read: false
+        }
+      });
+
+      return res.status(200).json({
+        success: true,
+        notification: serializeBigInt(notification)
+      });
+    }
+
     if (req.method === 'GET') {
       // Get notifications for a recipient
       const { recipient } = req.query;

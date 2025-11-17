@@ -614,25 +614,41 @@ contract ETHPredictionMarket is ReentrancyGuard, Ownable {
         uint256 payout = 0;
         
         if (market.outcome == 1 && position.yesShares > 0) {
-            // YES won
-            payout = position.yesShares * 1 ether / (market.totalYesShares > 0 ? market.totalYesShares : 1);
+            // YES won - pay 1 TCENT (1 ether) per share
+            payout = position.yesShares; // 1 ether per share directly
             position.yesShares = 0;
         } else if (market.outcome == 2 && position.noShares > 0) {
-            // NO won
-            payout = position.noShares * 1 ether / (market.totalNoShares > 0 ? market.totalNoShares : 1);
+            // NO won - pay 1 TCENT (1 ether) per share
+            payout = position.noShares; // 1 ether per share directly
             position.noShares = 0;
         } else if (market.outcome == 3) {
             // INVALID - refund proportionally
             uint256 totalShares = position.yesShares + position.noShares;
-            payout = (position.totalInvested * totalShares) / (position.yesShares + position.noShares);
+            if (totalShares > 0) {
+                payout = (position.totalInvested * totalShares) / totalShares;
+            }
             position.yesShares = 0;
             position.noShares = 0;
+        } else {
+            // User lost - no payout, shares are forfeited (contract keeps the funds)
+            // Clear losing shares
+            if (market.outcome == 1 && position.noShares > 0) {
+                position.noShares = 0; // NO shares lost - forfeited to contract
+            } else if (market.outcome == 2 && position.yesShares > 0) {
+                position.yesShares = 0; // YES shares lost - forfeited to contract
+            }
+            // Payout remains 0 for losers
         }
 
-        require(payout > 0, "No winnings to claim");
-        require(address(this).balance >= payout, "Insufficient contract balance");
-
-        payable(msg.sender).transfer(payout);
+        // Only require payout > 0 if user won (has winnings to claim)
+        // If user lost, payout is 0 but we still clear their position
+        if (payout > 0) {
+            require(address(this).balance >= payout, "Insufficient contract balance");
+            payable(msg.sender).transfer(payout);
+        } else {
+            // User lost - position is already cleared, but no payout
+            // Allow this so users can "claim" to clear their losing position from the UI
+        }
     }
 
     // Calculate shares for purchase using AMM formula
