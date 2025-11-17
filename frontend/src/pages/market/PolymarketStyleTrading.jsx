@@ -226,30 +226,22 @@ const PolymarketStyleTrading = () => {
 
   // These functions need to be defined before refreshAllData
   const fetchRecentTrades = useCallback(async () => {
-    if (!contracts?.predictionMarket) {
-      console.warn('Prediction market contract not available, skipping recent trades fetch');
-      setRecentTrades([]);
-      setUniqueTraders(0);
-      return;
-    }
-
-    if (typeof contracts.predictionMarket.getRecentTrades !== 'function') {
-      console.warn('getRecentTrades() not available on this contract. Skipping trades tab population.');
-      setRecentTrades([]);
-      setUniqueTraders(0);
-      return;
-    }
-
-    try {
-      const trades = await contracts.predictionMarket.getRecentTrades(marketId, 100);
-
-      if (!trades || trades.length === 0) {
+    if (!contracts?.predictionMarket || !marketId) {
         setRecentTrades([]);
         setUniqueTraders(0);
         return;
       }
 
-      const formattedTrades = trades.map(trade => {
+    try {
+      let formattedTrades = [];
+
+      // Try to use getRecentTrades if available
+      if (typeof contracts.predictionMarket.getRecentTrades === 'function') {
+        try {
+          const trades = await contracts.predictionMarket.getRecentTrades(marketId, 100);
+          
+          if (trades && trades.length > 0) {
+            formattedTrades = trades.map(trade => {
         const priceBps = Number(trade.price?.toString?.() ?? trade.price ?? 0);
         const timestampSeconds = Number(trade.timestamp?.toString?.() ?? trade.timestamp ?? 0);
         const sharesWei = trade.shares?.toString?.() ?? trade.shares ?? '0';
@@ -273,6 +265,98 @@ const PolymarketStyleTrading = () => {
           trader: trade.trader
         };
       });
+          }
+        } catch (getRecentTradesError) {
+          console.warn('getRecentTrades() failed, trying blockchain events:', getRecentTradesError);
+        }
+      }
+
+      // Fallback: Query blockchain events if getRecentTrades not available or failed
+      if (formattedTrades.length === 0) {
+        try {
+          let provider = null;
+          let contractToQuery = null;
+
+          // Try to get provider from contract
+          if (contracts.predictionMarket) {
+            provider = contracts.predictionMarket.provider;
+            contractToQuery = contracts.predictionMarket;
+          }
+
+          // If no provider, try to create one
+          if (!provider) {
+            if (typeof window !== 'undefined' && window.ethereum) {
+              provider = new ethers.providers.Web3Provider(window.ethereum);
+            } else if (RPC_URL) {
+              provider = new ethers.providers.JsonRpcProvider(RPC_URL);
+            }
+          }
+
+          if (provider && CONTRACT_ADDRESS) {
+            // Create contract instance if we don't have one
+            if (!contractToQuery) {
+              contractToQuery = new ethers.Contract(
+                CONTRACT_ADDRESS,
+                CONTRACT_ABI,
+                provider
+              );
+            }
+
+            // Get current block number
+            const currentBlock = await provider.getBlockNumber();
+            const fromBlock = Math.max(0, currentBlock - 10000); // Last ~10k blocks
+
+            // Query SharesPurchased events
+            const purchaseFilter = contractToQuery.filters.SharesPurchased(marketId, null);
+            const purchaseEvents = await contractToQuery.queryFilter(purchaseFilter, fromBlock);
+
+            // Query SharesSold events
+            const sellFilter = contractToQuery.filters.SharesSold(marketId, null);
+            const sellEvents = await contractToQuery.queryFilter(sellFilter, fromBlock);
+
+            const allEvents = [...purchaseEvents, ...sellEvents].sort((a, b) => {
+              if (a.blockNumber !== b.blockNumber) {
+                return b.blockNumber - a.blockNumber;
+              }
+              return b.logIndex - a.logIndex;
+            });
+
+            formattedTrades = await Promise.all(
+              allEvents.slice(0, 100).map(async (event) => {
+                const args = event.args;
+                const isPurchase = event.event === 'SharesPurchased';
+                const isYes = args.isYes || args[2];
+                const shares = args.shares || args[3];
+                const newPrice = args.newPrice || args[5] || args[4];
+                const trader = args.buyer || args.seller || args[1];
+                
+                const block = await event.getBlock();
+                const priceBps = newPrice ? Number(newPrice.toString()) : 5000;
+                const sharesWei = shares?.toString?.() || shares || '0';
+                
+                let sharesFormatted = '0';
+                try {
+                  sharesFormatted = ethers.utils.formatEther(sharesWei);
+                } catch (err) {
+                  sharesFormatted = sharesWei.toString();
+                }
+
+                return {
+                  side: isYes ? 'yes' : 'no',
+                  amount: parseFloat(sharesFormatted).toFixed(4),
+                  price: priceBps / 10000,
+                  yesPrice: isYes ? priceBps / 10000 : (10000 - priceBps) / 10000,
+                  noPrice: isYes ? (10000 - priceBps) / 10000 : priceBps / 10000,
+                  timestamp: new Date(block.timestamp * 1000).toISOString(),
+                  trader: trader
+                };
+              })
+            );
+          }
+        } catch (eventError) {
+          console.error('Error querying blockchain events:', eventError);
+        }
+      }
 
       // Sort newest first
       formattedTrades.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
@@ -282,9 +366,9 @@ const PolymarketStyleTrading = () => {
       const uniqueAddresses = new Set(formattedTrades.map(trade => (trade.trader || '').toLowerCase()));
       setUniqueTraders(uniqueAddresses.size);
 
-      console.log('✅ Loaded trades from blockchain:', formattedTrades.length);
+      console.log('✅ Loaded trades:', formattedTrades.length);
     } catch (error) {
-      console.error('Error fetching recent trades from blockchain:', error);
+      console.error('Error fetching recent trades:', error);
       setRecentTrades([]);
       setUniqueTraders(0);
     }
@@ -769,7 +853,7 @@ const PolymarketStyleTrading = () => {
               <span className="text-gray-400 text-sm sm:text-base" style={{ fontFamily: "'Clash Grotesk Variable', 'Clash Grotesk', sans-serif" }}>
                 chance
                     </span>
-                  </div>
+            </div>
 
             {/* Tabs */}
             <div className="space-y-4 sm:space-y-6 px-4 sm:px-0">
@@ -796,8 +880,8 @@ const PolymarketStyleTrading = () => {
                     </button>
                   );
                 })}
-                </div>
-
+              </div>
+              
               {/* Tab Content */}
               <div className="glass-card rounded-[16px] sm:rounded-[24px] border border-white/20 backdrop-blur-2xl px-4 sm:px-6 lg:px-9 pb-8 sm:pb-10 lg:pb-12 pt-6 sm:pt-8 lg:pt-10" style={{ background: 'rgba(12,12,12,0.55)' }}>
                 {activeTab === 'market' && (
@@ -808,101 +892,9 @@ const PolymarketStyleTrading = () => {
                         {market.description ||
                           "Will the Phoenix Suns defeat the Dallas Mavericks in the NBA game held at the American Airlines Center, Dallas, Texas, on 12 November 2025? Market resolves to 'Yes' if the Suns are the official winner. Outcome certified by the NBA's official box score."}
                       </p>
-              </div>
-
-                    <div className="space-y-3">
-                      <h3 className="text-[12px] font-semibold uppercase tracking-[0.3em] text-[#969696]">Outcomes</h3>
-                      <div className="flex items-center gap-4">
-                        {['Yes', 'No'].map((outcome) => (
-                          <div
-                            key={outcome}
-                            className="px-7 py-2 rounded-full border border-white/10 text-white text-sm"
-                            style={{ fontFamily: "'Clash Grotesk Variable', sans-serif" }}
-                          >
-                            {outcome}
-                  </div>
-                        ))}
-                </div>
-                  </div>
-
-                    <div className="space-y-3">
-                      <h3 className="text-[12px] font-semibold uppercase tracking-[0.3em] text-[#969696]">Order Book</h3>
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        {[
-                          { label: 'Yes Market', book: orderBook.yes },
-                          { label: 'No Market', book: orderBook.no }
-                        ].map(({ label, book }) => (
-                          <div
-                            key={label}
-                            className="glass-card border border-white/12 rounded-[20px] px-5 py-4 bg-transparent"
-                          >
-                            <div className="flex items-center justify-between mb-3">
-                              <span className="text-sm font-semibold text-white/80 tracking-[0.28em] uppercase">
-                                {label}
-                              </span>
-                              <span className="text-[11px] text-white/40 tracking-[0.3em] uppercase">Top Levels</span>
-                </div>
-
-                            {(!book?.bids?.length && !book?.asks?.length) ? (
-                              <div className="text-white/40 text-xs text-center py-6">
-                                No orders yet. Add liquidity to seed this market.
-                  </div>
-                            ) : (
-                              <div className="grid grid-cols-2 gap-4 text-xs text-white/70">
-                                <div>
-                                  <div className="text-white/40 tracking-[0.28em] uppercase mb-2">Bids</div>
-                                  <div className="space-y-2">
-                                    {(book?.bids || []).slice(0, 6).map((level, idx) => (
-                                      <div key={`bid-${label}-${idx}`} className="flex justify-between">
-                                        <span>{level.price?.toFixed?.(2) ?? level.price}¢</span>
-                                        <span>{parseFloat(level.amount ?? 0).toFixed(2)}</span>
-                </div>
-                                    ))}
-                                    {(!book?.bids || book.bids.length === 0) && (
-                                      <div className="text-white/30">—</div>
-                                    )}
-              </div>
-            </div>
-
-                                <div>
-                                  <div className="text-white/40 tracking-[0.28em] uppercase mb-2">Asks</div>
-                                  <div className="space-y-2">
-                                    {(book?.asks || []).slice(0, 6).map((level, idx) => (
-                                      <div key={`ask-${label}-${idx}`} className="flex justify-between">
-                                        <span>{level.price?.toFixed?.(2) ?? level.price}¢</span>
-                                        <span>{parseFloat(level.amount ?? 0).toFixed(2)}</span>
-              </div>
-                                    ))}
-                                    {(!book?.asks || book.asks.length === 0) && (
-                                      <div className="text-white/30">—</div>
-                                    )}
-                  </div>
                   </div>
                     </div>
                   )}
-                </div>
-                        ))}
-              </div>
-            </div>
-
-                    <div className="space-y-6">
-                      <h3 className="text-[12px] font-semibold uppercase tracking-[0.3em] text-[#969696]">Rules</h3>
-                      <div className="space-y-4 text-[#D8D8D8] text-[15px] leading-7">
-                        {rulesToRender.map((rule, index) => (
-                          <div key={index} className="flex gap-5 items-start">
-                            <div
-                              className="w-18 h-18 rounded-full border border-white/15 bg-[rgba(45,45,45,0.4)] flex items-center justify-center text-sm font-medium text-white"
-                              style={{ boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)' }}
-                            >
-                              {index + 1}
-              </div>
-                            <p className="pt-1">{rule}</p>
-                  </div>
-                        ))}
-                </div>
-                  </div>
-                </div>
-                )}
 
                 {activeTab === 'rules' && (
                   <div className="space-y-6 text-[#E4E4E4]" style={{ fontFamily: "'Clash Grotesk Variable', sans-serif" }}>
@@ -915,12 +907,12 @@ const PolymarketStyleTrading = () => {
                             style={{ boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)' }}
                           >
                             {index + 1}
-                          </div>
+                </div>
                           <p className="pt-1">{rule}</p>
-                        </div>
+                </div>
                       ))}
-                    </div>
-                  </div>
+              </div>
+            </div>
                 )}
 
                 {activeTab === 'trades' && (
@@ -928,8 +920,8 @@ const PolymarketStyleTrading = () => {
                     {tradesToDisplay.length === 0 ? (
                       <div className="text-white/50 text-sm text-center py-16">
                         No trades yet. Activity will appear here once trading begins.
-                      </div>
-                    ) : (
+                </div>
+              ) : (
                       <div className="space-y-3">
                         {tradesToDisplay.map((trade, index) => (
                           <div
@@ -939,9 +931,9 @@ const PolymarketStyleTrading = () => {
                             <div className="flex items-center justify-between text-sm">
                               <span className={`uppercase tracking-[0.28em] ${trade.side === 'yes' ? 'text-[#FFE600]' : 'text-white/60'}`}>
                                 {trade.side === 'yes' ? 'Yes' : 'No'}
-                              </span>
+                            </span>
                               <span className="text-white/70">{(trade.price * 100).toFixed(1)}%</span>
-                            </div>
+                          </div>
                             <div className="flex items-center justify-between text-xs text-white/50">
                               <span>{parseFloat(trade.amount).toFixed(2)} shares</span>
                               <span>{new Date(trade.timestamp).toLocaleString()}</span>
