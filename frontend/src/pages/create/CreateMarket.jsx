@@ -165,31 +165,42 @@ const CreateMarket = () => {
 
     setIsSubmitting(true);
 
+    // Payment is REQUIRED - fail if recipient not configured
+    if (!submissionFeeRecipient || !ethers.utils.isAddress(submissionFeeRecipient)) {
+      showGlassToast('Submission fee recipient not configured. Please contact support.', '❌', 'error');
+      setIsSubmitting(false);
+      return;
+    }
+
     let feeTxHash = null;
     let feeAmountWei = null;
 
-    // Only attempt fee payment if recipient is configured
-    if (submissionFeeRecipient && ethers.utils.isAddress(submissionFeeRecipient)) {
-      try {
-        setIsPayingFee(true);
-        const submissionFeeWei = ethers.utils.parseEther(SUBMISSION_FEE_TCENT);
-        showGlassToast(`Paying ${SUBMISSION_FEE_TCENT} TCENT submission fee...`, '⏳', 'info');
-        const feeTx = await signer.sendTransaction({
-          to: submissionFeeRecipient,
-          value: submissionFeeWei
-        });
-        feeTxHash = feeTx.hash;
-        feeAmountWei = submissionFeeWei.toString();
-        await feeTx.wait();
-        showGlassToast('Submission fee paid!', '✅', 'success');
-      } catch (feeError) {
-        console.error('Fee payment failed (continuing without fee):', feeError);
-        showGlassToast('Fee payment failed, but your market will still be submitted.', '⚠️', 'warning');
-      } finally {
-        setIsPayingFee(false);
-      }
-    } else {
-      console.log('No submission fee recipient configured, skipping fee payment');
+    // Attempt fee payment (required, so fail if it fails)
+    try {
+      setIsPayingFee(true);
+      const submissionFeeWei = ethers.utils.parseEther(SUBMISSION_FEE_TCENT);
+      showGlassToast(`Paying ${SUBMISSION_FEE_TCENT} TCENT submission fee...`, '⏳', 'info');
+      
+      const feeTx = await signer.sendTransaction({
+        to: submissionFeeRecipient,
+        value: submissionFeeWei
+      });
+      
+      feeTxHash = feeTx.hash;
+      feeAmountWei = submissionFeeWei.toString();
+      
+      showGlassToast('Waiting for fee payment confirmation...', '⏳', 'info');
+      await feeTx.wait();
+      
+      showGlassToast('Submission fee paid!', '✅', 'success');
+    } catch (feeError) {
+      console.error('Fee payment failed:', feeError);
+      showGlassToast(`Fee payment failed: ${feeError.message || 'Transaction rejected'}. Market submission cancelled.`, '❌', 'error');
+      setIsSubmitting(false);
+      setIsPayingFee(false);
+      return;
+    } finally {
+      setIsPayingFee(false);
     }
 
     try {
@@ -217,7 +228,11 @@ const CreateMarket = () => {
 
       let data;
       try {
-        data = await response.json();
+        const text = await response.text();
+        if (!text) {
+          throw new Error('Empty response from server');
+        }
+        data = JSON.parse(text);
       } catch (jsonError) {
         console.error('Failed to parse API response:', jsonError);
         throw new Error(`API returned invalid response (status ${response.status}). Check Vercel logs.`);
@@ -231,6 +246,8 @@ const CreateMarket = () => {
         throw new Error(errorMsg);
       }
 
+      // Success - show toast and log for debugging
+      console.log('✅ Market submitted successfully:', data);
       showGlassToast('Market submitted for approval! 🎉', '✅', 'success');
       
       // Reset form

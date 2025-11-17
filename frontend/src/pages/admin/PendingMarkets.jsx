@@ -29,7 +29,13 @@ const PendingMarkets = () => {
   const isAdmin = isConnected && account && ADMIN_ADDRESSES.includes(account.toLowerCase());
 
   useEffect(() => {
-    if (!isConnected) {
+    // Wait for Web3 to initialize (account might be null initially)
+    if (isConnected === false && account === null) {
+      // Still initializing, wait a bit
+      return;
+    }
+
+    if (!isConnected || !account) {
       history.push('/admin');
       return;
     }
@@ -41,7 +47,7 @@ const PendingMarkets = () => {
     }
 
     fetchPendingMarkets();
-  }, [isConnected, isAdmin, filter]);
+  }, [isConnected, account, isAdmin, filter, history]);
 
   const fetchPendingMarkets = async () => {
     try {
@@ -201,6 +207,61 @@ const PendingMarkets = () => {
           : pendingMarkets.filter(pm => pm.status === status).length
     }))
   ), [pendingMarkets]);
+
+  // Show loading state while Web3 initializes
+  if (isConnected === false && account === null) {
+    return (
+      <div className="min-h-screen bg-[#050505]" style={clashFont}>
+        <WormStyleNavbar />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-12">
+          <div className="glass-card rounded-[20px] border border-white/10 bg-white/5 text-center py-16">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FFE600] mx-auto mb-4"></div>
+            <p className="text-gray-300">Initializing Web3 connection...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show login prompt if not connected
+  if (!isConnected || !account) {
+    return (
+      <div className="min-h-screen bg-[#050505]" style={clashFont}>
+        <WormStyleNavbar />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-12">
+          <div className="glass-card rounded-[20px] border border-white/10 bg-white/5 text-center py-16">
+            <p className="text-gray-300 text-lg mb-4">Please connect your wallet to access admin panel</p>
+            <button
+              onClick={() => history.push('/admin')}
+              className="px-6 py-3 rounded-full bg-[#FFE600] text-black font-semibold"
+            >
+              Go to Admin Login
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show access denied if not admin
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen bg-[#050505]" style={clashFont}>
+        <WormStyleNavbar />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-12">
+          <div className="glass-card rounded-[20px] border border-white/10 bg-white/5 text-center py-16">
+            <p className="text-red-300 text-lg mb-4">Access denied. Admin only.</p>
+            <button
+              onClick={() => history.push('/')}
+              className="px-6 py-3 rounded-full bg-[#FFE600] text-black font-semibold"
+            >
+              Go to Home
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#050505]" style={clashFont}>
