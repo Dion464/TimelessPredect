@@ -489,7 +489,8 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
             description: `${totalAmount.toFixed(4)} ${currencySymbol} @ ${centsToTCENT(avgPrice)} TCENT. ${result.status === 'matched' ? 'Settlement executing on-chain.' : 'Remaining amount stays on the book.'}`,
             duration: 5200
           });
-        } else if (result.status === 'no_matches') {
+        } else if (result.status === 'no_matches' || (result.status === 'open' && (!result.matches || result.matches.length === 0) && (!result.fills || result.fills.length === 0))) {
+          // No matches found - fallback to AMM
           if (!buyShares) {
             throw new Error('Buy function not available. Please reconnect your wallet.');
           }
@@ -507,7 +508,7 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
               icon: '✅',
               title: `${tradeSide === 'yes' ? 'YES' : 'NO'} position confirmed`,
               description: `${parseFloat(tradeAmount).toFixed(4)} ${currencySymbol} filled via AMM.`,
-              txHash: receipt?.transactionHash
+              txHash: receipt?.transactionHash || receipt?.hash
             });
           } catch (ammError) {
             throw new Error(`AMM buy failed: ${ammError.message}`);
@@ -710,7 +711,8 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
             description: `${totalAmount.toFixed(4)} ${currencySymbol} @ ${centsToTCENT(avgPrice)} TCENT. ${result.status === 'matched' ? 'Settlement executing on-chain.' : 'Remaining amount stays on the book.'}`,
             duration: 5200
           });
-        } else if (result.status === 'no_matches') {
+        } else if (result.status === 'no_matches' || (result.status === 'open' && (!result.matches || result.matches.length === 0) && (!result.fills || result.fills.length === 0))) {
+          // No matches found - fallback to AMM
           if (!sellShares) {
             throw new Error('Sell function not available. Please reconnect your wallet.');
           }
@@ -728,7 +730,7 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
               icon: '✅',
               title: `${tradeSide === 'yes' ? 'YES' : 'NO'} shares sold`,
               description: `${parseFloat(tradeAmount).toFixed(4)} ${currencySymbol} released via AMM.`,
-              txHash: receipt?.transactionHash
+              txHash: receipt?.transactionHash || receipt?.hash
             });
           } catch (ammError) {
             throw new Error(`AMM sell failed: ${ammError.message}`);
