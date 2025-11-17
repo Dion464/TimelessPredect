@@ -165,18 +165,21 @@ const CreateMarket = () => {
 
     setIsSubmitting(true);
 
-    const submissionFeeWei = ethers.utils.parseEther(SUBMISSION_FEE_TCENT);
     let feeTxHash = null;
+    let feeAmountWei = null;
 
-    if (submissionFeeRecipient) {
+    // Only attempt fee payment if recipient is configured
+    if (submissionFeeRecipient && ethers.utils.isAddress(submissionFeeRecipient)) {
       try {
         setIsPayingFee(true);
+        const submissionFeeWei = ethers.utils.parseEther(SUBMISSION_FEE_TCENT);
         showGlassToast(`Paying ${SUBMISSION_FEE_TCENT} TCENT submission fee...`, '⏳', 'info');
         const feeTx = await signer.sendTransaction({
           to: submissionFeeRecipient,
           value: submissionFeeWei
         });
         feeTxHash = feeTx.hash;
+        feeAmountWei = submissionFeeWei.toString();
         await feeTx.wait();
         showGlassToast('Submission fee paid!', '✅', 'success');
       } catch (feeError) {
@@ -185,10 +188,14 @@ const CreateMarket = () => {
       } finally {
         setIsPayingFee(false);
       }
+    } else {
+      console.log('No submission fee recipient configured, skipping fee payment');
     }
 
     try {
       const apiBaseUrl = resolveApiBase();
+      console.log('Submitting to:', `${apiBaseUrl}/api/pending-markets`);
+      
       const response = await fetch(`${apiBaseUrl}/api/pending-markets`, {
         method: 'POST',
         headers: {
@@ -204,7 +211,7 @@ const CreateMarket = () => {
           rules: formData.rules.length > 0 ? formData.rules : null,
           creator: account.toLowerCase(),
           feeTxHash,
-          feeAmountWei: submissionFeeWei.toString()
+          feeAmountWei
         })
       });
 
