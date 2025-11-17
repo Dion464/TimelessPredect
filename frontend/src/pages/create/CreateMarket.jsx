@@ -215,10 +215,20 @@ const CreateMarket = () => {
         })
       });
 
-      const data = await response.json();
+      let data;
+      try {
+        data = await response.json();
+      } catch (jsonError) {
+        console.error('Failed to parse API response:', jsonError);
+        throw new Error(`API returned invalid response (status ${response.status}). Check Vercel logs.`);
+      }
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to submit market');
+        const errorMsg = data.details 
+          ? `${data.error}: ${data.details}${data.code ? ` (${data.code})` : ''}`
+          : data.error || 'Failed to submit market';
+        console.error('API error response:', data);
+        throw new Error(errorMsg);
       }
 
       showGlassToast('Market submitted for approval! 🎉', '✅', 'success');

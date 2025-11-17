@@ -90,9 +90,16 @@ module.exports = async (req, res) => {
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (error) {
     console.error('Error in pending-markets API:', error);
+    console.error('Error stack:', error.stack);
+    console.error('Error name:', error.name);
+    console.error('Error code:', error.code);
+    
+    // Return more detailed error info for debugging
     return res.status(500).json({
       error: 'Internal server error',
-      details: error.message
+      details: error.message,
+      code: error.code || 'UNKNOWN',
+      name: error.name || 'Error'
     });
   }
 };
