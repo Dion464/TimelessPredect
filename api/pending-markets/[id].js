@@ -1,5 +1,30 @@
 const prisma = require('../../lib/prismaClient');
 
+// Helper to convert BigInt values to strings for JSON serialization
+function serializeBigInt(obj) {
+  if (obj === null || obj === undefined) {
+    return obj;
+  }
+  
+  if (typeof obj === 'bigint') {
+    return obj.toString();
+  }
+  
+  if (Array.isArray(obj)) {
+    return obj.map(serializeBigInt);
+  }
+  
+  if (typeof obj === 'object' && obj.constructor === Object) {
+    const serialized = {};
+    for (const [key, value] of Object.entries(obj)) {
+      serialized[key] = serializeBigInt(value);
+    }
+    return serialized;
+  }
+  
+  return obj;
+}
+
 module.exports = async (req, res) => {
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -24,12 +49,17 @@ module.exports = async (req, res) => {
         return res.status(404).json({ error: 'Pending market not found' });
       }
 
+      // Serialize BigInt values and parse rules
+      const serializedMarket = serializeBigInt(pendingMarket);
+      if (serializedMarket.rules) {
+        serializedMarket.rules = JSON.parse(serializedMarket.rules);
+      } else {
+        serializedMarket.rules = [];
+      }
+
       return res.status(200).json({
         success: true,
-        pendingMarket: {
-          ...pendingMarket,
-          rules: pendingMarket.rules ? JSON.parse(pendingMarket.rules) : []
-        }
+        pendingMarket: serializedMarket
       });
     }
 
@@ -68,12 +98,17 @@ module.exports = async (req, res) => {
         data: updateData
       });
 
+      // Serialize BigInt values and parse rules
+      const serializedMarket = serializeBigInt(updatedMarket);
+      if (serializedMarket.rules) {
+        serializedMarket.rules = JSON.parse(serializedMarket.rules);
+      } else {
+        serializedMarket.rules = [];
+      }
+
       return res.status(200).json({
         success: true,
-        pendingMarket: {
-          ...updatedMarket,
-          rules: updatedMarket.rules ? JSON.parse(updatedMarket.rules) : []
-        }
+        pendingMarket: serializedMarket
       });
     }
 
