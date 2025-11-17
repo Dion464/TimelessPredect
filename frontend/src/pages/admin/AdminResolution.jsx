@@ -40,7 +40,7 @@ const AdminResolution = () => {
       setMarkets(marketData.filter(Boolean));
     } catch (err) {
       console.error('Failed to load active markets', err);
-      showGlassToast('Failed to load markets', '❌', 'error');
+      showGlassToast({ title: 'Failed to load markets', icon: '❌' });
     } finally {
       setLoading(false);
     }
@@ -71,21 +71,21 @@ const AdminResolution = () => {
 
   const handleResolve = async (marketId, outcome) => {
     if (!contracts?.predictionMarket) {
-      showGlassToast('Connect an admin wallet to resolve markets', '⚠️', 'warning');
+      showGlassToast({ title: 'Connect an admin wallet to resolve markets', icon: '⚠️' });
       return;
     }
 
     try {
       setResolvingId(marketId);
-      showGlassToast('Submitting resolution...', '⏳', 'info');
+      showGlassToast({ title: 'Submitting resolution...', icon: '⏳' });
       const tx = await contracts.predictionMarket.resolveMarket(marketId, outcome);
-      showTransactionToast('Resolution submitted', tx.hash, 'info');
+      showTransactionToast({ title: 'Resolution submitted', txHash: tx.hash });
       await tx.wait();
-      showGlassToast(`Market resolved as ${outcome === 1 ? 'YES' : 'NO'}`, '✅', 'success');
+      showGlassToast({ title: `Market resolved as ${outcome === 1 ? 'YES' : 'NO'}`, icon: '✅' });
       await loadMarkets();
     } catch (err) {
       console.error('Failed to resolve market', err);
-      showGlassToast(err?.message || 'Failed to resolve market', '❌', 'error');
+      showGlassToast({ title: err?.message || 'Failed to resolve market', icon: '❌' });
     } finally {
       setResolvingId(null);
     }

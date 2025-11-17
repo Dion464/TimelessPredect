@@ -161,11 +161,11 @@ const WormStyleNavbar = () => {
   const handleClaim = async (marketId) => {
     try {
       await claimWinnings(marketId);
-      showGlassToast('Winnings claimed successfully! 🎉', '✅', 'success');
+      showGlassToast({ title: 'Winnings claimed successfully! 🎉', icon: '✅' });
       loadNotifications();
     } catch (err) {
       console.error('Failed to claim winnings', err);
-      showGlassToast(err?.message || 'Failed to claim winnings', '❌', 'error');
+      showGlassToast({ title: err?.message || 'Failed to claim winnings', icon: '❌' });
     }
   };
 
