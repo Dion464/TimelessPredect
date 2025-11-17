@@ -980,7 +980,7 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
           <div className="flex items-center justify-between mb-1">
             <span style={{ fontFamily: clashFont, fontWeight: 300, fontSize: '14px', lineHeight: '20px', color: '#FFFFFF' }}>Amount</span>
             <span style={{ fontFamily: clashFont, fontWeight: 300, fontSize: '14px', lineHeight: '20px', color: '#FFFFFF' }}>
-              Balance: {activeTab === 'buy' ? `${parseFloat(ethBalance).toFixed(3)} TCENT` : `${parseFloat(tradeSide === 'yes' ? position.yesShares : position.noShares).toFixed(3)} TCENT`}
+              Balance: {activeTab === 'buy' ? `${parseFloat(ethBalance).toFixed(3)} TCENT` : `${parseFloat(tradeSide === 'yes' ? position.yesShares : position.noShares).toFixed(3)} shares`}
             </span>
           </div>
           

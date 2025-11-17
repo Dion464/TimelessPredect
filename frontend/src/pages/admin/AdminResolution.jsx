@@ -25,10 +25,26 @@ const AdminResolution = () => {
         return;
       }
 
+      console.log('📊 Loading markets for resolution, found', ids.length, 'active markets');
+
       const marketData = await Promise.all(
         ids.map(async (id) => {
           try {
             const data = await getMarketData(id);
+            // Log markets that have reached resolution time
+            if (data && data.resolutionTime) {
+              const resolutionTimestamp = Number(data.resolutionTime) * 1000;
+              const now = Date.now();
+              const hasReachedResolution = !data.resolved && now >= resolutionTimestamp;
+              if (hasReachedResolution) {
+                console.log('✅ Market ready for resolution:', {
+                  id: data.id,
+                  question: data.question,
+                  resolutionTime: new Date(resolutionTimestamp).toLocaleString(),
+                  currentTime: new Date(now).toLocaleString()
+                });
+              }
+            }
             return data;
           } catch (err) {
             console.error('Failed to fetch market data', err);
@@ -37,7 +53,9 @@ const AdminResolution = () => {
         })
       );
 
-      setMarkets(marketData.filter(Boolean));
+      const validMarkets = marketData.filter(Boolean);
+      console.log('📊 Loaded', validMarkets.length, 'markets');
+      setMarkets(validMarkets);
     } catch (err) {
       console.error('Failed to load active markets', err);
       showGlassToast({ title: 'Failed to load markets', icon: '❌' });
@@ -55,12 +73,17 @@ const AdminResolution = () => {
   }, [isConnected, loadMarkets]);
 
   const actionableMarkets = useMemo(
-    () =>
-      markets.filter((market) => {
-        if (!market) return false;
+    () => {
+      const now = Date.now();
+      const filtered = markets.filter((market) => {
+        if (!market || !market.resolutionTime) return false;
         const resolutionTimestamp = Number(market.resolutionTime) * 1000;
-        return !market.resolved && Date.now() >= resolutionTimestamp;
-      }),
+        const hasReachedResolution = !market.resolved && now >= resolutionTimestamp;
+        return hasReachedResolution;
+      });
+      console.log('🎯 Actionable markets (ready for resolution):', filtered.length, 'out of', markets.length);
+      return filtered;
+    },
     [markets]
   );
 
