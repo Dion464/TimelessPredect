@@ -29,18 +29,33 @@ const PendingMarkets = () => {
   // Resolve API base URL (use deployed Vercel API for local dev)
   const resolveApiBase = () => {
     const envBase = import.meta.env.VITE_API_BASE_URL;
-    const looksLocal = envBase && /localhost:8080|127\.0\.0\.1:8080/i.test(envBase);
-    if (envBase && !looksLocal) return envBase;
+    
+    // Ignore placeholder URLs
+    if (envBase && (envBase.includes('your-backend-api.com') || envBase.includes('example.com') || envBase.includes('placeholder'))) {
+      console.warn('Ignoring placeholder API URL:', envBase);
+    } else if (envBase && !/localhost:8080|127\.0\.0\.1:8080/i.test(envBase)) {
+      // Valid non-local API URL
+      return envBase;
+    }
 
     if (typeof window !== 'undefined' && window.location?.origin) {
       const origin = window.location.origin;
-      // In production, use same origin (Vercel will serve /api)
+      // In production (Vercel), use same origin (Vercel will serve /api)
       if (!/localhost|127\.0\.0\.1/i.test(origin)) {
+        console.log('Using same origin for API:', origin);
         return origin;
       }
-      // In local dev, always hit the deployed API
-      return 'https://polydegen.vercel.app';
+      // In local dev, use the deployed Vercel API
+      const deployedUrl = 'https://polydegen.vercel.app';
+      console.log('Local dev detected, using deployed API:', deployedUrl);
+      return deployedUrl;
     }
+    
+    // Fallback to current origin if available
+    if (typeof window !== 'undefined' && window.location?.origin) {
+      return window.location.origin;
+    }
+    
     return '';
   };
 
