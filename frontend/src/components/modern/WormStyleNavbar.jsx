@@ -204,6 +204,32 @@ const WormStyleNavbar = () => {
     return () => clearInterval(interval);
   }, [isConnected, account, loadNotifications]);
 
+  // Close notifications on escape key and prevent body scroll on mobile
+  useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key === 'Escape' && notificationsOpen) {
+        setNotificationsOpen(false);
+      }
+    };
+
+    if (notificationsOpen) {
+      document.addEventListener('keydown', handleEscape);
+      // Prevent body scroll when notifications are open (mainly for mobile)
+      const isMobile = window.innerWidth < 640; // sm breakpoint
+      if (isMobile) {
+        const originalOverflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        return () => {
+          document.removeEventListener('keydown', handleEscape);
+          document.body.style.overflow = originalOverflow;
+        };
+      }
+      return () => {
+        document.removeEventListener('keydown', handleEscape);
+      };
+    }
+  }, [notificationsOpen]);
+
   const notificationCount = notifications.length;
 
   const statusStyles = useMemo(() => ({
@@ -303,46 +329,76 @@ const WormStyleNavbar = () => {
                 </button>
 
                 {notificationsOpen && (
-                  <div className="absolute right-0 mt-3 w-[calc(100vw-2rem)] sm:w-80 max-w-[90vw] rounded-[16px] border border-white/10 bg-[#050505]/95 backdrop-blur-xl shadow-2xl z-50 p-4 space-y-3 max-h-[80vh] overflow-y-auto">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-semibold text-white">Notifications</p>
-                    {loadingNotifications && <span className="text-xs text-white/50">Refreshing...</span>}
-                  </div>
-                  {notifications.length === 0 ? (
-                    <p className="text-xs text-white/60 py-4 text-center">No updates yet.</p>
-                  ) : (
-                    notifications.map((notif) => (
-                      <div key={notif.id || `${notif.marketId}-${notif.status}`} className="rounded-[12px] border border-white/10 bg-white/5 px-4 py-3 space-y-2">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex-1">
-                            <p className="text-sm font-semibold text-white">{notif.title || notif.question}</p>
-                            <p className={`text-xs mt-1 ${statusStyles[notif.status] || 'text-white/70'}`}>
-                              {notif.message}
-                            </p>
-                          </div>
-                          {notif.type === 'db' && notif.id && (
-                            <button
-                              onClick={() => markAsRead(notif.id)}
-                              className="text-white/40 hover:text-white/70 text-xs"
-                              title="Mark as read"
-                            >
-                              ✕
-                            </button>
-                          )}
-                        </div>
-                        {notif.claimable && notif.marketId && (
+                  <>
+                    {/* Backdrop for mobile */}
+                    <div 
+                      className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 sm:hidden"
+                      onClick={() => setNotificationsOpen(false)}
+                    />
+                    {/* Notification dropdown */}
+                    <div className="fixed sm:absolute right-0 left-0 sm:left-auto top-[72px] sm:top-auto sm:mt-3 sm:w-80 w-full sm:max-w-[90vw] rounded-t-[20px] sm:rounded-[16px] border border-white/10 bg-[#050505]/98 backdrop-blur-xl shadow-2xl z-50 p-4 sm:p-4 space-y-3 max-h-[calc(100vh-88px)] sm:max-h-[80vh] overflow-y-auto">
+                      <div className="flex items-center justify-between mb-2 sm:mb-0">
+                        <p className="text-base sm:text-sm font-semibold text-white">Notifications</p>
+                        <div className="flex items-center gap-3">
+                          {loadingNotifications && <span className="text-xs text-white/50">Refreshing...</span>}
                           <button
-                            onClick={() => handleClaim(notif.marketId)}
-                            className="w-full text-xs font-semibold text-black bg-[#FFE600] rounded-full py-2"
+                            onClick={() => setNotificationsOpen(false)}
+                            className="sm:hidden text-white/60 hover:text-white p-1 -mr-2"
+                            aria-label="Close notifications"
                           >
-                            Claim {notif.shares.toFixed(2)} TCENT
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
                           </button>
-                        )}
+                        </div>
                       </div>
-                    ))
-                  )}
-                </div>
-              )}
+                      {notifications.length === 0 ? (
+                        <p className="text-sm sm:text-xs text-white/60 py-6 sm:py-4 text-center">No updates yet.</p>
+                      ) : (
+                        <div className="space-y-2.5 sm:space-y-3">
+                          {notifications.map((notif) => (
+                            <div key={notif.id || `${notif.marketId}-${notif.status}`} className="rounded-[14px] sm:rounded-[12px] border border-white/10 bg-white/5 px-4 sm:px-4 py-3.5 sm:py-3 space-y-2.5 sm:space-y-2 active:bg-white/10 transition-colors">
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-base sm:text-sm font-semibold text-white leading-tight break-words">
+                                    {notif.title || notif.question}
+                                  </p>
+                                  <p className={`text-sm sm:text-xs mt-1.5 sm:mt-1 leading-relaxed break-words ${statusStyles[notif.status] || 'text-white/70'}`}>
+                                    {notif.message}
+                                  </p>
+                                </div>
+                                {notif.type === 'db' && notif.id && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      markAsRead(notif.id);
+                                    }}
+                                    className="flex-shrink-0 text-white/50 hover:text-white/80 active:text-white text-lg sm:text-base p-1.5 sm:p-1 -mt-1 -mr-1 touch-manipulation"
+                                    title="Mark as read"
+                                    aria-label="Mark as read"
+                                  >
+                                    ✕
+                                  </button>
+                                )}
+                              </div>
+                              {notif.claimable && notif.marketId && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleClaim(notif.marketId);
+                                  }}
+                                  className="w-full text-sm sm:text-xs font-semibold text-black bg-[#FFE600] hover:bg-[#FFD700] active:bg-[#FFC700] rounded-full py-2.5 sm:py-2 touch-manipulation transition-colors"
+                                >
+                                  Claim {notif.shares.toFixed(2)} TCENT
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
 
               <button
