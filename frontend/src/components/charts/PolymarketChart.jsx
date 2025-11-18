@@ -797,34 +797,20 @@ const PolymarketChart = ({
     <div className="relative bg-[#1a1a1a] rounded-xl border border-white/10 shadow-sm p-4 sm:p-6 w-full">
       {/* Chart Header - Polymarket Style */}
       <div className="flex items-center justify-between mb-4 sm:mb-6 flex-wrap gap-3">
-        <div className="flex items-center space-x-4 sm:space-x-8 flex-wrap gap-2">
+        <div className="flex items-center space-x-4 sm:space-x-6 lg:space-x-8 flex-wrap gap-2">
           <div className="flex items-center space-x-2 sm:space-x-3">
-            <div className="w-3 h-3 bg-[#FFE600] rounded-full shadow-sm flex-shrink-0"></div>
+            <div className="w-3 h-3 sm:w-4 sm:h-4 bg-[#FFE600] rounded-full shadow-sm flex-shrink-0"></div>
             <span className="text-xs sm:text-sm font-semibold text-gray-400 uppercase tracking-wide">YES</span>
-            <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-white">
+            <div className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white">
               {formatPrice(currentYesPrice)}¢
             </div>
-            {yesPriceChange !== 0 && (
-              <div className={`flex items-center space-x-1 px-2 py-1 rounded text-xs sm:text-sm ${yesPriceChange >= 0 ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
-                <span className="font-semibold">
-                  {yesPriceChange >= 0 ? '↗' : '↘'} {yesPriceChange >= 0 ? '+' : ''}{yesPriceChange.toFixed(1)}%
-                </span>
-              </div>
-            )}
           </div>
           <div className="flex items-center space-x-2 sm:space-x-3">
-            <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-white">
+            <div className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white">
               {formatPrice(currentNoPrice)}¢
             </div>
             <span className="text-xs sm:text-sm font-semibold text-gray-400 uppercase tracking-wide">NO</span>
-            <div className="w-3 h-3 bg-[#ef4444] rounded-full shadow-sm flex-shrink-0"></div>
-            {noPriceChange !== 0 && (
-              <div className={`flex items-center space-x-1 px-2 py-1 rounded text-xs sm:text-sm ${noPriceChange >= 0 ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
-                <span className="font-semibold">
-                  {noPriceChange >= 0 ? '↗' : '↘'} {noPriceChange >= 0 ? '+' : ''}{noPriceChange.toFixed(1)}%
-                </span>
-              </div>
-            )}
+            <div className="w-3 h-3 sm:w-4 sm:h-4 bg-[#ef4444] rounded-full shadow-sm flex-shrink-0"></div>
           </div>
         </div>
         

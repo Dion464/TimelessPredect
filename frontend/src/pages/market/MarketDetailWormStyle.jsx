@@ -652,8 +652,8 @@ const MarketDetailWormStyle = () => {
               </div>
 
               {/* Question */}
-              <div className="bg-white/[0.08] backdrop-blur-xl rounded-[24px] p-6 border border-white/20 shadow-lg">
-                <h1 className="text-3xl md:text-4xl font-bold text-white leading-tight font-space-grotesk">
+              <div className="bg-white/[0.08] backdrop-blur-xl rounded-[24px] p-6 sm:p-8 border border-white/20 shadow-lg">
+                <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-white leading-tight font-space-grotesk break-words">
                   {market.question}
                 </h1>
               </div>
