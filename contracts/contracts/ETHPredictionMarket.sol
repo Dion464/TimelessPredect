@@ -533,8 +533,8 @@ contract ETHPredictionMarket is ReentrancyGuard, Ownable {
     // ============ Legacy Resolution Functions (for backward compatibility) ============
     
     /**
-     * @dev Resolve market (only owner or creator after resolution time) - LEGACY
-     * Still available but recommend using optimistic oracle instead
+     * @dev Resolve market (anyone can resolve after resolution time - they pay gas fees)
+     * This allows admins or anyone to resolve markets after the resolution window opens
      */
     function resolveMarket(uint256 _marketId, uint8 _outcome) external nonReentrant {
         Market storage market = markets[_marketId];
@@ -543,8 +543,8 @@ contract ETHPredictionMarket is ReentrancyGuard, Ownable {
         require(_outcome >= 1 && _outcome <= 3, "Invalid outcome"); // 1=YES, 2=NO, 3=INVALID
         require(
             msg.sender == owner() || 
-            (msg.sender == market.creator && block.timestamp >= market.resolutionTime),
-            "Not authorized to resolve"
+            block.timestamp >= market.resolutionTime,
+            "Resolution time not reached yet"
         );
 
         // Clear any existing proposals
@@ -778,6 +778,19 @@ contract ETHPredictionMarket is ReentrancyGuard, Ownable {
     function withdrawFees() external onlyOwner {
         payable(owner()).transfer(address(this).balance);
     }
+
+    /**
+     * @dev Receive function to accept ETH/TCENT deposits
+     * Anyone can deposit ETH to provide liquidity for payouts
+     * These funds will be used to:
+     * 1. Pay users when they sell shares
+     * 2. Pay winners when they claim winnings (1 TCENT per share)
+     */
+    receive() external payable {
+        emit Deposited(msg.sender, msg.value);
+    }
+
+    event Deposited(address indexed depositor, uint256 amount);
 
     // Emergency functions
     function emergencyPause(uint256 _marketId) external onlyOwner {

@@ -24,6 +24,7 @@ const PolymarketChart = ({
   const [hoveredPoint, setHoveredPoint] = useState(null);
   const animationRef = useRef(null);
   const [animationProgress, setAnimationProgress] = useState(0);
+  const [isExpanded, setIsExpanded] = useState(true);
 
   // Helper function to format prices: show decimals for small values
   const formatPrice = (price) => {
@@ -101,9 +102,9 @@ const PolymarketChart = ({
     const height = rect.height;
     const padding = 40;
 
-    // Clear canvas and fill with background - white
+    // Clear canvas and fill with background - dark theme like Polymarket
     ctx.clearRect(0, 0, width, height);
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = '#1a1a1a'; // Dark background
     ctx.fillRect(0, 0, width, height);
 
     // Use ONLY database price history - no current price additions
@@ -185,8 +186,8 @@ const PolymarketChart = ({
     const maxPrice = Math.min(100, actualMaxPrice + pricePadding);
     const priceRange = maxPrice - minPrice;
 
-    // Draw grid lines - ultra-subtle (Polymarket style)
-    ctx.strokeStyle = '#f9fafb';
+    // Draw grid lines - ultra-subtle dark theme (Polymarket style)
+    ctx.strokeStyle = '#2a2a2a';
     ctx.lineWidth = 1;
     ctx.setLineDash([]);
     
@@ -234,11 +235,11 @@ const PolymarketChart = ({
       const lastTime = new Date(sortedYesHistory[sortedYesHistory.length - 1].timestamp).getTime();
       const timeRange = Math.max(lastTime - firstTime, 1); // Avoid division by zero
       
-      ctx.strokeStyle = '#10b981';
+      ctx.strokeStyle = '#FFE600'; // Yellow color like Polymarket
       ctx.lineWidth = 2.5;
       ctx.lineJoin = 'round';
       ctx.lineCap = 'round';
-      ctx.shadowColor = 'rgba(16, 185, 129, 0.15)';
+      ctx.shadowColor = 'rgba(255, 230, 0, 0.15)';
       ctx.shadowBlur = 3;
       
       // Calculate all point coordinates first for line drawing
@@ -366,20 +367,20 @@ const PolymarketChart = ({
       // Draw a highlight dot on the current/animated price (last visible point) - Polymarket style
       if (animatedPoints.length > 0) {
         const lastPoint = animatedPoints[animatedPoints.length - 1];
-        ctx.fillStyle = '#10b981';
+        ctx.fillStyle = '#FFE600'; // Yellow
         ctx.beginPath();
         ctx.arc(lastPoint.x, lastPoint.y, 5, 0, 2 * Math.PI);
         ctx.fill();
-        // White inner dot for contrast
-        ctx.fillStyle = '#ffffff';
+        // Dark inner dot for contrast
+        ctx.fillStyle = '#1a1a1a';
         ctx.beginPath();
         ctx.arc(lastPoint.x, lastPoint.y, 2, 0, 2 * Math.PI);
         ctx.fill();
         
         // Draw price label next to the line endpoint - Polymarket style
         const priceInCents = sortedYesHistory[sortedYesHistory.length - 1].price * 100;
-        const priceLabel = `${formatPrice(priceInCents)}%`;
-        ctx.fillStyle = '#10b981';
+        const priceLabel = `Yes ${formatPrice(priceInCents)}¢`;
+        ctx.fillStyle = '#FFE600'; // Yellow
         ctx.font = 'bold 13px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
         ctx.textAlign = 'left';
         ctx.fillText(priceLabel, lastPoint.x + 10, lastPoint.y + 4);
@@ -398,11 +399,11 @@ const PolymarketChart = ({
       const lastTime = new Date(sortedNoHistory[sortedNoHistory.length - 1].timestamp).getTime();
       const timeRange = Math.max(lastTime - firstTime, 1); // Avoid division by zero
       
-      ctx.strokeStyle = '#ef4444';
+      ctx.strokeStyle = '#FFE600'; // Yellow color like Polymarket
       ctx.lineWidth = 2.5;
       ctx.lineJoin = 'round';
       ctx.lineCap = 'round';
-      ctx.shadowColor = 'rgba(239, 68, 68, 0.15)';
+      ctx.shadowColor = 'rgba(255, 230, 0, 0.15)';
       ctx.shadowBlur = 3;
       
       // Calculate all point coordinates first for line drawing
@@ -528,20 +529,20 @@ const PolymarketChart = ({
         
         // Draw a highlight dot on the current/animated price (last visible point) - Polymarket style
         const lastPoint = animatedPoints[animatedPoints.length - 1];
-        ctx.fillStyle = '#ef4444';
+        ctx.fillStyle = '#FFE600'; // Yellow
         ctx.beginPath();
         ctx.arc(lastPoint.x, lastPoint.y, 5, 0, 2 * Math.PI);
         ctx.fill();
-        // White inner dot for contrast
-        ctx.fillStyle = '#ffffff';
+        // Dark inner dot for contrast
+        ctx.fillStyle = '#1a1a1a';
         ctx.beginPath();
         ctx.arc(lastPoint.x, lastPoint.y, 2, 0, 2 * Math.PI);
         ctx.fill();
         
         // Draw price label next to the line endpoint - Polymarket style
         const priceInCents = sortedNoHistory[sortedNoHistory.length - 1].price * 100;
-        const priceLabel = `${formatPrice(priceInCents)}%`;
-        ctx.fillStyle = '#ef4444';
+        const priceLabel = `No ${formatPrice(priceInCents)}¢`;
+        ctx.fillStyle = '#FFE600'; // Yellow
         ctx.font = 'bold 13px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
         ctx.textAlign = 'left';
         ctx.fillText(priceLabel, lastPoint.x + 10, lastPoint.y + 4);
@@ -570,7 +571,7 @@ const PolymarketChart = ({
     }
 
     // Draw percentage labels - Y-axis on the right (Polymarket style)
-    ctx.fillStyle = '#6b7280';
+    ctx.fillStyle = '#888888'; // Lighter gray for dark background
     ctx.font = '11px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
     ctx.textAlign = 'left';
     
@@ -585,7 +586,7 @@ const PolymarketChart = ({
 
     // Draw time labels - at bottom (Polymarket style)
     ctx.textAlign = 'center';
-    ctx.fillStyle = '#6b7280';
+    ctx.fillStyle = '#888888'; // Lighter gray for dark background
     ctx.font = '11px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
     
     if (displayYesHistory.length > 0 || displayNoHistory.length > 0) {
@@ -744,18 +745,18 @@ const PolymarketChart = ({
 
 
   return (
-    <div className="relative bg-white rounded-xl border border-gray-200 shadow-sm p-4 sm:p-6 w-full">
+    <div className="relative bg-[#1a1a1a] rounded-xl border border-white/10 shadow-sm p-4 sm:p-6 w-full">
       {/* Chart Header - Polymarket Style */}
       <div className="flex items-center justify-between mb-4 sm:mb-6 flex-wrap gap-3">
         <div className="flex items-center space-x-4 sm:space-x-8 flex-wrap gap-2">
           <div className="flex items-center space-x-2 sm:space-x-3">
-            <div className="w-3 h-3 bg-green-500 rounded-full shadow-sm flex-shrink-0"></div>
-            <span className="text-xs sm:text-sm font-semibold text-gray-700 uppercase tracking-wide">YES</span>
-            <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">
-              {formatPrice(currentYesPrice)}%
+            <div className="w-3 h-3 bg-[#FFE600] rounded-full shadow-sm flex-shrink-0"></div>
+            <span className="text-xs sm:text-sm font-semibold text-gray-400 uppercase tracking-wide">YES</span>
+            <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-white">
+              {formatPrice(currentYesPrice)}¢
             </div>
             {yesPriceChange !== 0 && (
-              <div className={`flex items-center space-x-1 px-2 py-1 rounded text-xs sm:text-sm ${yesPriceChange >= 0 ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+              <div className={`flex items-center space-x-1 px-2 py-1 rounded text-xs sm:text-sm ${yesPriceChange >= 0 ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
                 <span className="font-semibold">
                   {yesPriceChange >= 0 ? '↗' : '↘'} {yesPriceChange >= 0 ? '+' : ''}{yesPriceChange.toFixed(1)}%
                 </span>
@@ -763,13 +764,13 @@ const PolymarketChart = ({
             )}
           </div>
           <div className="flex items-center space-x-2 sm:space-x-3">
-            <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">
-              {formatPrice(currentNoPrice)}%
+            <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-white">
+              {formatPrice(currentNoPrice)}¢
             </div>
-            <span className="text-xs sm:text-sm font-semibold text-gray-700 uppercase tracking-wide">NO</span>
-            <div className="w-3 h-3 bg-red-500 rounded-full shadow-sm flex-shrink-0"></div>
+            <span className="text-xs sm:text-sm font-semibold text-gray-400 uppercase tracking-wide">NO</span>
+            <div className="w-3 h-3 bg-[#FFE600] rounded-full shadow-sm flex-shrink-0"></div>
             {noPriceChange !== 0 && (
-              <div className={`flex items-center space-x-1 px-2 py-1 rounded text-xs sm:text-sm ${noPriceChange >= 0 ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+              <div className={`flex items-center space-x-1 px-2 py-1 rounded text-xs sm:text-sm ${noPriceChange >= 0 ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
                 <span className="font-semibold">
                   {noPriceChange >= 0 ? '↗' : '↘'} {noPriceChange >= 0 ? '+' : ''}{noPriceChange.toFixed(1)}%
                 </span>
@@ -778,70 +779,90 @@ const PolymarketChart = ({
           </div>
         </div>
         
-        {/* Time Range Selector - Polymarket Style - Responsive */}
-        <div className="flex items-center space-x-1 bg-gray-100 rounded-lg p-1 flex-wrap">
-          {ranges.map((range) => (
-            <button
-              key={range.value}
-              onClick={() => onRangeChange(range.value)}
-              className={`px-2 sm:px-3 py-1 sm:py-1.5 text-xs font-medium rounded transition-all ${
-                selectedRange === range.value
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
+        <div className="flex items-center gap-2">
+          {/* Time Range Selector - Polymarket Style - Responsive */}
+          <div className="flex items-center space-x-1 bg-white/5 rounded-lg p-1 flex-wrap">
+            {ranges.map((range) => (
+              <button
+                key={range.value}
+                onClick={() => onRangeChange(range.value)}
+                className={`px-2 sm:px-3 py-1 sm:py-1.5 text-xs font-medium rounded transition-all ${
+                  selectedRange === range.value
+                    ? 'bg-white/10 text-white shadow-sm'
+                    : 'text-gray-500 hover:text-gray-300'
+                }`}
+              >
+                {range.label}
+              </button>
+            ))}
+          </div>
+          
+          {/* Expand/Collapse Button */}
+          <button
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+            title={isExpanded ? 'Collapse chart' : 'Expand chart'}
+          >
+            <svg 
+              className="w-5 h-5 text-gray-400 transition-transform duration-200"
+              style={{ transform: isExpanded ? 'rotate(0deg)' : 'rotate(180deg)' }}
+              fill="none" 
+              stroke="currentColor" 
+              viewBox="0 0 24 24"
             >
-              {range.label}
-            </button>
-          ))}
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+            </svg>
+          </button>
         </div>
       </div>
 
-
-      {/* Chart Canvas - Clean Background (Polymarket style) - Responsive */}
-      <div className="relative bg-white rounded-lg border border-gray-100 overflow-hidden w-full">
-        <canvas
-          ref={canvasRef}
-          className="w-full cursor-crosshair"
-          onMouseMove={handleMouseMove}
-          onMouseLeave={() => setHoveredPoint(null)}
-          style={{ height: `${height}px`, width: '100%', display: 'block' }}
-        />
+      {/* Chart Canvas - Clean Background (Polymarket style) - Responsive - Collapsible */}
+      {isExpanded && (
+        <div className="relative bg-[#1a1a1a] rounded-lg border border-white/5 overflow-hidden w-full">
+          <canvas
+            ref={canvasRef}
+            className="w-full cursor-crosshair"
+            onMouseMove={handleMouseMove}
+            onMouseLeave={() => setHoveredPoint(null)}
+            style={{ height: `${height}px`, width: '100%', display: 'block' }}
+          />
         
-        {/* Hover Tooltip - Enhanced Polymarket Style */}
-        {hoveredPoint && (
-          <div
-            className="absolute bg-gray-900 text-white px-4 py-2.5 rounded-lg text-sm pointer-events-none z-20 shadow-xl border border-gray-700"
-            style={{
-              left: hoveredPoint.x + 15,
-              top: hoveredPoint.y - 70,
-              transform: hoveredPoint.x > 400 ? 'translateX(-100%)' : 'none'
-            }}
-          >
-            {hoveredPoint.yesPrice !== undefined && hoveredPoint.noPrice !== undefined ? (
-              <>
-                <div className="flex items-center space-x-2.5 mb-2">
-                  <div className="w-2.5 h-2.5 bg-green-500 rounded-full shadow-sm"></div>
-                  <span className="text-gray-400 text-xs uppercase tracking-wide">YES</span>
-                  <span className="font-bold text-base">{formatPrice(hoveredPoint.yesPrice)}%</span>
-                </div>
-                <div className="flex items-center space-x-2.5 mb-2">
-                  <div className="w-2.5 h-2.5 bg-red-500 rounded-full shadow-sm"></div>
-                  <span className="text-gray-400 text-xs uppercase tracking-wide">NO</span>
-                  <span className="font-bold text-base">{formatPrice(hoveredPoint.noPrice)}%</span>
-                </div>
-                <div className="text-gray-500 text-xs pt-2 border-t border-gray-700 mt-2 font-medium">
-                  {formatTime(hoveredPoint.timestamp)}
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="font-bold text-base">{formatPrice(hoveredPoint.price)}%</div>
-                <div className="text-gray-400 text-xs mt-1">{formatTime(hoveredPoint.timestamp)}</div>
-              </>
-            )}
-          </div>
-        )}
-      </div>
+          {/* Hover Tooltip - Enhanced Polymarket Style */}
+          {hoveredPoint && (
+            <div
+              className="absolute bg-gray-900 text-white px-4 py-2.5 rounded-lg text-sm pointer-events-none z-20 shadow-xl border border-gray-700"
+              style={{
+                left: hoveredPoint.x + 15,
+                top: hoveredPoint.y - 70,
+                transform: hoveredPoint.x > 400 ? 'translateX(-100%)' : 'none'
+              }}
+            >
+              {hoveredPoint.yesPrice !== undefined && hoveredPoint.noPrice !== undefined ? (
+                <>
+                  <div className="flex items-center space-x-2.5 mb-2">
+                    <div className="w-2.5 h-2.5 bg-[#FFE600] rounded-full shadow-sm"></div>
+                    <span className="text-gray-400 text-xs uppercase tracking-wide">YES</span>
+                    <span className="font-bold text-base">{formatPrice(hoveredPoint.yesPrice)}¢</span>
+                  </div>
+                  <div className="flex items-center space-x-2.5 mb-2">
+                    <div className="w-2.5 h-2.5 bg-[#FFE600] rounded-full shadow-sm"></div>
+                    <span className="text-gray-400 text-xs uppercase tracking-wide">NO</span>
+                    <span className="font-bold text-base">{formatPrice(hoveredPoint.noPrice)}¢</span>
+                  </div>
+                  <div className="text-gray-500 text-xs pt-2 border-t border-gray-700 mt-2 font-medium">
+                    {formatTime(hoveredPoint.timestamp)}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="font-bold text-base">{formatPrice(hoveredPoint.price)}¢</div>
+                  <div className="text-gray-400 text-xs mt-1">{formatTime(hoveredPoint.timestamp)}</div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

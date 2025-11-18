@@ -5,7 +5,7 @@ import { getCurrencySymbol } from '../../utils/currency';
 import { ethers } from 'ethers';
 import toast from 'react-hot-toast';
 import WormStyleNavbar from '../../components/modern/WormStyleNavbar';
-import PriceChart from '../../components/charts/PriceChart';
+import PolymarketChart from '../../components/charts/PolymarketChart';
 import { 
   createOrderWithDefaults, 
   signOrder, 
@@ -106,10 +106,48 @@ const MarketDetailWormStyle = () => {
   const [marketData, setMarketData] = useState(null);
   const [estimatedShares, setEstimatedShares] = useState('0');
   const [priceHistory, setPriceHistory] = useState([]);
+  const [yesPriceHistory, setYesPriceHistory] = useState([]);
+  const [noPriceHistory, setNoPriceHistory] = useState([]);
   const [orderType, setOrderType] = useState('market'); // 'market' or 'limit'
   const [limitPrice, setLimitPrice] = useState('');
+  const [timeframe, setTimeframe] = useState('1d');
   
   const currencySymbol = getCurrencySymbol(chainId);
+
+  // Helper function to record price after trades
+  const recordPriceAfterTrade = useCallback(async () => {
+    if (!contracts?.predictionMarket || !id) return;
+
+    try {
+      // Wait a bit for blockchain to update
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      const yesPrice = await contracts.predictionMarket.getCurrentPrice(id, true);
+      const noPrice = await contracts.predictionMarket.getCurrentPrice(id, false);
+      
+      const yesPriceBps = parseFloat(yesPrice.toString());
+      const noPriceBps = parseFloat(noPrice.toString());
+
+      console.log('📊 Recording price after trade:', { yesPriceBps, noPriceBps });
+
+      const response = await fetch(`${API_BASE}/api/record-price`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          marketId: id.toString(),
+          yesPriceBps: Math.round(yesPriceBps),
+          noPriceBps: Math.round(noPriceBps),
+          blockNumber: null
+        })
+      });
+
+      if (response.ok) {
+        console.log('✅ Price recorded after trade');
+      }
+    } catch (err) {
+      console.error('Failed to record price after trade:', err);
+    }
+  }, [contracts?.predictionMarket, id]);
 
   // Fetch market data and user position
   const fetchData = useCallback(async () => {
@@ -176,10 +214,14 @@ const MarketDetailWormStyle = () => {
 
       // Fetch price history
       try {
-        const response = await fetch(`${API_BASE}/api/price-history/${id}`);
+        const response = await fetch(`${API_BASE}/api/price-history?marketId=${id}&timeframe=${timeframe}`);
         if (response.ok) {
-          const history = await response.json();
-          setPriceHistory(history);
+          const data = await response.json();
+          if (data.success && data.data) {
+            setYesPriceHistory(data.data.yesPriceHistory || []);
+            setNoPriceHistory(data.data.noPriceHistory || []);
+            setPriceHistory(data.data.priceHistory || []);
+          }
         }
       } catch (err) {
         console.log('Could not fetch price history:', err.message);
@@ -189,24 +231,30 @@ const MarketDetailWormStyle = () => {
     } finally {
       setLoading(false);
     }
-  }, [contracts, id, isConnected, getUserPosition]);
+  }, [contracts, id, isConnected, getUserPosition, timeframe]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
-  // Real-time price updates
+  // Real-time price updates with recording
   useEffect(() => {
-    if (!isConnected || !contracts.predictionMarket || !id) return;
+    if (!contracts.predictionMarket || !id) return;
+
+    let lastYesPriceBps = null;
+    let lastNoPriceBps = null;
 
     const updatePrices = async () => {
       try {
         const yesPrice = await contracts.predictionMarket.getCurrentPrice(id, true);
         const noPrice = await contracts.predictionMarket.getCurrentPrice(id, false);
         
-        const yesPriceCents = parseFloat(yesPrice.toString()) / 100;
-        const noPriceCents = parseFloat(noPrice.toString()) / 100;
+        const yesPriceBps = parseFloat(yesPrice.toString());
+        const noPriceBps = parseFloat(noPrice.toString());
+        const yesPriceCents = yesPriceBps / 100;
+        const noPriceCents = noPriceBps / 100;
         
+        // Update UI
         setMarketData(prev => {
           if (prev?.yesPrice === yesPriceCents && prev?.noPrice === noPriceCents) {
             return prev;
@@ -217,16 +265,57 @@ const MarketDetailWormStyle = () => {
             noPrice: noPriceCents
           };
         });
+
+        // Also update market state
+        setMarket(prev => prev ? {
+          ...prev,
+          yesPrice: Math.round(yesPriceCents),
+          noPrice: Math.round(noPriceCents)
+        } : prev);
+
+        // Record price snapshot to DB if price changed
+        if (lastYesPriceBps !== yesPriceBps || lastNoPriceBps !== noPriceBps) {
+          console.log('💰 Price changed! Recording to DB:', {
+            previous: { yes: lastYesPriceBps, no: lastNoPriceBps },
+            current: { yes: yesPriceBps, no: noPriceBps }
+          });
+
+          try {
+            const response = await fetch(`${API_BASE}/api/record-price`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                marketId: id.toString(),
+                yesPriceBps: Math.round(yesPriceBps),
+                noPriceBps: Math.round(noPriceBps),
+                blockNumber: null
+              })
+            });
+
+            if (response.ok) {
+              console.log('✅ Price snapshot recorded');
+              lastYesPriceBps = yesPriceBps;
+              lastNoPriceBps = noPriceBps;
+              
+              // Refresh price history after recording
+              setTimeout(() => {
+                fetchData();
+              }, 500);
+            }
+          } catch (err) {
+            console.error('Failed to record price snapshot:', err);
+          }
+        }
       } catch (err) {
         console.log('Failed to update prices:', err.message);
       }
     };
 
-    const interval = setInterval(updatePrices, 30000);
-    updatePrices();
+    const interval = setInterval(updatePrices, 30000); // Every 30 seconds
+    updatePrices(); // Initial update
 
     return () => clearInterval(interval);
-  }, [isConnected, contracts.predictionMarket, id]);
+  }, [contracts.predictionMarket, id]);
 
   const handleTrade = async () => {
     if (!isConnected) {
@@ -310,6 +399,9 @@ const MarketDetailWormStyle = () => {
 
         setAmount('');
         setLimitPrice('');
+        
+        // Record price after trade
+        await recordPriceAfterTrade();
         setTimeout(() => fetchData(), 3000);
       } else {
         // Market order
@@ -360,6 +452,9 @@ const MarketDetailWormStyle = () => {
         }
 
         setAmount('');
+        
+        // Record price after trade
+        await recordPriceAfterTrade();
         setTimeout(() => fetchData(), 3000);
       }
     } catch (error) {
@@ -436,6 +531,9 @@ const MarketDetailWormStyle = () => {
 
         setAmount('');
         setLimitPrice('');
+        
+        // Record price after trade
+        await recordPriceAfterTrade();
         setTimeout(() => fetchData(), 3000);
       } else {
         // Market sell order
@@ -486,6 +584,9 @@ const MarketDetailWormStyle = () => {
         }
 
         setAmount('');
+        
+        // Record price after trade
+        await recordPriceAfterTrade();
         setTimeout(() => fetchData(), 3000);
       }
     } catch (error) {
@@ -569,47 +670,24 @@ const MarketDetailWormStyle = () => {
             </div>
 
             {/* Chart Section */}
-            <div className="bg-white/[0.08] backdrop-blur-xl rounded-[24px] p-6 border border-white/20 shadow-lg">
-              {/* Percentage Display */}
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-4">
-                  <div className="text-5xl font-bold text-white font-space-grotesk">{market.yesPrice}%</div>
-                  <div className="text-gray-400 text-sm font-space-grotesk">chance</div>
-                </div>
-                <button className="p-2 hover:bg-white/15 rounded-lg transition-colors backdrop-blur-md">
-                  <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-                  </svg>
-                </button>
-              </div>
-
-              {/* Chart */}
-              <div className="bg-white/5 backdrop-blur-md rounded-xl p-4 mb-4 border border-white/10" style={{ height: '250px' }}>
-                {priceHistory && priceHistory.length > 0 ? (
-                  <PriceChart 
-                    priceHistory={priceHistory} 
-                    marketId={parseInt(id)}
-                    height={220}
-                  />
-                ) : (
-                  <div className="flex items-center justify-center h-full text-gray-500 font-space-grotesk">
-                    No price history available
-                  </div>
-                )}
-              </div>
-
-              {/* Time Range Buttons */}
-              <div className="flex gap-2 justify-center">
-                {['ALL', '1H', '6H', '1D', '1W', '1M'].map((range) => (
-                  <button
-                    key={range}
-                    className="px-4 py-1.5 text-sm font-semibold text-gray-400 hover:text-white hover:bg-white/15 rounded-lg transition-all backdrop-blur-md font-space-grotesk"
-                  >
-                    {range}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <PolymarketChart
+              yesPriceHistory={yesPriceHistory}
+              noPriceHistory={noPriceHistory}
+              priceHistory={priceHistory}
+              currentYesPrice={market?.yesPrice || 50}
+              currentNoPrice={market?.noPrice || 50}
+              height={300}
+              selectedRange={timeframe}
+              onRangeChange={setTimeframe}
+              ranges={[
+                { label: '1H', value: '1h' },
+                { label: '6H', value: '6h' },
+                { label: '1D', value: '1d' },
+                { label: '1W', value: '1w' },
+                { label: '1M', value: '1m' },
+                { label: 'ALL', value: 'all' }
+              ]}
+            />
 
             {/* Tabs */}
             <div className="bg-white/[0.08] backdrop-blur-xl rounded-[24px] border border-white/20 shadow-lg overflow-hidden">

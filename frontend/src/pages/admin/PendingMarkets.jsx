@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useHistory } from 'react-router-dom';
 import { useWeb3 } from '../../hooks/useWeb3';
 import { ethers } from 'ethers';
-import { CONTRACT_ADDRESS, CONTRACT_ABI, BLOCK_EXPLORER_URL } from '../../contracts/eth-config';
+import { CONTRACT_ADDRESS, CONTRACT_ABI, BLOCK_EXPLORER_URL, CHAIN_ID, RPC_URL, NETWORK_NAME } from '../../contracts/eth-config';
 import { showGlassToast, showTransactionToast } from '../../utils/toastUtils';
 import WormStyleNavbar from '../../components/modern/WormStyleNavbar';
 
@@ -123,13 +123,107 @@ const PendingMarkets = () => {
     setProcessingId(pendingMarket.id);
 
     try {
+      // Check network connection first
+      let provider = signer.provider || (window.ethereum ? new ethers.providers.Web3Provider(window.ethereum) : null);
+      
+      if (!provider) {
+        throw new Error('No provider available. Please connect MetaMask.');
+      }
+
+      // Check if connected to correct network
+      try {
+        const network = await provider.getNetwork();
+        const currentChainId = network.chainId;
+        
+        if (currentChainId !== CHAIN_ID) {
+          showGlassToast({ 
+            title: `Please switch to ${NETWORK_NAME} (Chain ID: ${CHAIN_ID})`, 
+            icon: '⚠️' 
+          });
+          
+          // Try to switch network
+          if (window.ethereum) {
+            try {
+              await window.ethereum.request({
+                method: 'wallet_switchEthereumChain',
+                params: [{ chainId: `0x${CHAIN_ID.toString(16)}` }],
+              });
+              // Wait a bit for network to switch
+              await new Promise(resolve => setTimeout(resolve, 1000));
+              // Re-check network
+              const newNetwork = await provider.getNetwork();
+              if (newNetwork.chainId !== CHAIN_ID) {
+                throw new Error(`Failed to switch to ${NETWORK_NAME}. Please switch manually in MetaMask.`);
+              }
+            } catch (switchError) {
+              // If chain doesn't exist, try to add it
+              if (switchError.code === 4902 && RPC_URL) {
+                try {
+                  await window.ethereum.request({
+                    method: 'wallet_addEthereumChain',
+                    params: [{
+                      chainId: `0x${CHAIN_ID.toString(16)}`,
+                      chainName: NETWORK_NAME,
+                      nativeCurrency: {
+                        name: 'TCENT',
+                        symbol: 'TCENT',
+                        decimals: 18
+                      },
+                      rpcUrls: [RPC_URL],
+                      blockExplorerUrls: [BLOCK_EXPLORER_URL]
+                    }],
+                  });
+                  // Wait for network to be added
+                  await new Promise(resolve => setTimeout(resolve, 1000));
+                } catch (addError) {
+                  throw new Error(`Failed to add ${NETWORK_NAME}. Please add it manually in MetaMask.`);
+                }
+              } else {
+                throw switchError;
+              }
+            }
+          } else {
+            throw new Error(`Please switch to ${NETWORK_NAME} (Chain ID: ${CHAIN_ID}) in MetaMask.`);
+          }
+        }
+      } catch (networkError) {
+        console.error('Network check error:', networkError);
+        if (networkError.message.includes('switch') || networkError.message.includes('add')) {
+          throw networkError;
+        }
+        // If it's an RPC error but not a network switch error, continue with warning
+        console.warn('Network check failed, but continuing:', networkError.message);
+      }
+
+      // Create new signer with updated provider (in case network switched)
+      const updatedProvider = window.ethereum ? new ethers.providers.Web3Provider(window.ethereum) : provider;
+      const updatedSigner = updatedProvider.getSigner();
+      
       // Create market on-chain
-      const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+      const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, updatedSigner);
       
       const endTime = Math.floor(new Date(pendingMarket.endTime).getTime() / 1000);
       const resolutionTime = Math.floor(new Date(pendingMarket.resolutionTime).getTime() / 1000);
       
+      // Validate timestamps
+      const currentTime = Math.floor(Date.now() / 1000);
+      if (endTime <= currentTime) {
+        throw new Error('End time must be in the future');
+      }
+      if (resolutionTime <= endTime) {
+        throw new Error('Resolution time must be after end time');
+      }
+      
       showGlassToast({ title: 'Creating market on-chain...', icon: '⏳' });
+      
+      // Get market creation fee from contract
+      let marketCreationFee = ethers.utils.parseEther('0.01'); // Default fallback
+      try {
+        const fee = await contract.marketCreationFee();
+        marketCreationFee = fee;
+      } catch (feeError) {
+        console.warn('Could not fetch market creation fee, using default:', feeError);
+      }
       
       const tx = await contract.createMarket(
         pendingMarket.question,
@@ -137,7 +231,7 @@ const PendingMarkets = () => {
         pendingMarket.category,
         endTime,
         resolutionTime,
-        { value: ethers.utils.parseEther('0.01') } // Market creation fee
+        { value: marketCreationFee }
       );
 
       showGlassToast({ title: 'Transaction submitted. Waiting for confirmation...', icon: '⏳' });
@@ -220,7 +314,25 @@ const PendingMarkets = () => {
 
     } catch (error) {
       console.error('Error approving market:', error);
-      showGlassToast({ title: error.message || 'Failed to approve market', icon: '❌' });
+      
+      // Provide more specific error messages
+      let errorMessage = 'Failed to approve market';
+      
+      if (error.code === -32002) {
+        errorMessage = 'RPC endpoint unavailable. Check your network connection or try again.';
+      } else if (error.code === -32603) {
+        errorMessage = 'Network error. Please check your internet connection and MetaMask.';
+      } else if (error.code === 4001) {
+        errorMessage = 'Transaction rejected by user.';
+      } else if (error.code === 'NETWORK_ERROR' || error.message?.includes('Failed to fetch')) {
+        errorMessage = 'Network connection failed. Please check your internet and try again.';
+      } else if (error.message?.includes('network') || error.message?.includes('chain')) {
+        errorMessage = error.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      showGlassToast({ title: errorMessage, icon: '❌' });
     } finally {
       setProcessingId(null);
     }

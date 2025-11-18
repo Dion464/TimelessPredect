@@ -128,6 +128,9 @@ const PolymarketStyleTrading = () => {
   const refreshTriggerRef = useRef(0); // Force refresh counter
   const [customRules, setCustomRules] = useState([]);
   const fallbackContractRef = useRef(null);
+  const [yesPriceHistory, setYesPriceHistory] = useState([]);
+  const [noPriceHistory, setNoPriceHistory] = useState([]);
+  const [priceHistory, setPriceHistory] = useState([]);
 
   const safeToNumber = (value) => {
     if (value === null || value === undefined) return 0;
@@ -414,15 +417,66 @@ const PolymarketStyleTrading = () => {
       setLiquidity(0);
   }, []);
 
-  const recordPriceSnapshot = useCallback(async () => {
-    // Price snapshots are no longer recorded in the serverless workflow
+  const recordPriceSnapshot = useCallback(async (yesPriceBps, noPriceBps, blockNumber = null) => {
+      if (!marketId || !API_BASE) {
+        console.warn('Cannot record price snapshot: missing marketId or API_BASE');
         return;
-  }, []);
+      }
 
-  const fetchPriceHistoryFromDb = useCallback(async () => {
-    // Price history storage removed in serverless workflow
+    try {
+      const response = await fetch(`${API_BASE}/api/record-price`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          marketId: marketId.toString(),
+          yesPriceBps: Math.round(yesPriceBps),
+          noPriceBps: Math.round(noPriceBps),
+          blockNumber: blockNumber ? blockNumber.toString() : null
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Failed to record price snapshot:', response.status, errorText);
         return;
-  }, []);
+      }
+
+      const data = await response.json();
+      console.log('✅ Price snapshot recorded:', data);
+    } catch (error) {
+      console.error('Error recording price snapshot:', error);
+    }
+  }, [marketId, API_BASE]);
+
+  const fetchPriceHistoryFromDb = useCallback(async (timeframeParam = timeframe) => {
+    if (!marketId || !API_BASE) {
+      console.warn('Cannot fetch price history: missing marketId or API_BASE');
+        return;
+      }
+
+    try {
+      const response = await fetch(`${API_BASE}/api/price-history?marketId=${marketId}&timeframe=${timeframeParam}`);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Failed to fetch price history:', response.status, errorText);
+        return;
+      }
+
+      const data = await response.json();
+      
+      if (data.success && data.data) {
+        setYesPriceHistory(data.data.yesPriceHistory || []);
+        setNoPriceHistory(data.data.noPriceHistory || []);
+        setPriceHistory(data.data.priceHistory || []);
+        console.log(`✅ Loaded ${data.data.count || 0} price snapshots for timeframe: ${timeframeParam}`);
+      }
+    } catch (error) {
+      console.error('Error fetching price history:', error);
+    }
+  }, [marketId, API_BASE, timeframe]);
 
   const fetchMarketData = useCallback(async () => {
     try {
@@ -529,7 +583,7 @@ const PolymarketStyleTrading = () => {
             const yesPriceBps = parseFloat(yesPrice.toString());
             const noPriceBps = parseFloat(noPrice.toString());
             console.log('🔄 Recording price after buy trade:', { yesPriceBps, noPriceBps });
-            await recordPriceSnapshot(yesPriceBps, noPriceBps);
+            await recordPriceSnapshot(yesPriceBps, noPriceBps, null);
             // Wait a bit for DB to commit, then refresh chart
             setTimeout(() => {
               refreshAllData();
@@ -557,7 +611,7 @@ const PolymarketStyleTrading = () => {
             const yesPriceBps = parseFloat(yesPrice.toString());
             const noPriceBps = parseFloat(noPrice.toString());
             console.log('🔄 Recording price after sell trade:', { yesPriceBps, noPriceBps });
-            await recordPriceSnapshot(yesPriceBps, noPriceBps);
+            await recordPriceSnapshot(yesPriceBps, noPriceBps, null);
             // Wait a bit for DB to commit, then refresh chart
             setTimeout(() => {
               refreshAllData();
@@ -617,7 +671,7 @@ const PolymarketStyleTrading = () => {
             previous: { yes: lastYesPriceBps, no: lastNoPriceBps },
             current: { yes: yesPriceBps, no: noPriceBps }
           });
-          await recordPriceSnapshot(yesPriceBps, noPriceBps);
+          await recordPriceSnapshot(yesPriceBps, noPriceBps, null);
           lastYesPriceBps = yesPriceBps;
           lastNoPriceBps = noPriceBps;
         } else {
@@ -649,7 +703,7 @@ const PolymarketStyleTrading = () => {
                             Math.abs(noPriceCents - (market?.noPrice || 0)) > 0.01;
         
         if (priceChanged) {
-          await recordPriceSnapshot(yesPriceBps, noPriceBps);
+          await recordPriceSnapshot(yesPriceBps, noPriceBps, null);
         }
       } catch (err) {
         console.log('Failed to update prices from chain:', err.message);
@@ -855,6 +909,28 @@ const PolymarketStyleTrading = () => {
                     </span>
             </div>
 
+            {/* Price History Chart */}
+            <div className="px-4 sm:px-0">
+              <PolymarketChart 
+                yesPriceHistory={yesPriceHistory}
+                noPriceHistory={noPriceHistory}
+                priceHistory={priceHistory}
+                currentYesPrice={market?.yesPrice ? market.yesPrice / 100 : 0.5}
+                currentNoPrice={market?.noPrice ? market.noPrice / 100 : 0.5}
+                height={300}
+                selectedRange={timeframe}
+                onRangeChange={handleTimeframeChange}
+                ranges={[
+                  { label: '1H', value: '1h' },
+                  { label: '6H', value: '6h' },
+                  { label: '1D', value: '1d' },
+                  { label: '1W', value: '1w' },
+                  { label: '1M', value: '1m' },
+                  { label: 'ALL', value: 'all' }
+                ]}
+              />
+            </div>
+
             {/* Tabs */}
             <div className="space-y-4 sm:space-y-6 px-4 sm:px-0">
               <div className="flex items-center justify-between border border-white/25 rounded-[18px] sm:rounded-[22px] px-1 sm:px-2 py-1">
@@ -880,7 +956,7 @@ const PolymarketStyleTrading = () => {
                     </button>
                   );
                 })}
-              </div>
+                  </div>
               
               {/* Tab Content */}
               <div className="glass-card rounded-[16px] sm:rounded-[24px] border border-white/20 backdrop-blur-2xl px-4 sm:px-6 lg:px-9 pb-8 sm:pb-10 lg:pb-12 pt-6 sm:pt-8 lg:pt-10" style={{ background: 'rgba(12,12,12,0.55)' }}>

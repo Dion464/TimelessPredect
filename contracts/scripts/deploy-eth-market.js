@@ -10,7 +10,16 @@ async function main() {
     // Deploy ETH Prediction Market
     console.log("\n📊 Deploying ETH Prediction Market...");
     const ETHPredictionMarket = await ethers.getContractFactory("ETHPredictionMarket");
-    const ethPredictionMarket = await ETHPredictionMarket.deploy();
+    
+    // Constructor arguments: marketCreationFee, platformFeePercent
+    const marketCreationFeeArg = ethers.utils.parseEther("0.01"); // 0.01 TCENT
+    const platformFeePercentArg = 200; // 2% in basis points (200 = 2%)
+    
+    console.log("Constructor arguments:");
+    console.log("  Market Creation Fee:", ethers.utils.formatEther(marketCreationFeeArg), "TCENT");
+    console.log("  Platform Fee:", platformFeePercentArg, "basis points (2%)");
+    
+    const ethPredictionMarket = await ETHPredictionMarket.deploy(marketCreationFeeArg, platformFeePercentArg);
     await ethPredictionMarket.deployed();
 
     console.log("✅ ETH Prediction Market deployed to:", ethPredictionMarket.address);
@@ -23,10 +32,13 @@ async function main() {
     console.log("Market Creation Fee:", ethers.utils.formatEther(marketCreationFee), "ETH");
     console.log("Platform Fee:", platformFeePercent.toString(), "basis points (", platformFeePercent.toNumber() / 100, "%)");
 
+    // Get network info
+    const network = await ethers.provider.getNetwork();
+    
     // Save deployment info
     const deploymentInfo = {
-        network: "hardhat",
-        chainId: 1337,
+        network: network.name,
+        chainId: network.chainId,
         contracts: {
             ETHPredictionMarket: {
                 address: ethPredictionMarket.address,
@@ -42,12 +54,25 @@ async function main() {
         timestamp: new Date().toISOString()
     };
 
+    // Save to deployments folder
+    const fs = require("fs");
+    const path = require("path");
+    const deploymentsDir = path.join(__dirname, "..", "deployments");
+    if (!fs.existsSync(deploymentsDir)) {
+        fs.mkdirSync(deploymentsDir, { recursive: true });
+    }
+    const deploymentFile = path.join(deploymentsDir, `eth-${network.chainId}.json`);
+    fs.writeFileSync(deploymentFile, JSON.stringify(deploymentInfo, null, 2));
+    console.log("📁 Deployment info saved to:", deploymentFile);
+
     console.log("\n💾 Deployment Summary:");
     console.log(JSON.stringify(deploymentInfo, null, 2));
 
     console.log("\n🎉 Deployment completed successfully!");
-    console.log("📝 Update your frontend CONTRACT_ADDRESSES with:");
-    console.log(`ETH_PREDICTION_MARKET: "${ethPredictionMarket.address}"`);
+    console.log("\n📝 Next steps:");
+    console.log(`   1. Update VITE_CONTRACT_ADDRESS in your .env file: ${ethPredictionMarket.address}`);
+    console.log(`   2. Send TCENT to the contract address to provide liquidity for payouts`);
+    console.log(`   3. Check contract balance: npx hardhat run scripts/check-contract-balance.js --network incentiv ${ethPredictionMarket.address}`);
 }
 
 main()
