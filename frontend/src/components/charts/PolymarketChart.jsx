@@ -180,33 +180,10 @@ const PolymarketChart = ({
       return;
     }
     
-    // Use intelligent range with better visibility for extreme values
-    const actualMinPrice = Math.min(...allPrices);
-    const actualMaxPrice = Math.max(...allPrices);
-    const actualRange = actualMaxPrice - actualMinPrice;
-    
-    let minPrice, maxPrice, priceRange;
-    
-    // If range is very small (lines close together), expand the view significantly
-    if (actualRange < 5) {
-      // For very close prices (< 5%), show at least 20% range
-      const midPoint = (actualMinPrice + actualMaxPrice) / 2;
-      minPrice = Math.max(0, midPoint - 10);
-      maxPrice = Math.min(100, midPoint + 10);
-      priceRange = maxPrice - minPrice;
-    } else if (actualRange < 20) {
-      // For somewhat close prices (5-20%), add 30% padding
-      const pricePadding = actualRange * 0.3;
-      minPrice = Math.max(0, actualMinPrice - pricePadding);
-      maxPrice = Math.min(100, actualMaxPrice + pricePadding);
-      priceRange = maxPrice - minPrice;
-    } else {
-      // For normal ranges, use standard 5% padding
-      const pricePadding = Math.max(actualRange * 0.05, 2.5);
-      minPrice = Math.max(0, actualMinPrice - pricePadding);
-      maxPrice = Math.min(100, actualMaxPrice + pricePadding);
-      priceRange = maxPrice - minPrice;
-    }
+    // Always use full 0-100% range for accurate positioning
+    const minPrice = 0;
+    const maxPrice = 100;
+    const priceRange = 100;
 
     // Draw grid lines - ultra-subtle dark theme (Polymarket style)
     ctx.strokeStyle = '#2a2a2a';
@@ -702,6 +679,9 @@ const PolymarketChart = ({
     const chartWidth = rect.width - 2 * padding;
     const chartHeight = rect.height - 2 * padding;
     
+    // Debug: Log mouse position
+    console.log('Mouse move:', { x, y, hasYesData: yesPriceHistory.length, hasNoData: noPriceHistory.length });
+    
     // Allow hover anywhere on the chart, not just within padding
     if (x >= 0 && x <= rect.width && y >= 0 && y <= rect.height) {
       // Use the same filtering logic as drawChart
@@ -754,13 +734,16 @@ const PolymarketChart = ({
         const closestYes = findClosestPoint(yesFiltered, hoverTimeYes);
         const closestNo = findClosestPoint(noFiltered, hoverTimeNo);
         
-        setHoveredPoint({
+        const tooltipData = {
           yesPrice: closestYes.price * 100, // Convert to cents - use ACTUAL database price
           noPrice: closestNo.price * 100, // Convert to cents - use ACTUAL database price
           timestamp: closestYes.timestamp, // Use YES timestamp
           x: x,
           y: y
-        });
+        };
+        
+        console.log('Setting tooltip:', tooltipData);
+        setHoveredPoint(tooltipData);
       } else if (priceHistory.length > 0) {
         // Fallback to single price history
         const sortedHistory = [...priceHistory].sort(sortByTimestamp);
