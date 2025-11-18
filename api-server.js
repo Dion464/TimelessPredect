@@ -11,6 +11,10 @@ import userStatsHandler from './api/user-stats.js';
 import { getOrderMatcher } from './lib/orderMatcher.js';
 import { executeOrderViaAMM } from './api/execute-amm-order.js';
 
+// Import pending markets handlers
+const pendingMarketsHandler = require('./api/pending-markets/index.js');
+const pendingMarketByIdHandler = require('./api/pending-markets/[id].js');
+
 const app = express();
 const PORT = process.env.PORT || 8080;
 
@@ -106,6 +110,57 @@ app.get('/api/user-stats/:address', async (req, res) => {
     await userStatsHandler(vercelReq, res);
   } catch (error) {
     console.error('Error in user-stats handler:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Pending markets routes
+app.get('/api/pending-markets', async (req, res) => {
+  try {
+    const vercelReq = { ...req, query: req.query };
+    await pendingMarketsHandler(vercelReq, res);
+  } catch (error) {
+    console.error('Error in pending-markets handler:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/pending-markets', async (req, res) => {
+  try {
+    const vercelReq = { ...req, query: req.query, body: req.body };
+    await pendingMarketsHandler(vercelReq, res);
+  } catch (error) {
+    console.error('Error in pending-markets handler:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/pending-markets/:id', async (req, res) => {
+  try {
+    const vercelReq = { ...req, query: { ...req.query, id: req.params.id } };
+    await pendingMarketByIdHandler(vercelReq, res);
+  } catch (error) {
+    console.error('Error in pending-market handler:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.patch('/api/pending-markets/:id', async (req, res) => {
+  try {
+    const vercelReq = { ...req, query: { ...req.query, id: req.params.id }, body: req.body };
+    await pendingMarketByIdHandler(vercelReq, res);
+  } catch (error) {
+    console.error('Error in pending-market handler:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/pending-markets/:id', async (req, res) => {
+  try {
+    const vercelReq = { ...req, query: { ...req.query, id: req.params.id } };
+    await pendingMarketByIdHandler(vercelReq, res);
+  } catch (error) {
+    console.error('Error in pending-market handler:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -257,6 +312,9 @@ server.listen(PORT, () => {
   console.log(`   - DELETE /api/orders/:id (cancel order)`);
   console.log(`   - POST /api/settle (settle trade)`);
   console.log(`   - GET  /api/user-stats/:address (user profile stats)`);
+  console.log(`   - GET  /api/pending-markets (list pending markets)`);
+  console.log(`   - POST /api/pending-markets (submit market)`);
+  console.log(`   - PATCH /api/pending-markets/:id (approve/reject)`);
   console.log(`   - WS   ws://localhost:${PORT} (WebSocket for order book)`);
   console.log(`\n🔄 Order matching service: Running (matches every 5s)`);
   console.log(`\n📊 Database: ${process.env.DATABASE_URL ? '✅ Connected' : '❌ Not configured'}`);
