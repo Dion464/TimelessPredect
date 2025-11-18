@@ -180,15 +180,33 @@ const PolymarketChart = ({
       return;
     }
     
-    // Use reasonable range with moderate padding (like Polymarket)
+    // Use intelligent range with better visibility for extreme values
     const actualMinPrice = Math.min(...allPrices);
     const actualMaxPrice = Math.max(...allPrices);
     const actualRange = actualMaxPrice - actualMinPrice;
-    // Use 2% padding for smoother display, but ensure at least 5% range for visibility
-    const pricePadding = Math.max(actualRange * 0.02, Math.max(2.5, (100 - actualRange) / 2));
-    const minPrice = Math.max(0, actualMinPrice - pricePadding);
-    const maxPrice = Math.min(100, actualMaxPrice + pricePadding);
-    const priceRange = maxPrice - minPrice;
+    
+    let minPrice, maxPrice, priceRange;
+    
+    // If range is very small (lines close together), expand the view significantly
+    if (actualRange < 5) {
+      // For very close prices (< 5%), show at least 20% range
+      const midPoint = (actualMinPrice + actualMaxPrice) / 2;
+      minPrice = Math.max(0, midPoint - 10);
+      maxPrice = Math.min(100, midPoint + 10);
+      priceRange = maxPrice - minPrice;
+    } else if (actualRange < 20) {
+      // For somewhat close prices (5-20%), add 30% padding
+      const pricePadding = actualRange * 0.3;
+      minPrice = Math.max(0, actualMinPrice - pricePadding);
+      maxPrice = Math.min(100, actualMaxPrice + pricePadding);
+      priceRange = maxPrice - minPrice;
+    } else {
+      // For normal ranges, use standard 5% padding
+      const pricePadding = Math.max(actualRange * 0.05, 2.5);
+      minPrice = Math.max(0, actualMinPrice - pricePadding);
+      maxPrice = Math.min(100, actualMaxPrice + pricePadding);
+      priceRange = maxPrice - minPrice;
+    }
 
     // Draw grid lines - ultra-subtle dark theme (Polymarket style)
     ctx.strokeStyle = '#2a2a2a';
@@ -226,14 +244,29 @@ const PolymarketChart = ({
       ctx.stroke();
       ctx.setLineDash([]);
       
-      // Draw a highlight circle at hover point
+      // Draw a large highlight circle at hover point
+      // Outer glow
+      ctx.fillStyle = 'rgba(255, 230, 0, 0.2)';
+      ctx.beginPath();
+      ctx.arc(hoveredPoint.x, hoveredPoint.y, 12, 0, 2 * Math.PI);
+      ctx.fill();
+      
+      // Main circle
       ctx.fillStyle = '#FFE600';
       ctx.beginPath();
-      ctx.arc(hoveredPoint.x, hoveredPoint.y, 6, 0, 2 * Math.PI);
+      ctx.arc(hoveredPoint.x, hoveredPoint.y, 8, 0, 2 * Math.PI);
       ctx.fill();
+      
+      // Border
       ctx.strokeStyle = '#1a1a1a';
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 3;
       ctx.stroke();
+      
+      // Inner dot
+      ctx.fillStyle = '#1a1a1a';
+      ctx.beginPath();
+      ctx.arc(hoveredPoint.x, hoveredPoint.y, 3, 0, 2 * Math.PI);
+      ctx.fill();
     }
 
     // Draw YES price line (green) - includes current price from chain
@@ -249,11 +282,11 @@ const PolymarketChart = ({
       const timeRange = Math.max(lastTime - firstTime, 1); // Avoid division by zero
       
       ctx.strokeStyle = '#FFE600'; // Yellow color like Polymarket
-      ctx.lineWidth = 2.5;
+      ctx.lineWidth = 3.5; // Thicker line for better visibility
       ctx.lineJoin = 'round';
       ctx.lineCap = 'round';
-      ctx.shadowColor = 'rgba(255, 230, 0, 0.15)';
-      ctx.shadowBlur = 3;
+      ctx.shadowColor = 'rgba(255, 230, 0, 0.3)';
+      ctx.shadowBlur = 6;
       
       // Calculate all point coordinates first for line drawing
       const points = [];
@@ -380,23 +413,32 @@ const PolymarketChart = ({
       // Draw a highlight dot on the current/animated price (last visible point) - Polymarket style
       if (animatedPoints.length > 0) {
         const lastPoint = animatedPoints[animatedPoints.length - 1];
+        
+        // Outer glow
+        ctx.fillStyle = 'rgba(255, 230, 0, 0.3)';
+        ctx.beginPath();
+        ctx.arc(lastPoint.x, lastPoint.y, 10, 0, 2 * Math.PI);
+        ctx.fill();
+        
+        // Main dot
         ctx.fillStyle = '#FFE600'; // Yellow
         ctx.beginPath();
-        ctx.arc(lastPoint.x, lastPoint.y, 5, 0, 2 * Math.PI);
+        ctx.arc(lastPoint.x, lastPoint.y, 7, 0, 2 * Math.PI);
         ctx.fill();
+        
         // Dark inner dot for contrast
         ctx.fillStyle = '#1a1a1a';
         ctx.beginPath();
-        ctx.arc(lastPoint.x, lastPoint.y, 2, 0, 2 * Math.PI);
+        ctx.arc(lastPoint.x, lastPoint.y, 3, 0, 2 * Math.PI);
         ctx.fill();
         
         // Draw price label next to the line endpoint - Polymarket style
         const priceInCents = sortedYesHistory[sortedYesHistory.length - 1].price * 100;
         const priceLabel = `Yes ${formatPrice(priceInCents)}¢`;
         ctx.fillStyle = '#FFE600'; // Yellow
-        ctx.font = 'bold 13px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+        ctx.font = 'bold 14px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
         ctx.textAlign = 'left';
-        ctx.fillText(priceLabel, lastPoint.x + 10, lastPoint.y + 4);
+        ctx.fillText(priceLabel, lastPoint.x + 15, lastPoint.y + 5);
       }
     }
 
@@ -413,11 +455,11 @@ const PolymarketChart = ({
       const timeRange = Math.max(lastTime - firstTime, 1); // Avoid division by zero
       
       ctx.strokeStyle = '#ef4444'; // Red color for No line
-      ctx.lineWidth = 2.5;
+      ctx.lineWidth = 3.5; // Thicker line for better visibility
       ctx.lineJoin = 'round';
       ctx.lineCap = 'round';
-      ctx.shadowColor = 'rgba(239, 68, 68, 0.15)';
-      ctx.shadowBlur = 3;
+      ctx.shadowColor = 'rgba(239, 68, 68, 0.3)';
+      ctx.shadowBlur = 6;
       
       // Calculate all point coordinates first for line drawing
       const points = [];
@@ -542,23 +584,32 @@ const PolymarketChart = ({
         
         // Draw a highlight dot on the current/animated price (last visible point) - Polymarket style
         const lastPoint = animatedPoints[animatedPoints.length - 1];
+        
+        // Outer glow
+        ctx.fillStyle = 'rgba(239, 68, 68, 0.3)';
+        ctx.beginPath();
+        ctx.arc(lastPoint.x, lastPoint.y, 10, 0, 2 * Math.PI);
+        ctx.fill();
+        
+        // Main dot
         ctx.fillStyle = '#ef4444'; // Red
         ctx.beginPath();
-        ctx.arc(lastPoint.x, lastPoint.y, 5, 0, 2 * Math.PI);
+        ctx.arc(lastPoint.x, lastPoint.y, 7, 0, 2 * Math.PI);
         ctx.fill();
+        
         // White inner dot for contrast
         ctx.fillStyle = '#ffffff';
         ctx.beginPath();
-        ctx.arc(lastPoint.x, lastPoint.y, 2, 0, 2 * Math.PI);
+        ctx.arc(lastPoint.x, lastPoint.y, 3, 0, 2 * Math.PI);
         ctx.fill();
         
         // Draw price label next to the line endpoint - Polymarket style
         const priceInCents = sortedNoHistory[sortedNoHistory.length - 1].price * 100;
         const priceLabel = `No ${formatPrice(priceInCents)}¢`;
         ctx.fillStyle = '#ef4444'; // Red
-        ctx.font = 'bold 13px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+        ctx.font = 'bold 14px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
         ctx.textAlign = 'left';
-        ctx.fillText(priceLabel, lastPoint.x + 10, lastPoint.y + 4);
+        ctx.fillText(priceLabel, lastPoint.x + 15, lastPoint.y + 5);
       }
     }
 
@@ -649,8 +700,10 @@ const PolymarketChart = ({
     
     const padding = 40;
     const chartWidth = rect.width - 2 * padding;
+    const chartHeight = rect.height - 2 * padding;
     
-    if (x >= padding && x <= rect.width - padding && y >= padding && y <= rect.height - padding) {
+    // Allow hover anywhere on the chart, not just within padding
+    if (x >= 0 && x <= rect.width && y >= 0 && y <= rect.height) {
       // Use the same filtering logic as drawChart
       const filterOutliers = (history) => {
         return history.filter(point => {
@@ -834,10 +887,15 @@ const PolymarketChart = ({
         <div className="relative bg-[#1a1a1a] rounded-lg border border-white/5 overflow-hidden w-full">
           <canvas
             ref={canvasRef}
-            className="w-full cursor-crosshair"
+            className="w-full"
             onMouseMove={handleMouseMove}
             onMouseLeave={() => setHoveredPoint(null)}
-            style={{ height: `${height}px`, width: '100%', display: 'block' }}
+            style={{ 
+              height: `${height}px`, 
+              width: '100%', 
+              display: 'block',
+              cursor: hoveredPoint ? 'pointer' : 'crosshair'
+            }}
           />
         
           {/* Hover Tooltip - Enhanced with better visibility */}
