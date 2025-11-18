@@ -25,6 +25,7 @@ const PolymarketChart = ({
   const animationRef = useRef(null);
   const [animationProgress, setAnimationProgress] = useState(0);
   const [isExpanded, setIsExpanded] = useState(true);
+  const [canvasWidth, setCanvasWidth] = useState(0);
 
   // Helper function to format prices: show decimals for small values
   const formatPrice = (price) => {
@@ -101,6 +102,9 @@ const PolymarketChart = ({
     const width = rect.width;
     const height = rect.height;
     const padding = 40;
+    
+    // Store width for tooltip positioning
+    setCanvasWidth(width);
 
     // Clear canvas and fill with background - dark theme like Polymarket
     ctx.clearRect(0, 0, width, height);
@@ -209,10 +213,10 @@ const PolymarketChart = ({
       ctx.stroke();
     }
     
-    // Draw crosshair on hover (Polymarket style)
+    // Draw crosshair on hover (Polymarket style) - more visible
     if (hoveredPoint) {
-      ctx.strokeStyle = '#e5e7eb';
-      ctx.lineWidth = 1;
+      ctx.strokeStyle = '#666666';
+      ctx.lineWidth = 1.5;
       ctx.setLineDash([5, 5]);
       ctx.beginPath();
       ctx.moveTo(hoveredPoint.x, padding);
@@ -221,6 +225,15 @@ const PolymarketChart = ({
       ctx.lineTo(width - padding, hoveredPoint.y);
       ctx.stroke();
       ctx.setLineDash([]);
+      
+      // Draw a highlight circle at hover point
+      ctx.fillStyle = '#FFE600';
+      ctx.beginPath();
+      ctx.arc(hoveredPoint.x, hoveredPoint.y, 6, 0, 2 * Math.PI);
+      ctx.fill();
+      ctx.strokeStyle = '#1a1a1a';
+      ctx.lineWidth = 2;
+      ctx.stroke();
     }
 
     // Draw YES price line (green) - includes current price from chain
@@ -399,11 +412,11 @@ const PolymarketChart = ({
       const lastTime = new Date(sortedNoHistory[sortedNoHistory.length - 1].timestamp).getTime();
       const timeRange = Math.max(lastTime - firstTime, 1); // Avoid division by zero
       
-      ctx.strokeStyle = '#FFE600'; // Yellow color like Polymarket
+      ctx.strokeStyle = '#ef4444'; // Red color for No line
       ctx.lineWidth = 2.5;
       ctx.lineJoin = 'round';
       ctx.lineCap = 'round';
-      ctx.shadowColor = 'rgba(255, 230, 0, 0.15)';
+      ctx.shadowColor = 'rgba(239, 68, 68, 0.15)';
       ctx.shadowBlur = 3;
       
       // Calculate all point coordinates first for line drawing
@@ -529,12 +542,12 @@ const PolymarketChart = ({
         
         // Draw a highlight dot on the current/animated price (last visible point) - Polymarket style
         const lastPoint = animatedPoints[animatedPoints.length - 1];
-        ctx.fillStyle = '#FFE600'; // Yellow
+        ctx.fillStyle = '#ef4444'; // Red
         ctx.beginPath();
         ctx.arc(lastPoint.x, lastPoint.y, 5, 0, 2 * Math.PI);
         ctx.fill();
-        // Dark inner dot for contrast
-        ctx.fillStyle = '#1a1a1a';
+        // White inner dot for contrast
+        ctx.fillStyle = '#ffffff';
         ctx.beginPath();
         ctx.arc(lastPoint.x, lastPoint.y, 2, 0, 2 * Math.PI);
         ctx.fill();
@@ -542,7 +555,7 @@ const PolymarketChart = ({
         // Draw price label next to the line endpoint - Polymarket style
         const priceInCents = sortedNoHistory[sortedNoHistory.length - 1].price * 100;
         const priceLabel = `No ${formatPrice(priceInCents)}¢`;
-        ctx.fillStyle = '#FFE600'; // Yellow
+        ctx.fillStyle = '#ef4444'; // Red
         ctx.font = 'bold 13px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
         ctx.textAlign = 'left';
         ctx.fillText(priceLabel, lastPoint.x + 10, lastPoint.y + 4);
@@ -768,7 +781,7 @@ const PolymarketChart = ({
               {formatPrice(currentNoPrice)}¢
             </div>
             <span className="text-xs sm:text-sm font-semibold text-gray-400 uppercase tracking-wide">NO</span>
-            <div className="w-3 h-3 bg-[#FFE600] rounded-full shadow-sm flex-shrink-0"></div>
+            <div className="w-3 h-3 bg-[#ef4444] rounded-full shadow-sm flex-shrink-0"></div>
             {noPriceChange !== 0 && (
               <div className={`flex items-center space-x-1 px-2 py-1 rounded text-xs sm:text-sm ${noPriceChange >= 0 ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
                 <span className="font-semibold">
@@ -827,36 +840,37 @@ const PolymarketChart = ({
             style={{ height: `${height}px`, width: '100%', display: 'block' }}
           />
         
-          {/* Hover Tooltip - Enhanced Polymarket Style */}
+          {/* Hover Tooltip - Enhanced with better visibility */}
           {hoveredPoint && (
             <div
-              className="absolute bg-gray-900 text-white px-4 py-2.5 rounded-lg text-sm pointer-events-none z-20 shadow-xl border border-gray-700"
+              className="absolute bg-black text-white px-4 py-3 rounded-xl text-sm pointer-events-none z-50 shadow-2xl border-2 border-[#FFE600]"
               style={{
-                left: hoveredPoint.x + 15,
-                top: hoveredPoint.y - 70,
-                transform: hoveredPoint.x > 400 ? 'translateX(-100%)' : 'none'
+                left: hoveredPoint.x > canvasWidth - 200 ? hoveredPoint.x - 165 : hoveredPoint.x + 15,
+                top: hoveredPoint.y - 90,
+                backdropFilter: 'blur(10px)',
+                backgroundColor: 'rgba(0, 0, 0, 0.95)'
               }}
             >
               {hoveredPoint.yesPrice !== undefined && hoveredPoint.noPrice !== undefined ? (
                 <>
-                  <div className="flex items-center space-x-2.5 mb-2">
-                    <div className="w-2.5 h-2.5 bg-[#FFE600] rounded-full shadow-sm"></div>
-                    <span className="text-gray-400 text-xs uppercase tracking-wide">YES</span>
-                    <span className="font-bold text-base">{formatPrice(hoveredPoint.yesPrice)}¢</span>
+                  <div className="flex items-center space-x-3 mb-2">
+                    <div className="w-3 h-3 bg-[#FFE600] rounded-full shadow-lg"></div>
+                    <span className="text-gray-300 text-xs uppercase tracking-wider font-semibold">YES</span>
+                    <span className="font-bold text-lg text-[#FFE600]">{formatPrice(hoveredPoint.yesPrice)}¢</span>
                   </div>
-                  <div className="flex items-center space-x-2.5 mb-2">
-                    <div className="w-2.5 h-2.5 bg-[#FFE600] rounded-full shadow-sm"></div>
-                    <span className="text-gray-400 text-xs uppercase tracking-wide">NO</span>
-                    <span className="font-bold text-base">{formatPrice(hoveredPoint.noPrice)}¢</span>
+                  <div className="flex items-center space-x-3 mb-2">
+                    <div className="w-3 h-3 bg-[#ef4444] rounded-full shadow-lg"></div>
+                    <span className="text-gray-300 text-xs uppercase tracking-wider font-semibold">NO</span>
+                    <span className="font-bold text-lg text-[#ef4444]">{formatPrice(hoveredPoint.noPrice)}¢</span>
                   </div>
-                  <div className="text-gray-500 text-xs pt-2 border-t border-gray-700 mt-2 font-medium">
+                  <div className="text-gray-400 text-xs pt-2 border-t border-gray-600 mt-2 font-medium">
                     {formatTime(hoveredPoint.timestamp)}
                   </div>
                 </>
               ) : (
                 <>
-                  <div className="font-bold text-base">{formatPrice(hoveredPoint.price)}¢</div>
-                  <div className="text-gray-400 text-xs mt-1">{formatTime(hoveredPoint.timestamp)}</div>
+                  <div className="font-bold text-lg">{formatPrice(hoveredPoint.price)}¢</div>
+                  <div className="text-gray-300 text-xs mt-1">{formatTime(hoveredPoint.timestamp)}</div>
                 </>
               )}
             </div>
