@@ -1,6 +1,14 @@
+const path = require('path');
 const { PrismaClient } = require('@prisma/client');
 
-const prisma = new PrismaClient();
+// Use the correct prisma schema path
+const prisma = new PrismaClient({
+  datasources: {
+    db: {
+      url: process.env.DATABASE_URL || 'file:./prisma/dev.db'
+    }
+  }
+});
 
 async function seedPriceHistory(marketId, hoursBack = 24) {
   console.log(`🌱 Seeding price history for market ${marketId}...`);
