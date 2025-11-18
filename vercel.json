@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "cd frontend && npm run build",
+  "buildCommand": "npx prisma migrate deploy && cd frontend && npm run build",
   "outputDirectory": "frontend/dist",
   "installCommand": "npm install && npx prisma generate --schema=./prisma/schema.prisma && cd frontend && npm install",
   "rewrites": [
