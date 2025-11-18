@@ -38,9 +38,13 @@ module.exports = async (req, res) => {
 
   const { id } = req.query;
 
+  if (!id) {
+    return res.status(400).json({ error: 'Market ID is required' });
+  }
+
   try {
     if (req.method === 'GET') {
-      // Get a single pending market
+      // Get specific pending market
       const pendingMarket = await prisma.pendingMarket.findUnique({
         where: { id: BigInt(id) }
       });
@@ -49,7 +53,6 @@ module.exports = async (req, res) => {
         return res.status(404).json({ error: 'Pending market not found' });
       }
 
-      // Serialize BigInt values and parse rules
       const serializedMarket = serializeBigInt(pendingMarket);
       if (serializedMarket.rules) {
         serializedMarket.rules = JSON.parse(serializedMarket.rules);
@@ -64,79 +67,41 @@ module.exports = async (req, res) => {
     }
 
     if (req.method === 'PATCH') {
-      // Approve or reject a pending market
-      const { action, approvedBy, rejectionReason, marketId } = req.body;
+      // Update pending market status (approve/reject)
+      const { status, deployedMarketId, rejectionReason } = req.body;
 
-      if (!action || !['approve', 'reject'].includes(action)) {
-        return res.status(400).json({ error: 'Invalid action. Must be "approve" or "reject"' });
+      if (!status) {
+        return res.status(400).json({ error: 'Status is required' });
       }
 
-      if (action === 'approve' && !approvedBy) {
-        return res.status(400).json({ error: 'approvedBy is required for approval' });
+      // Validate status
+      const validStatuses = ['PENDING', 'APPROVED', 'REJECTED', 'DEPLOYED'];
+      if (!validStatuses.includes(status.toUpperCase())) {
+        return res.status(400).json({ 
+          error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` 
+        });
       }
 
-      if (action === 'reject' && !rejectionReason) {
-        return res.status(400).json({ error: 'rejectionReason is required for rejection' });
-      }
-
+      // Build update data
       const updateData = {
-        status: action === 'approve' ? 'APPROVED' : 'REJECTED',
-        updatedAt: new Date()
+        status: status.toUpperCase()
       };
 
-      if (action === 'approve') {
-        updateData.approvedBy = approvedBy.toLowerCase();
-        if (marketId) {
-          updateData.marketId = BigInt(marketId);
-        }
-      } else {
+      if (status.toUpperCase() === 'DEPLOYED' && deployedMarketId) {
+        updateData.deployedMarketId = BigInt(deployedMarketId);
+      }
+
+      if (status.toUpperCase() === 'REJECTED' && rejectionReason) {
         updateData.rejectionReason = rejectionReason;
       }
 
-      // Get the pending market first to access creator address
-      const pendingMarket = await prisma.pendingMarket.findUnique({
-        where: { id: BigInt(id) }
-      });
-
-      if (!pendingMarket) {
-        return res.status(404).json({ error: 'Pending market not found' });
-      }
-
+      // Update the pending market
       const updatedMarket = await prisma.pendingMarket.update({
         where: { id: BigInt(id) },
         data: updateData
       });
 
-      // Create notification for the market creator
-      try {
-        if (action === 'approve') {
-          await prisma.notification.create({
-            data: {
-              recipient: pendingMarket.creator.toLowerCase(),
-              type: 'MARKET_APPROVED',
-              title: 'Market Approved! 🎉',
-              message: `Your market "${pendingMarket.question}" has been approved and is now live on-chain.`,
-              marketId: marketId ? BigInt(marketId) : null,
-              pendingMarketId: BigInt(id)
-            }
-          });
-        } else if (action === 'reject') {
-          await prisma.notification.create({
-            data: {
-              recipient: pendingMarket.creator.toLowerCase(),
-              type: 'MARKET_REJECTED',
-              title: 'Market Rejected',
-              message: `Your market "${pendingMarket.question}" was rejected. Reason: ${rejectionReason}`,
-              pendingMarketId: BigInt(id)
-            }
-          });
-        }
-      } catch (notifError) {
-        // Log but don't fail the request if notification creation fails
-        console.error('Error creating notification:', notifError);
-      }
-
-      // Serialize BigInt values and parse rules
+      // Serialize BigInt values
       const serializedMarket = serializeBigInt(updatedMarket);
       if (serializedMarket.rules) {
         serializedMarket.rules = JSON.parse(serializedMarket.rules);
@@ -151,19 +116,7 @@ module.exports = async (req, res) => {
     }
 
     if (req.method === 'DELETE') {
-      // Delete a pending market (only if pending or rejected)
-      const pendingMarket = await prisma.pendingMarket.findUnique({
-        where: { id: BigInt(id) }
-      });
-
-      if (!pendingMarket) {
-        return res.status(404).json({ error: 'Pending market not found' });
-      }
-
-      if (pendingMarket.status === 'APPROVED') {
-        return res.status(400).json({ error: 'Cannot delete approved markets' });
-      }
-
+      // Delete pending market
       await prisma.pendingMarket.delete({
         where: { id: BigInt(id) }
       });
@@ -177,10 +130,10 @@ module.exports = async (req, res) => {
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (error) {
     console.error('Error in pending-markets/[id] API:', error);
+    
     return res.status(500).json({
       error: 'Internal server error',
       details: error.message
     });
   }
 };
-

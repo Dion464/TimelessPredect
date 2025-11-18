@@ -29,7 +29,7 @@ module.exports = async (req, res) => {
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') {
@@ -122,6 +122,61 @@ module.exports = async (req, res) => {
       return res.status(200).json({
         success: true,
         pendingMarkets: serializedMarkets
+      });
+    }
+
+    if (req.method === 'PATCH') {
+      // Update pending market status (approve/reject)
+      const marketId = req.url.split('/').pop().split('?')[0]; // Extract ID from URL
+      
+      if (!marketId || marketId === 'pending-markets') {
+        return res.status(400).json({ error: 'Market ID is required' });
+      }
+
+      const { status, deployedMarketId, rejectionReason } = req.body;
+
+      if (!status) {
+        return res.status(400).json({ error: 'Status is required' });
+      }
+
+      // Validate status
+      const validStatuses = ['PENDING', 'APPROVED', 'REJECTED', 'DEPLOYED'];
+      if (!validStatuses.includes(status.toUpperCase())) {
+        return res.status(400).json({ 
+          error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` 
+        });
+      }
+
+      // Build update data
+      const updateData = {
+        status: status.toUpperCase()
+      };
+
+      if (status.toUpperCase() === 'DEPLOYED' && deployedMarketId) {
+        updateData.deployedMarketId = BigInt(deployedMarketId);
+      }
+
+      if (status.toUpperCase() === 'REJECTED' && rejectionReason) {
+        updateData.rejectionReason = rejectionReason;
+      }
+
+      // Update the pending market
+      const updatedMarket = await prisma.pendingMarket.update({
+        where: { id: BigInt(marketId) },
+        data: updateData
+      });
+
+      // Serialize BigInt values
+      const serializedMarket = serializeBigInt(updatedMarket);
+      if (serializedMarket.rules) {
+        serializedMarket.rules = JSON.parse(serializedMarket.rules);
+      } else {
+        serializedMarket.rules = [];
+      }
+
+      return res.status(200).json({
+        success: true,
+        pendingMarket: serializedMarket
       });
     }
 
