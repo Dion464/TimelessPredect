@@ -16,7 +16,7 @@ const CreateMarket = () => {
   const [formData, setFormData] = useState({
     question: '',
     description: '',
-    category: 'General',
+    category: 'Politics',
     imageUrl: '',
     endDate: '',
     endTime: '23:59',
@@ -55,14 +55,11 @@ const CreateMarket = () => {
   };
 
   const categories = [
-    'General',
-    'Technology',
-    'Crypto',
-    'Sports',
     'Politics',
-    'Entertainment',
-    'Economics',
-    'Science'
+    'Sports',
+    'Crypto',
+    'Tech',
+    'WTF'
   ];
 
   const handleImageFile = (file) => {
@@ -254,7 +251,7 @@ const CreateMarket = () => {
       setFormData({
         question: '',
         description: '',
-        category: 'General',
+        category: 'Politics',
         imageUrl: '',
         endDate: '',
         endTime: '23:59',
