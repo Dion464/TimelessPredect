@@ -110,7 +110,7 @@ const MarketDetailWormStyle = () => {
   const [noPriceHistory, setNoPriceHistory] = useState([]);
   const [orderType, setOrderType] = useState('market'); // 'market' or 'limit'
   const [limitPrice, setLimitPrice] = useState('');
-  const [timeframe, setTimeframe] = useState('1d');
+  const [timeframe, setTimeframe] = useState('1h');
   
   const currencySymbol = getCurrencySymbol(chainId);
 

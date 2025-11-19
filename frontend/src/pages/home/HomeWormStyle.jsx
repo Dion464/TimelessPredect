@@ -14,6 +14,7 @@ const HomeWormStyle = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [trendingMarkets, setTrendingMarkets] = useState([]);
+  const [sortBy, setSortBy] = useState('newest'); // 'newest', 'volume', 'popular'
   
   const currencySymbol = getCurrencySymbol(chainId);
   const resolveApiBase = () => {
@@ -137,15 +138,30 @@ const HomeWormStyle = () => {
 
   const handleSearch = (e) => {
     e.preventDefault();
-    if (searchQuery.trim()) {
-      history.push(`/markets?search=${encodeURIComponent(searchQuery)}`);
-    }
+    // Search happens in real-time via filteredMarkets, no need to navigate
   };
 
   const filteredMarkets = markets.filter(market => {
     const matchesCategory = selectedCategory === 'All' || market.category === selectedCategory;
-    const matchesSearch = market.question.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = !searchQuery.trim() || 
+      market.question.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      market.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      market.creator.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesCategory && matchesSearch;
+  });
+
+  // Sort filtered markets
+  const sortedMarkets = [...filteredMarkets].sort((a, b) => {
+    switch (sortBy) {
+      case 'volume':
+        return b.volume - a.volume;
+      case 'popular':
+        // Sort by total shares (popularity indicator)
+        return (b.totalYesShares + b.totalNoShares) - (a.totalYesShares + a.totalNoShares);
+      case 'newest':
+      default:
+        return b.createdAt - a.createdAt;
+    }
   });
 
   const getMarketImage = (market) => {
@@ -305,6 +321,17 @@ const HomeWormStyle = () => {
           )}
         </div>
 
+        {/* Results Counter */}
+        {!loading && (searchQuery.trim() || selectedCategory !== 'All') && (
+          <div className="mb-4">
+            <p className="text-gray-400 text-sm font-space-grotesk">
+              Found <span className="text-white font-semibold">{sortedMarkets.length}</span> market{sortedMarkets.length !== 1 ? 's' : ''}
+              {searchQuery.trim() && <span> matching "<span className="text-white">{searchQuery}</span>"</span>}
+              {selectedCategory !== 'All' && <span> in <span className="text-white">{selectedCategory}</span></span>}
+            </p>
+          </div>
+        )}
+
         {/* Category Filter */}
         <div className="flex items-center justify-between mb-8 gap-4 flex-wrap">
           <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
@@ -323,12 +350,20 @@ const HomeWormStyle = () => {
             ))}
           </div>
           
-          <button className="flex items-center gap-2 px-5 py-2.5 bg-[#222222] text-white rounded-full hover:bg-[#333333] transition-all whitespace-nowrap border border-white/10">
-            <span className="text-[14px] font-medium font-space-grotesk">Sort by: Newest</span>
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="relative">
+            <select 
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="appearance-none flex items-center gap-2 px-5 py-2.5 bg-[#222222] text-white rounded-full hover:bg-[#333333] transition-all whitespace-nowrap border border-white/10 cursor-pointer text-[14px] font-medium font-space-grotesk pr-10"
+            >
+              <option value="newest">Sort by: Newest</option>
+              <option value="volume">Sort by: Volume</option>
+              <option value="popular">Sort by: Popular</option>
+            </select>
+            <svg className="w-4 h-4 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
             </svg>
-          </button>
+          </div>
         </div>
 
         {/* Markets Grid */}
@@ -336,14 +371,26 @@ const HomeWormStyle = () => {
           <div className="flex justify-center items-center py-20">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
           </div>
-        ) : filteredMarkets.length === 0 ? (
+        ) : sortedMarkets.length === 0 ? (
           <div className="text-center py-20">
-            <p className="text-gray-400 text-lg">No markets found</p>
-            <p className="text-gray-500 text-sm mt-2">Try creating one or check back later!</p>
+            <p className="text-gray-400 text-lg font-space-grotesk">
+              {searchQuery.trim() ? `No markets found for "${searchQuery}"` : 'No markets found'}
+            </p>
+            <p className="text-gray-500 text-sm mt-2 font-space-grotesk">
+              {searchQuery.trim() ? 'Try a different search term' : 'Try creating one or check back later!'}
+            </p>
+            {searchQuery.trim() && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="mt-4 px-6 py-2 bg-white/10 hover:bg-white/20 text-white rounded-full transition-all font-space-grotesk"
+              >
+                Clear Search
+              </button>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredMarkets.map((market) => (
+            {sortedMarkets.map((market) => (
               <div
                 key={market.id}
                 onClick={() => history.push(`/markets/${market.id}`)}
