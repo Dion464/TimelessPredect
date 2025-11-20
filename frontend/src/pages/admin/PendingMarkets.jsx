@@ -294,6 +294,13 @@ const PendingMarkets = () => {
       }
 
       // Update pending market status in database
+      console.log('Updating pending market status:', {
+        url: `${apiBaseUrl}/api/pending-markets/${pendingMarket.id}`,
+        status: 'DEPLOYED',
+        deployedMarketId: marketId,
+        pendingMarketId: pendingMarket.id
+      });
+      
       const approveResponse = await fetch(`${apiBaseUrl}/api/pending-markets/${pendingMarket.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -303,10 +310,22 @@ const PendingMarkets = () => {
         })
       });
 
+      console.log('Approve response status:', approveResponse.status, approveResponse.statusText);
+      
       if (!approveResponse.ok) {
-        const errorData = await approveResponse.json().catch(() => ({ error: 'Failed to update pending market status' }));
-        throw new Error(errorData.error || 'Failed to update pending market status');
+        const errorText = await approveResponse.text();
+        console.error('Approve response error:', approveResponse.status, errorText);
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch (e) {
+          errorData = { error: errorText || 'Failed to update pending market status' };
+        }
+        throw new Error(errorData.error || `HTTP ${approveResponse.status}: Failed to update pending market status`);
       }
+      
+      const approveData = await approveResponse.json();
+      console.log('✅ Pending market status updated:', approveData);
 
       showGlassToast({ title: 'Market approved and deployed! 🎉', icon: '✅' });
       fetchPendingMarkets();
@@ -347,6 +366,13 @@ const PendingMarkets = () => {
       const apiBaseUrl = resolveApiBase();
       console.log('Rejecting market via:', `${apiBaseUrl}/api/pending-markets/${pendingMarket.id}`);
       
+      console.log('Rejecting pending market:', {
+        url: `${apiBaseUrl}/api/pending-markets/${pendingMarket.id}`,
+        status: 'REJECTED',
+        rejectionReason: reason,
+        pendingMarketId: pendingMarket.id
+      });
+      
       const response = await fetch(`${apiBaseUrl}/api/pending-markets/${pendingMarket.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -356,10 +382,18 @@ const PendingMarkets = () => {
         })
       });
 
+      console.log('Reject response status:', response.status, response.statusText);
+
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Rejection response error:', response.status, errorText);
-        throw new Error(`HTTP ${response.status}: ${errorText.substring(0, 100)}`);
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch (e) {
+          errorData = { error: errorText || 'Failed to reject market' };
+        }
+        throw new Error(errorData.error || `HTTP ${response.status}: Failed to reject market`);
       }
 
       const data = await response.json();
