@@ -29,23 +29,128 @@ module.exports = async (req, res) => {
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,DELETE,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
 
-  // If this is a PATCH request to /api/pending-markets/:id, it should go to [id].js
-  // But if it somehow reaches here, return 405
-  if (req.method === 'PATCH') {
-    console.error('[pending-markets/index] PATCH request reached index.js - should go to [id].js');
-    return res.status(405).json({ 
-      error: 'Method not allowed',
-      message: 'PATCH requests should go to /api/pending-markets/:id'
-    });
+  // Check if URL contains an ID (e.g., /api/pending-markets/30)
+  // Extract ID from URL path - works for both Vercel and Express
+  let id = req.query?.id;
+  if (!id && req.url) {
+    const match = req.url.match(/\/pending-markets\/(\d+)/);
+    if (match) {
+      id = match[1];
+    }
   }
 
+  console.log(`[pending-markets/index] ${req.method} request - URL: ${req.url}, ID: ${id}, Query:`, req.query);
+
+  // If there's an ID in the URL, handle single market operations
+  if (id && (req.method === 'GET' || req.method === 'PATCH' || req.method === 'DELETE')) {
+    try {
+      if (req.method === 'GET') {
+        // Get specific pending market
+        const pendingMarket = await prisma.pendingMarket.findUnique({
+          where: { id: BigInt(id) }
+        });
+
+        if (!pendingMarket) {
+          return res.status(404).json({ error: 'Pending market not found' });
+        }
+
+        const serializedMarket = serializeBigInt(pendingMarket);
+        if (serializedMarket.rules) {
+          serializedMarket.rules = JSON.parse(serializedMarket.rules);
+        } else {
+          serializedMarket.rules = [];
+        }
+
+        return res.status(200).json({
+          success: true,
+          pendingMarket: serializedMarket
+        });
+      }
+
+      if (req.method === 'PATCH') {
+        console.log(`[pending-markets/index] PATCH request for id: ${id}, body:`, req.body);
+        
+        // Update pending market status (approve/reject)
+        const { status, deployedMarketId, rejectionReason } = req.body;
+
+        if (!status) {
+          console.error('[pending-markets/index] Missing status in PATCH body');
+          return res.status(400).json({ error: 'Status is required' });
+        }
+
+        // Validate status
+        const validStatuses = ['PENDING', 'APPROVED', 'REJECTED', 'DEPLOYED'];
+        if (!validStatuses.includes(status.toUpperCase())) {
+          return res.status(400).json({ 
+            error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` 
+          });
+        }
+
+        // Build update data
+        const updateData = {
+          status: status.toUpperCase()
+        };
+
+        if (status.toUpperCase() === 'DEPLOYED' && deployedMarketId) {
+          updateData.deployedMarketId = BigInt(deployedMarketId);
+        }
+
+        if (status.toUpperCase() === 'REJECTED' && rejectionReason) {
+          updateData.rejectionReason = rejectionReason;
+        }
+
+        console.log(`[pending-markets/index] Updating market ${id} with:`, updateData);
+
+        // Update the pending market
+        const updatedMarket = await prisma.pendingMarket.update({
+          where: { id: BigInt(id) },
+          data: updateData
+        });
+
+        // Serialize BigInt values
+        const serializedMarket = serializeBigInt(updatedMarket);
+        if (serializedMarket.rules) {
+          serializedMarket.rules = JSON.parse(serializedMarket.rules);
+        } else {
+          serializedMarket.rules = [];
+        }
+
+        console.log(`[pending-markets/index] Successfully updated market ${id}`);
+
+        return res.status(200).json({
+          success: true,
+          pendingMarket: serializedMarket
+        });
+      }
+
+      if (req.method === 'DELETE') {
+        // Delete pending market
+        await prisma.pendingMarket.delete({
+          where: { id: BigInt(id) }
+        });
+
+        return res.status(200).json({
+          success: true,
+          message: 'Pending market deleted'
+        });
+      }
+    } catch (error) {
+      console.error(`[pending-markets/index] Error handling ${req.method} for id ${id}:`, error);
+      return res.status(500).json({
+        error: 'Internal server error',
+        details: error.message
+      });
+    }
+  }
+
+  // No ID in URL - handle collection operations (GET list, POST create)
   try {
     if (req.method === 'POST') {
       // Submit a new pending market
@@ -135,62 +240,11 @@ module.exports = async (req, res) => {
       });
     }
 
-    if (req.method === 'PATCH') {
-      // Update pending market status (approve/reject)
-      const marketId = req.url.split('/').pop().split('?')[0]; // Extract ID from URL
-      
-      if (!marketId || marketId === 'pending-markets') {
-        return res.status(400).json({ error: 'Market ID is required' });
-      }
-
-      const { status, deployedMarketId, rejectionReason } = req.body;
-
-      if (!status) {
-        return res.status(400).json({ error: 'Status is required' });
-      }
-
-      // Validate status
-      const validStatuses = ['PENDING', 'APPROVED', 'REJECTED', 'DEPLOYED'];
-      if (!validStatuses.includes(status.toUpperCase())) {
-        return res.status(400).json({ 
-          error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` 
-        });
-      }
-
-      // Build update data
-      const updateData = {
-        status: status.toUpperCase()
-      };
-
-      if (status.toUpperCase() === 'DEPLOYED' && deployedMarketId) {
-        updateData.deployedMarketId = BigInt(deployedMarketId);
-      }
-
-      if (status.toUpperCase() === 'REJECTED' && rejectionReason) {
-        updateData.rejectionReason = rejectionReason;
-      }
-
-      // Update the pending market
-      const updatedMarket = await prisma.pendingMarket.update({
-        where: { id: BigInt(marketId) },
-        data: updateData
-      });
-
-      // Serialize BigInt values
-      const serializedMarket = serializeBigInt(updatedMarket);
-      if (serializedMarket.rules) {
-        serializedMarket.rules = JSON.parse(serializedMarket.rules);
-      } else {
-        serializedMarket.rules = [];
-      }
-
-      return res.status(200).json({
-        success: true,
-        pendingMarket: serializedMarket
-      });
-    }
-
-    return res.status(405).json({ error: 'Method not allowed' });
+    // Only GET and POST are allowed without an ID
+    return res.status(405).json({ 
+      error: 'Method not allowed',
+      message: `Method ${req.method} requires an ID in the URL path (e.g., /api/pending-markets/30)`
+    });
   } catch (error) {
     console.error('Error in pending-markets API:', error);
     console.error('Error stack:', error.stack);
