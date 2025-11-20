@@ -114,6 +114,8 @@ const HomeWormStyle = () => {
               resolved: market.resolved,
               active: market.active,
               createdAt: market.createdAt ? new Date(market.createdAt.toNumber() * 1000) : new Date(),
+              endTime: market.endTime ? new Date(market.endTime.toNumber() * 1000).toISOString() : null,
+              resolutionTime: market.resolutionTime ? new Date(market.resolutionTime.toNumber() * 1000).toISOString() : null,
               imageUrl: persistedImages[marketIdStr] || (market.imageUrl ?? null),
             };
           } catch (err) {

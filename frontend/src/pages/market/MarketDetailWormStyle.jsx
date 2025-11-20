@@ -198,6 +198,8 @@ const MarketDetailWormStyle = () => {
         resolved: marketInfo.resolved,
         active: marketInfo.active,
         createdAt: marketInfo.createdAt ? new Date(marketInfo.createdAt.toNumber() * 1000) : new Date(),
+        endTime: marketInfo.endTime ? new Date(marketInfo.endTime.toNumber() * 1000).toISOString() : null,
+        resolutionTime: marketInfo.resolutionTime ? new Date(marketInfo.resolutionTime.toNumber() * 1000).toISOString() : null,
       };
 
       setMarket(marketState);
