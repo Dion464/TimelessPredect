@@ -176,6 +176,39 @@ module.exports = async (req, res) => {
 
         console.log(`[pending-markets/index] Successfully updated market ${id}`);
 
+        // Send notification to market creator
+        try {
+          let notificationType, notificationTitle, notificationMessage;
+          
+          if (status.toUpperCase() === 'REJECTED') {
+            notificationType = 'MARKET_REJECTED';
+            notificationTitle = 'Market Rejected';
+            notificationMessage = `Your market "${updatedMarket.question}" was rejected. Reason: ${rejectionReason || 'No reason provided'}`;
+          } else if (status.toUpperCase() === 'DEPLOYED') {
+            notificationType = 'MARKET_APPROVED';
+            notificationTitle = 'Market Approved & Deployed!';
+            notificationMessage = `Your market "${updatedMarket.question}" has been approved and deployed to the blockchain!`;
+          }
+          
+          if (notificationType && updatedMarket.creator) {
+            await prisma.notification.create({
+              data: {
+                recipient: updatedMarket.creator.toLowerCase(),
+                type: notificationType,
+                title: notificationTitle,
+                message: notificationMessage,
+                marketId: deployedMarketId ? BigInt(deployedMarketId) : null,
+                pendingMarketId: BigInt(id),
+                read: false
+              }
+            });
+            console.log(`[pending-markets/index] Notification sent to ${updatedMarket.creator}`);
+          }
+        } catch (notifError) {
+          console.error(`[pending-markets/index] Failed to send notification:`, notifError);
+          // Don't fail the request if notification fails
+        }
+
         return res.status(200).json({
           success: true,
           pendingMarket: serializedMarket
