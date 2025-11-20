@@ -4,6 +4,7 @@ import { useWeb3 } from '../../hooks/useWeb3';
 import { getCurrencySymbol } from '../../utils/currency';
 import { ethers } from 'ethers';
 import WormStyleNavbar from '../../components/modern/WormStyleNavbar';
+import MarketCountdown from '../../components/common/MarketCountdown';
 import { CONTRACT_ADDRESS, CONTRACT_ABI, RPC_URL } from '../../contracts/eth-config';
 
 const HomeWormStyle = () => {
