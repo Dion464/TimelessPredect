@@ -38,15 +38,39 @@ module.exports = async (req, res) => {
 
   // Check if URL contains an ID (e.g., /api/pending-markets/30)
   // Extract ID from URL path - works for both Vercel and Express
+  // On Vercel, req.url might be just "/29" or "/api/pending-markets/29" or "/pending-markets/29"
   let id = req.query?.id;
+  
+  // Try multiple patterns to extract ID
   if (!id && req.url) {
-    const match = req.url.match(/\/pending-markets\/(\d+)/);
+    // Try full path pattern: /api/pending-markets/29
+    let match = req.url.match(/\/pending-markets\/(\d+)/);
     if (match) {
       id = match[1];
+    } else {
+      // Try just the number at the end: /29
+      match = req.url.match(/\/(\d+)(?:\?|$)/);
+      if (match) {
+        id = match[1];
+      }
+    }
+  }
+  
+  // Also check if Vercel puts it in a different query param
+  if (!id && req.query) {
+    // Check all query params for a numeric ID
+    for (const [key, value] of Object.entries(req.query)) {
+      if (key === 'id' || /^\d+$/.test(String(value))) {
+        const numValue = String(value);
+        if (/^\d+$/.test(numValue)) {
+          id = numValue;
+          break;
+        }
+      }
     }
   }
 
-  console.log(`[pending-markets/index] ${req.method} request - URL: ${req.url}, ID: ${id}, Query:`, req.query);
+  console.log(`[pending-markets/index] ${req.method} request - URL: ${req.url}, ID: ${id}, Query:`, req.query, 'Headers:', req.headers);
 
   // If there's an ID in the URL, handle single market operations
   if (id && (req.method === 'GET' || req.method === 'PATCH' || req.method === 'DELETE')) {

@@ -44,18 +44,37 @@ module.exports = async (req, res) => {
   // On Vercel, dynamic route params come from req.query
   // The route /api/pending-markets/30 should have req.query.id = '30'
   // But sometimes we need to extract from URL path as fallback
-  let { id } = req.query;
+  let id = req.query?.id;
   
-  // Fallback: extract ID from URL path if not in query
+  // Try multiple patterns to extract ID - Vercel might pass it differently
   if (!id && req.url) {
-    const match = req.url.match(/\/pending-markets\/(\d+)/);
+    // Try full path: /api/pending-markets/29
+    let match = req.url.match(/\/pending-markets\/(\d+)/);
     if (match) {
       id = match[1];
+    } else {
+      // Try just the number: /29
+      match = req.url.match(/\/(\d+)(?:\?|$)/);
+      if (match) {
+        id = match[1];
+      }
+    }
+    if (id) {
       console.log(`[pending-markets/[id]] Extracted id from URL: ${id}`);
     }
   }
+  
+  // Also check if Vercel puts it in a different query param
+  if (!id && req.query) {
+    for (const [key, value] of Object.entries(req.query)) {
+      if (key === 'id' || (/^\d+$/.test(String(value)) && !isNaN(parseInt(value)))) {
+        id = String(value);
+        break;
+      }
+    }
+  }
 
-  console.log(`[pending-markets/[id]] ${req.method} request for id: ${id}`);
+  console.log(`[pending-markets/[id]] ${req.method} request for id: ${id}, URL: ${req.url}, Query:`, req.query);
 
   if (!id) {
     console.error('[pending-markets/[id]] Missing id parameter');
@@ -90,8 +109,21 @@ module.exports = async (req, res) => {
 
     if (req.method === 'PATCH') {
       // Update pending market status (approve/reject)
-      console.log('[pending-markets/[id]] PATCH request body:', JSON.stringify(req.body));
-      const { status, deployedMarketId, rejectionReason } = req.body;
+      console.log('[pending-markets/[id]] PATCH request received');
+      console.log('[pending-markets/[id]] Request body:', JSON.stringify(req.body, null, 2));
+      console.log('[pending-markets/[id]] ID from query/URL:', id);
+      
+      // Parse body if it's a string (sometimes Vercel doesn't parse it)
+      let body = req.body;
+      if (typeof body === 'string') {
+        try {
+          body = JSON.parse(body);
+        } catch (e) {
+          console.error('[pending-markets/[id]] Failed to parse body:', e);
+        }
+      }
+      
+      const { status, deployedMarketId, rejectionReason } = body || req.body;
 
       if (!status) {
         console.error('[pending-markets/[id]] Missing status in request body');
