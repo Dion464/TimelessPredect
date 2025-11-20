@@ -29,11 +29,21 @@ module.exports = async (req, res) => {
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
+  }
+
+  // If this is a PATCH request to /api/pending-markets/:id, it should go to [id].js
+  // But if it somehow reaches here, return 405
+  if (req.method === 'PATCH') {
+    console.error('[pending-markets/index] PATCH request reached index.js - should go to [id].js');
+    return res.status(405).json({ 
+      error: 'Method not allowed',
+      message: 'PATCH requests should go to /api/pending-markets/:id'
+    });
   }
 
   try {

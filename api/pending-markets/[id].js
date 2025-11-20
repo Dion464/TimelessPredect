@@ -26,6 +26,11 @@ function serializeBigInt(obj) {
 }
 
 module.exports = async (req, res) => {
+  // Log all incoming requests for debugging
+  console.log(`[pending-markets/[id]] Received ${req.method} request`);
+  console.log(`[pending-markets/[id]] URL: ${req.url || 'no url'}`);
+  console.log(`[pending-markets/[id]] Query:`, req.query);
+  
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -36,12 +41,26 @@ module.exports = async (req, res) => {
     return res.status(200).end();
   }
 
-  const { id } = req.query;
+  // On Vercel, dynamic route params come from req.query
+  // The route /api/pending-markets/30 should have req.query.id = '30'
+  // But sometimes we need to extract from URL path as fallback
+  let { id } = req.query;
+  
+  // Fallback: extract ID from URL path if not in query
+  if (!id && req.url) {
+    const match = req.url.match(/\/pending-markets\/(\d+)/);
+    if (match) {
+      id = match[1];
+      console.log(`[pending-markets/[id]] Extracted id from URL: ${id}`);
+    }
+  }
 
   console.log(`[pending-markets/[id]] ${req.method} request for id: ${id}`);
 
   if (!id) {
     console.error('[pending-markets/[id]] Missing id parameter');
+    console.error('[pending-markets/[id]] req.query:', req.query);
+    console.error('[pending-markets/[id]] req.url:', req.url);
     return res.status(400).json({ error: 'Market ID is required' });
   }
 
