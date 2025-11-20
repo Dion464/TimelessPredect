@@ -434,6 +434,15 @@ const HomeWormStyle = () => {
                     )}
                   </div>
                   
+                  {/* Countdown timer badge */}
+                  <div className="absolute" style={{ top: '80px', right: '24px' }}>
+                    <MarketCountdown 
+                      endTime={market.endTime} 
+                      variant="card"
+                      showLabel={false}
+                    />
+                  </div>
+                  
                   {/* Bottom content - matching Figma specs */}
                   <div className="absolute" style={{ bottom: '24px', left: '24px', right: '24px' }}>
                     {/* Percentage */}
