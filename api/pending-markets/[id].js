@@ -26,20 +26,27 @@ function serializeBigInt(obj) {
 }
 
 module.exports = async (req, res) => {
+  // Handle OPTIONS preflight FIRST - before any other logic
+  // This is critical for CORS to work from localhost
+  if (req.method === 'OPTIONS') {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,PATCH,DELETE,OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Max-Age', '86400'); // 24 hours
+    return res.status(200).end();
+  }
+
   // Log all incoming requests for debugging
   console.log(`[pending-markets/[id]] Received ${req.method} request`);
   console.log(`[pending-markets/[id]] URL: ${req.url || 'no url'}`);
   console.log(`[pending-markets/[id]] Query:`, req.query);
   
-  // Set CORS headers
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  // Set CORS headers for all other requests
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,PATCH,DELETE,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
 
   // On Vercel, dynamic route params come from req.query
   // The route /api/pending-markets/30 should have req.query.id = '30'

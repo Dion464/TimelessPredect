@@ -26,15 +26,22 @@ function serializeBigInt(obj) {
 }
 
 module.exports = async (req, res) => {
-  // Set CORS headers
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,DELETE,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
+  // Handle OPTIONS preflight FIRST - before any other logic
+  // This is critical for CORS to work from localhost
   if (req.method === 'OPTIONS') {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,DELETE,OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Max-Age', '86400'); // 24 hours
     return res.status(200).end();
   }
+
+  // Set CORS headers for all other requests
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,DELETE,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
 
   // Check if URL contains an ID (e.g., /api/pending-markets/30)
   // Extract ID from URL path - works for both Vercel and Express
@@ -72,8 +79,29 @@ module.exports = async (req, res) => {
 
   console.log(`[pending-markets/index] ${req.method} request - URL: ${req.url}, ID: ${id}, Query:`, req.query, 'Headers:', req.headers);
 
-  // If there's an ID in the URL, handle single market operations
-  if (id && (req.method === 'GET' || req.method === 'PATCH' || req.method === 'DELETE')) {
+  // If there's an ID in the URL OR if method is PATCH/DELETE (likely has ID), handle single market operations
+  // This handles cases where Vercel routes /api/pending-markets/30 to index.js
+  if (id || (req.method === 'PATCH' || req.method === 'DELETE')) {
+    // If we don't have ID yet but method suggests we should, try harder to extract it
+    if (!id && req.url) {
+      // Try full path: /api/pending-markets/29
+      let match = req.url.match(/\/pending-markets\/(\d+)/);
+      if (match) {
+        id = match[1];
+      } else {
+        // Try just the number at the end: /29
+        match = req.url.match(/\/(\d+)(?:\?|$)/);
+        if (match) {
+          id = match[1];
+        }
+      }
+      if (id) {
+        console.log(`[pending-markets/index] Extracted ID ${id} from ${req.method} request`);
+      }
+    }
+    
+    // Only proceed if we have an ID and the method matches
+    if (id && (req.method === 'GET' || req.method === 'PATCH' || req.method === 'DELETE')) {
     try {
       if (req.method === 'GET') {
         // Get specific pending market
@@ -170,11 +198,16 @@ module.exports = async (req, res) => {
       return res.status(500).json({
         error: 'Internal server error',
         details: error.message
-      });
+        });
+    } else if (!id) {
+      // We got a PATCH/DELETE but couldn't extract ID
+      console.error(`[pending-markets/index] ${req.method} request but no ID found in URL: ${req.url}`);
+      return res.status(400).json({ error: 'Market ID is required for this operation' });
     }
+    // If ID exists but method doesn't match (e.g., POST with ID), continue to collection handlers below
   }
 
-  // No ID in URL - handle collection operations (GET list, POST create)
+  // No ID in URL (or POST/GET without ID) - handle collection operations (GET list, POST create)
   try {
     if (req.method === 'POST') {
       // Submit a new pending market
