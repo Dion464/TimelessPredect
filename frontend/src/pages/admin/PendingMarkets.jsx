@@ -298,9 +298,8 @@ const PendingMarkets = () => {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'approve',
-          approvedBy: account,
-          marketId: marketId
+          status: 'DEPLOYED',
+          deployedMarketId: marketId
         })
       });
 
@@ -352,7 +351,7 @@ const PendingMarkets = () => {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'reject',
+          status: 'REJECTED',
           rejectionReason: reason
         })
       });
