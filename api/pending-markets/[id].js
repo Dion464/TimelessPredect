@@ -38,7 +38,10 @@ module.exports = async (req, res) => {
 
   const { id } = req.query;
 
+  console.log(`[pending-markets/[id]] ${req.method} request for id: ${id}`);
+
   if (!id) {
+    console.error('[pending-markets/[id]] Missing id parameter');
     return res.status(400).json({ error: 'Market ID is required' });
   }
 
@@ -68,9 +71,11 @@ module.exports = async (req, res) => {
 
     if (req.method === 'PATCH') {
       // Update pending market status (approve/reject)
+      console.log('[pending-markets/[id]] PATCH request body:', JSON.stringify(req.body));
       const { status, deployedMarketId, rejectionReason } = req.body;
 
       if (!status) {
+        console.error('[pending-markets/[id]] Missing status in request body');
         return res.status(400).json({ error: 'Status is required' });
       }
 
@@ -127,9 +132,16 @@ module.exports = async (req, res) => {
       });
     }
 
-    return res.status(405).json({ error: 'Method not allowed' });
+    // Log unexpected methods
+    console.error(`[pending-markets/[id]] Unsupported method: ${req.method} for id: ${id}`);
+    return res.status(405).json({ 
+      error: 'Method not allowed',
+      receivedMethod: req.method,
+      supportedMethods: ['GET', 'PATCH', 'DELETE', 'OPTIONS']
+    });
   } catch (error) {
     console.error('Error in pending-markets/[id] API:', error);
+    console.error('Error stack:', error.stack);
     
     return res.status(500).json({
       error: 'Internal server error',
