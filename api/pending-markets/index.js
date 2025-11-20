@@ -193,19 +193,28 @@ module.exports = async (req, res) => {
           message: 'Pending market deleted'
         });
       }
+      
+      // If we got here, method didn't match - shouldn't happen, but return 405
+      return res.status(405).json({ 
+        error: 'Method not allowed for this operation',
+        message: `Method ${req.method} with ID requires GET, PATCH, or DELETE`
+      });
     } catch (error) {
       console.error(`[pending-markets/index] Error handling ${req.method} for id ${id}:`, error);
       return res.status(500).json({
         error: 'Internal server error',
         details: error.message
-        });
-    } else if (!id) {
-      // We got a PATCH/DELETE but couldn't extract ID
+      });
+    }
+    } // Close inner if (id && (req.method === 'GET' || ...))
+    
+    // If we reached here, we have PATCH/DELETE but couldn't extract ID
+    if (!id && (req.method === 'PATCH' || req.method === 'DELETE')) {
       console.error(`[pending-markets/index] ${req.method} request but no ID found in URL: ${req.url}`);
       return res.status(400).json({ error: 'Market ID is required for this operation' });
     }
     // If ID exists but method doesn't match (e.g., POST with ID), continue to collection handlers below
-  }
+  } // Close outer if (id || (req.method === 'PATCH' || req.method === 'DELETE'))
 
   // No ID in URL (or POST/GET without ID) - handle collection operations (GET list, POST create)
   try {
