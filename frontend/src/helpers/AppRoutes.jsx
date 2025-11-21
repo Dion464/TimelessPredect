@@ -1,10 +1,7 @@
 import React from 'react';
 import { Route, Switch, Redirect } from 'react-router-dom';
-import Markets from '../pages/markets/Markets';
-import About from '../pages/about/About';
-import Stats from '../pages/stats/Stats';
 import HomeWormStyle from '../pages/home/HomeWormStyle';
-import PolymarketStyleTrading from '../pages/market/PolymarketStyleTrading';
+import MarketDetailWormStyle from '../pages/market/MarketDetailWormStyle';
 import User from '../pages/user/User';
 import CreateMarket from '../pages/create/CreateMarket';
 import MarketCreation from '../pages/admin/MarketCreation';
@@ -48,17 +45,9 @@ const AppRoutes = () => {
   return (
     <Switch>
       {/* Public Routes */}
-      <Route exact path='/about' component={About} />
-      
-      <Route exact path='/markets/:marketId'>
-        <PolymarketStyleTrading />
-      </Route>
-      
-      <Route exact path='/markets' component={Markets} />
+      <Route exact path='/markets/:marketId' component={MarketDetailWormStyle} />
       
       <Route exact path='/user/:address' component={User} />
-      
-      <Route exact path='/stats' component={Stats} />
 
       {/* Public Market Creation */}
       <Route exact path='/create' component={CreateMarket} />

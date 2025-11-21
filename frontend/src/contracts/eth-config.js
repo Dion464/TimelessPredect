@@ -1,5 +1,4 @@
 // Contract configuration - uses environment variables only
-// No fallback to localhost - must set VITE_* environment variables
 
 export const CONTRACT_ADDRESS = import.meta.env.VITE_CONTRACT_ADDRESS;
 export const CHAIN_ID = parseInt(import.meta.env.VITE_CHAIN_ID);
