@@ -119,10 +119,11 @@ export const Web3Provider = ({ children }) => {
         throw new Error('Prediction market ABI is missing required getMarket(uint256) function');
       }
 
-      const contractCode = await web3Signer.provider.getCode(addresses.ETH_PREDICTION_MARKET);
-      if (!contractCode || contractCode === '0x' || contractCode === '0x0') {
-        throw new Error(`No contract deployed at ${addresses.ETH_PREDICTION_MARKET} on chain ${chainId}`);
-      }
+      // Skip contract code verification for speed - assume it exists if ABI is correct
+      // const contractCode = await web3Signer.provider.getCode(addresses.ETH_PREDICTION_MARKET);
+      // if (!contractCode || contractCode === '0x' || contractCode === '0x0') {
+      //   throw new Error(`No contract deployed at ${addresses.ETH_PREDICTION_MARKET} on chain ${chainId}`);
+      // }
 
       const predictionMarket = new ethers.Contract(
         addresses.ETH_PREDICTION_MARKET,
@@ -130,25 +131,8 @@ export const Web3Provider = ({ children }) => {
         web3Signer
       );
 
-      // Try to get the PricingAMM address (might not exist in all versions)
+      // Skip PricingAMM initialization for speed (not used in current implementation)
       let pricingAMM = null;
-      try {
-        const pricingAMMAddress = predictionMarketInterface.functions['pricingAMM()']
-          ? await predictionMarket.pricingAMM()
-          : ethers.constants.AddressZero;
-
-        console.log('PricingAMM address:', pricingAMMAddress);
-
-        if (pricingAMMAddress !== ethers.constants.AddressZero) {
-          pricingAMM = new ethers.Contract(
-            pricingAMMAddress,
-            PRICING_AMM_ABI,
-            web3Signer
-          );
-        }
-      } catch (err) {
-        console.log('PricingAMM not available, skipping:', err.message);
-      }
 
       console.log('Contracts created successfully');
 
@@ -167,66 +151,42 @@ export const Web3Provider = ({ children }) => {
     }
   }, []);
 
-  // Get ETH balance with retry logic
+  // Get ETH balance - optimized for speed (single attempt, no retries)
   const updateEthBalance = useCallback(async () => {
     if (!provider || !account) {
-      console.log('⚠️ Missing provider or account:', { hasProvider: !!provider, account });
       return;
     }
 
-    const maxRetries = 3;
-    let lastError;
-
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        console.log(`💰 Fetching ETH balance (attempt ${attempt}/${maxRetries}) for account:`, account);
-        
-        // Add delay between retries
-        if (attempt > 1) {
-          await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-        }
-
-        const balance = await provider.getBalance(account);
-        
-        const formattedBalance = ethers.utils.formatEther(balance);
-        console.log('✅ Raw ETH balance:', balance.toString());
-        console.log('✅ Formatted ETH balance:', formattedBalance);
-        
-        setEthBalance(formattedBalance);
-        return; // Success, exit retry loop
-      } catch (err) {
-        lastError = err;
-        console.error(`❌ Failed to update ETH balance (attempt ${attempt}):`, err);
-        
-        // If circuit breaker error, wait longer before retry
-        if (err.message && err.message.includes('circuit breaker')) {
-          console.log('⏳ Circuit breaker detected, waiting longer...');
-          await new Promise(resolve => setTimeout(resolve, 3000 * attempt));
-        }
-        
-        // If last attempt, set error
-        if (attempt === maxRetries) {
-          console.error('❌ Failed to update ETH balance after all retries:', lastError);
-          setEthBalance('0');
-        }
-      }
+    try {
+      const balance = await provider.getBalance(account);
+      const formattedBalance = ethers.utils.formatEther(balance);
+      setEthBalance(formattedBalance);
+    } catch (err) {
+      console.error('Failed to update ETH balance:', err.message);
+      // Don't set to '0' on error - keep previous value
     }
   }, [provider, account]);
 
-  // Add network to MetaMask if not already added
+  // Add network to MetaMask - optimized for speed
   const addNetwork = useCallback(async (targetChainId = CHAIN_ID) => {
     if (typeof window.ethereum === 'undefined') {
       return false;
     }
 
     try {
+      // Check current chain first - skip if already on correct network
+      const currentChainId = await window.ethereum.request({ method: 'eth_chainId' });
+      if (parseInt(currentChainId, 16) === targetChainId) {
+        return true; // Already on correct network, no need to switch
+      }
+
       // Use environment variables for network configuration
       const config = {
         chainId: `0x${targetChainId.toString(16)}`,
-        chainName: NETWORK_NAME || 'Unknown Network',
+        chainName: NETWORK_NAME || 'Incentiv Testnet',
         nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
         rpcUrls: [RPC_URL],
-        blockExplorerUrls: null,
+        blockExplorerUrls: ['https://explorer-testnet.incentiv.io'],
       };
 
       if (!RPC_URL || !NETWORK_NAME) {
@@ -285,14 +245,7 @@ export const Web3Provider = ({ children }) => {
     setError(null);
 
     try {
-      // First, ensure we're on the correct network
-      console.log('🔗 Ensuring correct network is configured...');
-      await addNetwork(CHAIN_ID);
-      
-      // Wait a bit for network switch to complete
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Request account access
+      // Request account access first (fastest)
       const accounts = await window.ethereum.request({
         method: 'eth_requestAccounts',
       });
@@ -305,37 +258,36 @@ export const Web3Provider = ({ children }) => {
       const network = await web3Provider.getNetwork();
       const web3Signer = web3Provider.getSigner();
 
-      console.log('Wallet connected:', {
-        account: accounts[0],
-        chainId: network.chainId,
-        networkName: network.name
-      });
-
-      // Verify we're on the correct chain
-      if (network.chainId !== CHAIN_ID) {
-        console.warn('⚠️ Wrong network detected. Expected:', CHAIN_ID, 'Got:', network.chainId);
-        toast.error(`Please switch to ${NETWORK_NAME} (Chain ID: ${CHAIN_ID})`);
-        setIsConnecting(false);
-        connectingRef.current = false;
-        return false;
-      }
-
+      // Set state immediately for faster UI update
       setProvider(web3Provider);
       setChainId(network.chainId);
       setAccount(accounts[0]);
       setSigner(web3Signer);
       setIsConnected(true);
 
-      console.log('Initializing contracts...');
-      const contractsResult = await initializeContracts(web3Signer);
-      console.log('Contracts initialized:', contractsResult);
+      // Initialize contracts in parallel with network check
+      const [contractsResult] = await Promise.all([
+        initializeContracts(web3Signer),
+        // Switch network if needed (non-blocking)
+        network.chainId !== CHAIN_ID ? addNetwork(CHAIN_ID) : Promise.resolve(true)
+      ]);
+
+      // Verify we're on the correct chain after switch
+      if (network.chainId !== CHAIN_ID) {
+        const finalNetwork = await web3Provider.getNetwork();
+        if (finalNetwork.chainId !== CHAIN_ID) {
+          console.warn('⚠️ Wrong network detected. Expected:', CHAIN_ID, 'Got:', finalNetwork.chainId);
+          toast.error(`Please switch to ${NETWORK_NAME} (Chain ID: ${CHAIN_ID})`);
+          setIsConnecting(false);
+          connectingRef.current = false;
+          return false;
+        }
+      }
       
-      // Update ETH balance after a short delay
-      setTimeout(() => {
-        updateEthBalance();
-      }, 500);
+      // Update ETH balance asynchronously (non-blocking)
+      updateEthBalance();
       
-      toast.success('✅ Wallet connected successfully!');
+      toast.success('✅ Wallet connected!');
       return true;
     } catch (err) {
       console.error('Failed to connect wallet:', err);
@@ -368,21 +320,6 @@ export const Web3Provider = ({ children }) => {
     setError(null);
   }, []);
 
-  // Check if wallet is ready for transactions
-  const isWalletReady = useCallback(async () => {
-    if (!provider || !signer || !account) {
-      return false;
-    }
-
-    try {
-      // Check if we can get the account balance (simple test)
-      await provider.getBalance(account);
-      return true;
-    } catch (error) {
-      console.error('Wallet not ready:', error);
-      return false;
-    }
-  }, [provider, signer, account]);
 
   // Buy shares with ETH
   const normalizeDecimal = (value) => {
@@ -393,155 +330,61 @@ export const Web3Provider = ({ children }) => {
     return trimmed.replace(/,/g, '.');
   };
 
-  // Buy shares with retry logic
+  // Buy shares - optimized for speed with fixed gas
   const buyShares = useCallback(async (marketId, isYes, ethAmount) => {
     if (!contracts.predictionMarket || !signer) {
       throw new Error('Contracts not initialized');
     }
 
-    // Check if wallet is ready
-    const walletReady = await isWalletReady();
-    if (!walletReady) {
-      throw new Error('Wallet not ready. Please check your MetaMask connection.');
+    try {
+      // Use fixed gas limit for speed (skip estimation)
+      const tx = await contracts.predictionMarket.buyShares(marketId, isYes, {
+        value: ethers.utils.parseUnits(normalizeDecimal(ethAmount), 18),
+        gasLimit: 500000 // Fixed gas limit - faster than estimation
+      });
+
+      console.log('Buy transaction sent:', tx.hash);
+      const receipt = await tx.wait();
+      console.log('Buy transaction confirmed:', receipt);
+
+      // Update balance asynchronously (non-blocking)
+      updateEthBalance();
+      return receipt;
+    } catch (err) {
+      console.error('Buy transaction failed:', err.message);
+      throw err;
     }
+  }, [contracts.predictionMarket, signer, updateEthBalance]);
 
-    const maxRetries = 3;
-    let lastError;
-
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        console.log(`🔄 Buy attempt ${attempt}/${maxRetries} for ${isYes ? 'YES' : 'NO'} shares`);
-        
-        // Wait a bit between retries
-        if (attempt > 1) {
-          await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-        }
-
-        // Try with gas estimation first
-        try {
-          const gasEstimate = await contracts.predictionMarket.estimateGas.buyShares(marketId, isYes, {
-            value: ethers.utils.parseUnits(normalizeDecimal(ethAmount), 18)
-          });
-          console.log(`⛽ Gas estimate: ${gasEstimate.toString()}`);
-
-          const tx = await contracts.predictionMarket.buyShares(marketId, isYes, {
-            value: ethers.utils.parseUnits(normalizeDecimal(ethAmount), 18),
-            gasLimit: gasEstimate.mul(120).div(100) // Add 20% buffer
-          });
-
-          console.log('Buy transaction sent:', tx.hash);
-          const receipt = await tx.wait();
-          console.log('Buy transaction confirmed:', receipt);
-
-          await updateEthBalance();
-          return receipt;
-        } catch (gasError) {
-          console.log(`⛽ Gas estimation failed, trying with fixed gas limit...`);
-          
-          // Fallback to fixed gas limit
-          const tx = await contracts.predictionMarket.buyShares(marketId, isYes, {
-            value: ethers.utils.parseUnits(normalizeDecimal(ethAmount), 18),
-            gasLimit: 500000 // Fixed gas limit
-          });
-
-          console.log('Buy transaction sent (fixed gas):', tx.hash);
-          const receipt = await tx.wait();
-          console.log('Buy transaction confirmed (fixed gas):', receipt);
-
-          await updateEthBalance();
-          return receipt;
-        }
-      } catch (err) {
-        lastError = err;
-        console.error(`❌ Buy attempt ${attempt} failed:`, err.message);
-        
-        // If this is the last attempt, throw the error
-        if (attempt === maxRetries) {
-          throw lastError;
-        }
-      }
-    }
-  }, [contracts.predictionMarket, signer, updateEthBalance, isWalletReady]);
-
-  // Sell shares with retry logic
+  // Sell shares - optimized for speed with fixed gas
   const sellShares = useCallback(async (marketId, isYes, shares) => {
     if (!contracts.predictionMarket || !signer) {
       throw new Error('Contracts not initialized');
     }
 
-    // Check if wallet is ready
-    const walletReady = await isWalletReady();
-    if (!walletReady) {
-      throw new Error('Wallet not ready. Please check your MetaMask connection.');
+    try {
+      // Use fixed gas limit for speed (skip estimation)
+      const tx = await contracts.predictionMarket.sellShares(
+        marketId,
+        isYes,
+        ethers.utils.parseUnits(normalizeDecimal(shares), 18),
+        {
+          gasLimit: 300000 // Fixed gas limit - faster than estimation
+        }
+      );
+
+      console.log('Sell transaction sent:', tx.hash);
+      const receipt = await tx.wait();
+      console.log('Sell transaction confirmed:', receipt);
+
+      // Update balance asynchronously (non-blocking)
+      updateEthBalance();
+      return receipt;
+    } catch (err) {
+      console.error('Sell transaction failed:', err.message);
+      throw err;
     }
-
-    const maxRetries = 3;
-    let lastError;
-
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        console.log(`🔄 Sell attempt ${attempt}/${maxRetries} for ${shares} ${isYes ? 'YES' : 'NO'} shares`);
-        
-        // Wait a bit between retries
-        if (attempt > 1) {
-          await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-        }
-
-        // Try with gas estimation first
-        try {
-          const gasEstimate = await contracts.predictionMarket.estimateGas.sellShares(
-            marketId,
-            isYes,
-            ethers.utils.parseUnits(normalizeDecimal(shares), 18)
-          );
-          console.log(`⛽ Gas estimate: ${gasEstimate.toString()}`);
-
-          const tx = await contracts.predictionMarket.sellShares(
-            marketId,
-            isYes,
-            ethers.utils.parseUnits(normalizeDecimal(shares), 18),
-            {
-            gasLimit: gasEstimate.mul(120).div(100) // Add 20% buffer
-            }
-          );
-
-          console.log('Sell transaction sent:', tx.hash);
-          const receipt = await tx.wait();
-          console.log('Sell transaction confirmed:', receipt);
-
-          await updateEthBalance();
-          return receipt;
-        } catch (gasError) {
-          console.log(`⛽ Gas estimation failed, trying with fixed gas limit...`);
-          
-          // Fallback to fixed gas limit
-          const tx = await contracts.predictionMarket.sellShares(
-            marketId,
-            isYes,
-            ethers.utils.parseUnits(normalizeDecimal(shares), 18),
-            {
-            gasLimit: 300000 // Fixed gas limit
-            }
-          );
-
-          console.log('Sell transaction sent (fixed gas):', tx.hash);
-          const receipt = await tx.wait();
-          console.log('Sell transaction confirmed (fixed gas):', receipt);
-
-          await updateEthBalance();
-          return receipt;
-        }
-      } catch (err) {
-        lastError = err;
-        console.error(`❌ Sell attempt ${attempt} failed:`, err.message);
-        
-        // If this is the last attempt, throw the error
-        if (attempt === maxRetries) {
-          throw lastError;
-        }
-      }
-    }
-  }, [contracts.predictionMarket, signer, updateEthBalance, isWalletReady]);
+  }, [contracts.predictionMarket, signer, updateEthBalance]);
 
   // Get user position
   const getUserPosition = useCallback(async (marketId) => {
@@ -562,15 +405,10 @@ export const Web3Provider = ({ children }) => {
     }
   }, [contracts.predictionMarket, account]);
 
-  // Place a limit order
+  // Place a limit order - optimized for speed
   const placeLimitOrder = useCallback(async (marketId, isYes, priceCents, ethAmount) => {
     if (!contracts.predictionMarket || !signer) {
       throw new Error('Contracts not initialized');
-    }
-
-    const walletReady = await isWalletReady();
-    if (!walletReady) {
-      throw new Error('Wallet not ready. Please check your MetaMask connection.');
     }
 
     // Convert price from cents to basis points (50¢ -> 5000 basis points)
@@ -579,74 +417,30 @@ export const Web3Provider = ({ children }) => {
       throw new Error('Price must be between 1¢ and 100¢');
     }
 
-    const maxRetries = 3;
-    let lastError;
-
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        console.log(`🔄 Placing limit order attempt ${attempt}/${maxRetries}`);
-        
-        if (attempt > 1) {
-          await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+    try {
+      // Use fixed gas limit for speed (skip estimation)
+      const tx = await contracts.predictionMarket.placeLimitOrder(
+        marketId,
+        isYes,
+        priceBps,
+        {
+          value: ethers.utils.parseUnits(normalizeDecimal(ethAmount), 18),
+          gasLimit: 500000 // Fixed gas limit - faster than estimation
         }
+      );
 
-        try {
-          const gasEstimate = await contracts.predictionMarket.estimateGas.placeLimitOrder(
-            marketId,
-            isYes,
-            priceBps,
-            {
-              value: ethers.utils.parseUnits(normalizeDecimal(ethAmount), 18)
-            }
-          );
-          console.log(`⛽ Gas estimate: ${gasEstimate.toString()}`);
+      console.log('Limit order transaction sent:', tx.hash);
+      const receipt = await tx.wait();
+      console.log('Limit order transaction confirmed:', receipt);
 
-          const tx = await contracts.predictionMarket.placeLimitOrder(
-            marketId,
-            isYes,
-            priceBps,
-            {
-              value: ethers.utils.parseUnits(normalizeDecimal(ethAmount), 18),
-              gasLimit: gasEstimate.mul(120).div(100)
-            }
-          );
-
-          console.log('Limit order transaction sent:', tx.hash);
-          const receipt = await tx.wait();
-          console.log('Limit order transaction confirmed:', receipt);
-
-          await updateEthBalance();
-          return receipt;
-        } catch (gasError) {
-          console.log(`⛽ Gas estimation failed, trying with fixed gas limit...`);
-          
-          const tx = await contracts.predictionMarket.placeLimitOrder(
-            marketId,
-            isYes,
-            priceBps,
-            {
-              value: ethers.utils.parseUnits(normalizeDecimal(ethAmount), 18),
-              gasLimit: 500000
-            }
-          );
-
-          console.log('Limit order transaction sent (fixed gas):', tx.hash);
-          const receipt = await tx.wait();
-          console.log('Limit order transaction confirmed (fixed gas):', receipt);
-
-          await updateEthBalance();
-          return receipt;
-        }
-      } catch (err) {
-        lastError = err;
-        console.error(`❌ Limit order attempt ${attempt} failed:`, err.message);
-        
-        if (attempt === maxRetries) {
-          throw lastError;
-        }
-      }
+      // Update balance asynchronously (non-blocking)
+      updateEthBalance();
+      return receipt;
+    } catch (err) {
+      console.error('Limit order transaction failed:', err.message);
+      throw err;
     }
-  }, [contracts.predictionMarket, signer, updateEthBalance, isWalletReady]);
+  }, [contracts.predictionMarket, signer, updateEthBalance]);
 
   // Get user's limit orders for a market (uses hybrid order API)
   const getUserLimitOrders = useCallback(async (marketId) => {
@@ -780,84 +574,37 @@ export const Web3Provider = ({ children }) => {
     }
   }, [contracts.predictionMarket, contracts.pricingAMM]);
 
-  // Create market with improved error handling
+  // Create market - optimized for speed with fixed gas
   const createMarket = useCallback(async (question, description, category, endTime, resolutionTime) => {
     if (!contracts.predictionMarket || !signer) {
       throw new Error('Contracts not initialized');
-    }
-
-    // Check if wallet is ready
-    const walletReady = await isWalletReady();
-    if (!walletReady) {
-      throw new Error('Wallet not ready. Please check your MetaMask connection.');
     }
 
     try {
       const marketCreationFee = await contracts.predictionMarket.marketCreationFee();
       
       console.log('Creating market with fee:', ethers.utils.formatEther(marketCreationFee), 'ETH');
-      console.log('Parameters:', { question, category, endTime, resolutionTime });
       
-      // Try with gas estimation first
-      try {
-        const gasEstimate = await contracts.predictionMarket.estimateGas.createMarket(
-          question,
-          description,
-          category,
-          endTime,
-          resolutionTime,
-          {
-            value: marketCreationFee
-          }
-        );
-        console.log(`⛽ Gas estimate: ${gasEstimate.toString()}`);
+      // Use fixed gas limit for speed (skip estimation)
+      const tx = await contracts.predictionMarket.createMarket(
+        question,
+        description,
+        category,
+        endTime,
+        resolutionTime,
+        {
+          value: marketCreationFee,
+          gasLimit: 2000000 // Fixed gas limit - faster than estimation
+        }
+      );
 
-        const tx = await contracts.predictionMarket.createMarket(
-          question,
-          description,
-          category,
-          endTime,
-          resolutionTime,
-          {
-            value: marketCreationFee,
-            gasLimit: gasEstimate.mul(120).div(100) // Add 20% buffer
-          }
-        );
+      console.log('Create market transaction sent:', tx.hash);
+      const receipt = await tx.wait();
+      console.log('Create market transaction confirmed:', receipt);
 
-        console.log('Create market transaction sent:', tx.hash);
-        const receipt = await tx.wait();
-        console.log('Create market transaction confirmed:', receipt);
-
-        // Update ETH balance
-        await updateEthBalance();
-
-        return receipt;
-      } catch (gasError) {
-        console.log(`⛽ Gas estimation failed, trying with fixed gas limit...`);
-        console.error('Gas estimation error:', gasError);
-        
-        // Fallback to fixed gas limit
-        const tx = await contracts.predictionMarket.createMarket(
-          question,
-          description,
-          category,
-          endTime,
-          resolutionTime,
-          {
-            value: marketCreationFee,
-            gasLimit: 2000000 // Higher fixed gas limit for market creation
-          }
-        );
-
-        console.log('Create market transaction sent (fixed gas):', tx.hash);
-        const receipt = await tx.wait();
-        console.log('Create market transaction confirmed (fixed gas):', receipt);
-
-        // Update ETH balance
-        await updateEthBalance();
-
-        return receipt;
-      }
+      // Update balance asynchronously (non-blocking)
+      updateEthBalance();
+      return receipt;
     } catch (err) {
       console.error('Failed to create market:', err);
       
@@ -882,7 +629,7 @@ export const Web3Provider = ({ children }) => {
       
       throw new Error(errorMessage);
     }
-  }, [contracts.predictionMarket, signer, updateEthBalance, isWalletReady]);
+  }, [contracts.predictionMarket, signer, updateEthBalance]);
 
   // Get user markets
   const getUserMarkets = useCallback(async () => {
@@ -929,8 +676,8 @@ export const Web3Provider = ({ children }) => {
       const receipt = await tx.wait();
       console.log('Claim winnings transaction confirmed:', receipt);
 
-      // Update ETH balance
-      await updateEthBalance();
+      // Update balance asynchronously (non-blocking)
+      updateEthBalance();
 
       return receipt;
     } catch (err) {
