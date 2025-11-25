@@ -5,7 +5,7 @@ import Web3TradingInterface from '../../components/trading/Web3TradingInterface'
 import WormStyleNavbar from '../../components/modern/WormStyleNavbar';
 import { useWeb3 } from '../../hooks/useWeb3';
 import { getCurrencySymbol } from '../../utils/currency';
-import { CONTRACT_ADDRESS, CONTRACT_ABI, RPC_URL } from '../../contracts/eth-config';
+import { CONTRACT_ADDRESS, CONTRACT_ABI, RPC_URL, BLOCK_EXPLORER_URL } from '../../contracts/eth-config';
 import { ethers } from 'ethers';
 import './MarketDetailGlass.css'; // Import glassmorphism styles
 
@@ -180,6 +180,14 @@ const PolymarketStyleTrading = () => {
     return [];
   }, []);
 
+  const getBlockExplorerUrl = useCallback((txHash) => {
+    if (!txHash) return null;
+    const explorerBase = BLOCK_EXPLORER_URL || 'https://etherscan.io';
+    // Remove trailing slash if present
+    const base = explorerBase.replace(/\/$/, '');
+    return `${base}/tx/${txHash}`;
+  }, []);
+
   const getPredictionMarketContract = useCallback(async () => {
     if (contracts?.predictionMarket) {
       return contracts.predictionMarket;
@@ -265,7 +273,8 @@ const PolymarketStyleTrading = () => {
           yesPrice: trade.isYes ? priceBps / 10000 : (10000 - priceBps) / 10000,
           noPrice: trade.isYes ? (10000 - priceBps) / 10000 : priceBps / 10000,
           timestamp: timestamp.toISOString(),
-          trader: trade.trader
+          trader: trade.trader,
+          txHash: trade.txHash || trade.transactionHash || null
         };
       });
           }
@@ -351,7 +360,8 @@ const PolymarketStyleTrading = () => {
                   yesPrice: isYes ? priceBps / 10000 : (10000 - priceBps) / 10000,
                   noPrice: isYes ? (10000 - priceBps) / 10000 : priceBps / 10000,
                   timestamp: new Date(block.timestamp * 1000).toISOString(),
-                  trader: trader
+                  trader: trader,
+                  txHash: event.transactionHash || null
                 };
               })
             );
@@ -1012,11 +1022,27 @@ const PolymarketStyleTrading = () => {
                               <span>{parseFloat(trade.amount).toFixed(2)} shares</span>
                               <span>{new Date(trade.timestamp).toLocaleString()}</span>
                             </div>
-                            {trade.trader && (
-                              <span className="text-white/30 text-[11px] tracking-[0.3em] uppercase">
-                                {trade.trader.slice(0, 6)}…{trade.trader.slice(-4)}
-                              </span>
-                            )}
+                            <div className="flex items-center justify-between gap-2">
+                              {trade.trader && (
+                                <span className="text-white/30 text-[11px] tracking-[0.3em] uppercase">
+                                  {trade.trader.slice(0, 6)}…{trade.trader.slice(-4)}
+                                </span>
+                              )}
+                              {trade.txHash && (
+                                <a
+                                  href={getBlockExplorerUrl(trade.txHash)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-[#FFE600] hover:text-[#FFD700] text-[11px] tracking-[0.1em] uppercase transition-colors flex items-center gap-1"
+                                  title="View on block explorer"
+                                >
+                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                  </svg>
+                                  TX
+                                </a>
+                              )}
+                            </div>
                           </div>
                         ))}
                       </div>
