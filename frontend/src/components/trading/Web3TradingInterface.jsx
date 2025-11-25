@@ -387,10 +387,9 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
             duration: 5200
           });
           
-          setTimeout(() => {
-            fetchOpenOrders();
-            fetchData();
-          }, 5000);
+          // Update immediately - no delay
+          fetchOpenOrders();
+          fetchData();
         } else {
           showGlassToast({
             icon: '📥',
@@ -398,17 +397,15 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
             description: `Queued at ${centsToTCENT(limitPrice)} TCENT. We’ll settle it once matched.`,
             duration: 4800
           });
-          setTimeout(() => {
-            fetchOpenOrders();
-          }, 2000);
+          // Update immediately - no delay
+          fetchOpenOrders();
         }
         
         setTradeAmount('');
         setLimitPrice('');
         
-        setTimeout(() => {
-          fetchData();
-        }, 3000);
+        // Update immediately - no delay
+        fetchData();
       } else {
         if (!signer) {
           toast.error('Please connect your wallet');
@@ -521,13 +518,12 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
         setTradeAmount('');
       }
       
-      setTimeout(() => {
-        fetchData();
-        fetchOpenOrders();
-      }, 10000);
+      // Update immediately - no delay
+      fetchData();
+      fetchOpenOrders();
       
       if (onTradeComplete) {
-        setTimeout(() => onTradeComplete(), 5000);
+        onTradeComplete();
       }
     } catch (err) {
       console.error(orderType === 'limit' ? 'Limit order failed:' : 'Buy failed:', err);
@@ -634,10 +630,9 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
             duration: 5200
           });
           
-          setTimeout(() => {
-            fetchOpenOrders();
-            fetchData();
-          }, 5000);
+          // Update immediately - no delay
+          fetchOpenOrders();
+          fetchData();
         } else {
           showGlassToast({
             icon: '📤',
@@ -645,17 +640,15 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
             description: `Queued at ${centsToTCENT(limitPrice)} TCENT. We’ll process it once matched.`,
             duration: 4800
           });
-          setTimeout(() => {
-            fetchOpenOrders();
-          }, 2000);
+          // Update immediately - no delay
+          fetchOpenOrders();
         }
         
         setTradeAmount('');
         setLimitPrice('');
         
-        setTimeout(() => {
-          fetchData();
-        }, 3000);
+        // Update immediately - no delay
+        fetchData();
       } else {
         if (!signer) {
           toast.error('Please connect your wallet');
@@ -725,6 +718,11 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
           });
 
           try {
+            // Validate tradeAmount before selling
+            if (!tradeAmount || parseFloat(tradeAmount) <= 0) {
+              throw new Error('Invalid amount: Please enter a valid number of shares to sell');
+            }
+            
             const receipt = await sellShares(marketId, tradeSide === 'yes', tradeAmount);
             showTransactionToast({
               icon: '✅',
@@ -742,13 +740,12 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
         setTradeAmount('');
       }
       
-      setTimeout(() => {
-        fetchData();
-        fetchOpenOrders();
-      }, 10000);
+      // Update immediately - no delay
+      fetchData();
+      fetchOpenOrders();
       
       if (onTradeComplete) {
-        setTimeout(() => onTradeComplete(), 5000);
+        onTradeComplete();
       }
     } catch (err) {
       console.error(orderType === 'limit' ? 'Limit order failed:' : 'Sell failed:', err);

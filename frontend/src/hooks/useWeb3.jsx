@@ -3,11 +3,7 @@ import { ethers } from 'ethers';
 import toast from 'react-hot-toast';
 import { CONTRACT_ADDRESS, CHAIN_ID, CONTRACT_ABI, RPC_URL, NETWORK_NAME } from '../contracts/eth-config';
 
-// Debug log to verify import
-console.log('📍 Imported CONTRACT_ADDRESS:', CONTRACT_ADDRESS);
-console.log('📍 CHAIN_ID:', CHAIN_ID);
-console.log('📍 RPC_URL:', RPC_URL);
-console.log('📍 NETWORK_NAME:', NETWORK_NAME);
+// Environment configuration loaded
 
 const ETH_PREDICTION_MARKET_ABI = CONTRACT_ABI;
 
@@ -83,18 +79,11 @@ export const Web3Provider = ({ children }) => {
     try {
       const network = await web3Signer.provider.getNetwork();
       const chainId = network.chainId;
-      console.log('🔗 Network detected:', network.name, 'Chain ID:', chainId);
-      console.log('Initializing contracts for chain:', chainId);
       
       const addresses = CONTRACT_ADDRESSES[chainId];
       if (!addresses) {
-        console.error(`❌ Unsupported network: ${chainId}`);
-        console.log('Expected chain ID:', CHAIN_ID);
         throw new Error(`Unsupported network: ${chainId}. Please switch to ${NETWORK_NAME} (Chain ID: ${CHAIN_ID}).`);
       }
-
-      console.log('Contract addresses for chain', chainId, ':', addresses);
-      console.log('🔍 Using PredictionMarket address:', addresses.ETH_PREDICTION_MARKET);
 
       if (!addresses.ETH_PREDICTION_MARKET) {
         throw new Error(`Prediction market address missing for chain ${chainId}`);
@@ -134,14 +123,10 @@ export const Web3Provider = ({ children }) => {
       // Skip PricingAMM initialization for speed (not used in current implementation)
       let pricingAMM = null;
 
-      console.log('Contracts created successfully');
-
       setContracts({
         predictionMarket,
         pricingAMM,
       });
-
-      console.log('Contracts set in state');
 
       return { predictionMarket, pricingAMM };
     } catch (err) {
@@ -190,7 +175,6 @@ export const Web3Provider = ({ children }) => {
       };
 
       if (!RPC_URL || !NETWORK_NAME) {
-        console.error('Network configuration incomplete. Please set VITE_RPC_URL and VITE_NETWORK_NAME');
         return false;
       }
       
@@ -213,7 +197,6 @@ export const Web3Provider = ({ children }) => {
         throw switchError;
       }
     } catch (error) {
-      console.error('Failed to add/switch network:', error);
       return false;
     }
   }, []);
@@ -222,7 +205,6 @@ export const Web3Provider = ({ children }) => {
   const connectWallet = useCallback(async () => {
     // Prevent multiple simultaneous connection attempts
     if (connectingRef.current || isConnecting) {
-      console.log('⚠️ Connection already in progress, skipping...');
       return false;
     }
     
@@ -265,24 +247,21 @@ export const Web3Provider = ({ children }) => {
       setSigner(web3Signer);
       setIsConnected(true);
 
-      // Initialize contracts in parallel with network check
-      const [contractsResult] = await Promise.all([
-        initializeContracts(web3Signer),
-        // Switch network if needed (non-blocking)
-        network.chainId !== CHAIN_ID ? addNetwork(CHAIN_ID) : Promise.resolve(true)
-      ]);
-
-      // Verify we're on the correct chain after switch
+      // Switch network first if needed (faster to do before contract init)
       if (network.chainId !== CHAIN_ID) {
-        const finalNetwork = await web3Provider.getNetwork();
-        if (finalNetwork.chainId !== CHAIN_ID) {
-          console.warn('⚠️ Wrong network detected. Expected:', CHAIN_ID, 'Got:', finalNetwork.chainId);
+        await addNetwork(CHAIN_ID);
+        // Re-check network after switch
+        const updatedNetwork = await web3Provider.getNetwork();
+        if (updatedNetwork.chainId !== CHAIN_ID) {
           toast.error(`Please switch to ${NETWORK_NAME} (Chain ID: ${CHAIN_ID})`);
           setIsConnecting(false);
           connectingRef.current = false;
           return false;
         }
       }
+
+      // Initialize contracts (only after network is confirmed)
+      await initializeContracts(web3Signer);
       
       // Update ETH balance asynchronously (non-blocking)
       updateEthBalance();
@@ -290,7 +269,6 @@ export const Web3Provider = ({ children }) => {
       toast.success('✅ Wallet connected!');
       return true;
     } catch (err) {
-      console.error('Failed to connect wallet:', err);
       setError(err.message);
       
       // Check if it's a circuit breaker error
@@ -321,13 +299,26 @@ export const Web3Provider = ({ children }) => {
   }, []);
 
 
-  // Buy shares with ETH
+  // Buy shares with ETH - optimized decimal normalization
   const normalizeDecimal = (value) => {
-    if (value === null || value === undefined) return '0';
-    if (typeof value === 'number') return value.toString();
-    const trimmed = value.toString().trim();
-    if (!trimmed) return '0';
-    return trimmed.replace(/,/g, '.');
+    if (value === null || value === undefined || value === '') {
+      throw new Error('Invalid amount: value cannot be empty');
+    }
+    if (typeof value === 'number') {
+      if (isNaN(value) || !isFinite(value) || value <= 0) {
+        throw new Error('Invalid amount: must be a positive number');
+      }
+      return value.toString();
+    }
+    const trimmed = String(value).trim().replace(/,/g, '.');
+    if (!trimmed || trimmed === '.' || trimmed === '0' || trimmed === '0.') {
+      throw new Error('Invalid amount: value cannot be zero or empty');
+    }
+    const parsed = parseFloat(trimmed);
+    if (isNaN(parsed) || !isFinite(parsed) || parsed <= 0) {
+      throw new Error('Invalid amount: must be a positive number');
+    }
+    return trimmed;
   };
 
   // Buy shares - optimized for speed with fixed gas
@@ -343,9 +334,7 @@ export const Web3Provider = ({ children }) => {
         gasLimit: 500000 // Fixed gas limit - faster than estimation
       });
 
-      console.log('Buy transaction sent:', tx.hash);
       const receipt = await tx.wait();
-      console.log('Buy transaction confirmed:', receipt);
 
       // Update balance asynchronously (non-blocking)
       updateEthBalance();
@@ -356,33 +345,51 @@ export const Web3Provider = ({ children }) => {
     }
   }, [contracts.predictionMarket, signer, updateEthBalance]);
 
-  // Sell shares - optimized for speed with fixed gas
+  // Sell shares - optimized for speed with fixed gas and validation
   const sellShares = useCallback(async (marketId, isYes, shares) => {
     if (!contracts.predictionMarket || !signer) {
       throw new Error('Contracts not initialized');
     }
 
+    // Validate shares parameter before processing
+    if (shares === null || shares === undefined || shares === '') {
+      throw new Error('Invalid shares: amount cannot be empty. Please enter a valid number of shares to sell.');
+    }
+
     try {
+      // Normalize and validate shares amount
+      const normalizedShares = normalizeDecimal(shares);
+      const sharesInWei = ethers.utils.parseUnits(normalizedShares, 18);
+      
+      // Additional validation: ensure shares > 0
+      if (sharesInWei.isZero()) {
+        throw new Error('Invalid shares: amount must be greater than zero');
+      }
+
       // Use fixed gas limit for speed (skip estimation)
       const tx = await contracts.predictionMarket.sellShares(
         marketId,
         isYes,
-        ethers.utils.parseUnits(normalizeDecimal(shares), 18),
+        sharesInWei,
         {
           gasLimit: 300000 // Fixed gas limit - faster than estimation
         }
       );
 
-      console.log('Sell transaction sent:', tx.hash);
       const receipt = await tx.wait();
-      console.log('Sell transaction confirmed:', receipt);
 
       // Update balance asynchronously (non-blocking)
       updateEthBalance();
       return receipt;
     } catch (err) {
-      console.error('Sell transaction failed:', err.message);
-      throw err;
+      // Provide user-friendly error messages
+      if (err.message.includes('Invalid shares') || err.message.includes('Invalid amount')) {
+        throw err;
+      }
+      if (err.message.includes('user rejected')) {
+        throw new Error('Transaction was rejected');
+      }
+      throw new Error(`Sell failed: ${err.message}`);
     }
   }, [contracts.predictionMarket, signer, updateEthBalance]);
 
@@ -514,8 +521,6 @@ export const Web3Provider = ({ children }) => {
         throw new Error(`Market ${normalizedMarketId.toString()} does not exist`);
       }
 
-      console.log('Market data fetched:', market);
-
       // Get prices directly from chain using getCurrentPrice
       let yesPrice = 50; // Default 50¢
       let noPrice = 50; // Default 50¢
@@ -527,17 +532,7 @@ export const Web3Provider = ({ children }) => {
         yesPrice = parseFloat(yesPriceBps.toString()) / 100; // Convert to cents
         noPrice = parseFloat(noPriceBps.toString()) / 100; // Convert to cents
       } catch (err) {
-        console.log('Could not get prices from chain, using defaults:', err.message);
-        // Fallback to PricingAMM if available
-        if (contracts.pricingAMM) {
-          try {
-            const prices = await contracts.pricingAMM.calculatePrice(normalizedMarketId);
-            yesPrice = prices[0].toNumber() / 100;
-            noPrice = prices[1].toNumber() / 100;
-          } catch (ammErr) {
-            console.log('Could not get prices from PricingAMM either, using defaults');
-          }
-        }
+        // Use default prices if fetch fails
       }
 
       const toNumber = (value) => {
@@ -583,8 +578,6 @@ export const Web3Provider = ({ children }) => {
     try {
       const marketCreationFee = await contracts.predictionMarket.marketCreationFee();
       
-      console.log('Creating market with fee:', ethers.utils.formatEther(marketCreationFee), 'ETH');
-      
       // Use fixed gas limit for speed (skip estimation)
       const tx = await contracts.predictionMarket.createMarket(
         question,
@@ -598,9 +591,7 @@ export const Web3Provider = ({ children }) => {
         }
       );
 
-      console.log('Create market transaction sent:', tx.hash);
       const receipt = await tx.wait();
-      console.log('Create market transaction confirmed:', receipt);
 
       // Update balance asynchronously (non-blocking)
       updateEthBalance();

@@ -120,9 +120,7 @@ const MarketDetailWormStyle = () => {
     if (!contracts?.predictionMarket || !id) return;
 
     try {
-      // Wait a bit for blockchain to update
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
+      // Get prices immediately (blockchain updates are fast)
       const yesPrice = await contracts.predictionMarket.getCurrentPrice(id, true);
       const noPrice = await contracts.predictionMarket.getCurrentPrice(id, false);
       
@@ -300,10 +298,8 @@ const MarketDetailWormStyle = () => {
               lastYesPriceBps = yesPriceBps;
               lastNoPriceBps = noPriceBps;
               
-              // Refresh price history after recording
-              setTimeout(() => {
-                fetchData();
-              }, 500);
+              // Refresh price history immediately
+              fetchData();
             }
           } catch (err) {
             console.error('Failed to record price snapshot:', err);
@@ -403,9 +399,9 @@ const MarketDetailWormStyle = () => {
         setAmount('');
         setLimitPrice('');
         
-        // Record price after trade
-        await recordPriceAfterTrade();
-        setTimeout(() => fetchData(), 3000);
+        // Record price after trade (non-blocking)
+        recordPriceAfterTrade();
+        fetchData();
       } else {
         // Market order
         if (!signer || !buyShares) {
@@ -456,9 +452,9 @@ const MarketDetailWormStyle = () => {
 
         setAmount('');
         
-        // Record price after trade
-        await recordPriceAfterTrade();
-        setTimeout(() => fetchData(), 3000);
+        // Record price after trade (non-blocking)
+        recordPriceAfterTrade();
+        fetchData();
       }
     } catch (error) {
       console.error('Buy error:', error);
@@ -535,9 +531,9 @@ const MarketDetailWormStyle = () => {
         setAmount('');
         setLimitPrice('');
         
-        // Record price after trade
-        await recordPriceAfterTrade();
-        setTimeout(() => fetchData(), 3000);
+        // Record price after trade (non-blocking)
+        recordPriceAfterTrade();
+        fetchData();
       } else {
         // Market sell order
         if (!signer || !sellShares) {
@@ -588,9 +584,9 @@ const MarketDetailWormStyle = () => {
 
         setAmount('');
         
-        // Record price after trade
-        await recordPriceAfterTrade();
-        setTimeout(() => fetchData(), 3000);
+        // Record price after trade (non-blocking)
+        recordPriceAfterTrade();
+        fetchData();
       }
     } catch (error) {
       console.error('Sell error:', error);
