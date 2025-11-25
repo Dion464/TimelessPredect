@@ -870,14 +870,20 @@ const PolymarketStyleTrading = () => {
               </h1>
 
               {/* Market Image - Right Side on Desktop, Below Title on Mobile */}
-              <div className="relative rounded-[12px] sm:rounded-[16px] overflow-hidden flex-shrink-0 border border-white/20 shadow-lg w-full sm:w-[180px] lg:w-[300px] h-[200px]" style={{ height: '120px', maxHeight: '150px' }}>
+              <div className="relative rounded-[12px] sm:rounded-[16px] overflow-hidden flex-shrink-0 border border-white/20 shadow-lg w-full sm:w-[200px] lg:w-[280px]" style={{ minHeight: '120px', height: '140px' }}>
                 <img
                   src={getMarketImage(market, marketId)}
                   alt={market.questionTitle}
                   className="w-full h-full object-cover"
+                  style={{ minHeight: '120px', display: 'block' }}
                   onError={(e) => {
                     e.target.style.display = 'none';
-                    e.target.parentElement.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+                    const parent = e.target.parentElement;
+                    if (parent) {
+                      parent.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+                      parent.style.minHeight = '120px';
+                      parent.style.height = '140px';
+                    }
                   }}
                 />
               </div>
