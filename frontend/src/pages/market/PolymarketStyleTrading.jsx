@@ -114,7 +114,7 @@ const PolymarketStyleTrading = () => {
   const API_BASE = resolveApiBase();
   const [market, setMarket] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('market');
+  const [activeTab, setActiveTab] = useState('trades');
   const [selectedSide, setSelectedSide] = useState('yes');
   const [amount, setAmount] = useState('');
   const [recentTrades, setRecentTrades] = useState([]);
@@ -241,7 +241,7 @@ const PolymarketStyleTrading = () => {
       // Try to use getRecentTrades if available
       if (typeof contracts.predictionMarket.getRecentTrades === 'function') {
         try {
-          const trades = await contracts.predictionMarket.getRecentTrades(marketId, 100);
+          const trades = await contracts.predictionMarket.getRecentTrades(marketId, 1000);
           
           if (trades && trades.length > 0) {
             formattedTrades = trades.map(trade => {
@@ -325,7 +325,7 @@ const PolymarketStyleTrading = () => {
             });
 
             formattedTrades = await Promise.all(
-              allEvents.slice(0, 100).map(async (event) => {
+              allEvents.slice(0, 1000).map(async (event) => {
                 const args = event.args;
                 const isPurchase = event.event === 'SharesPurchased';
                 const isYes = args.isYes || args[2];
@@ -854,7 +854,7 @@ const PolymarketStyleTrading = () => {
     ? customRules
     : (Array.isArray(market?.rules) && market.rules.length > 0 ? market.rules : defaultRules);
 
-  const tradesToDisplay = Array.isArray(recentTrades) ? recentTrades.slice(0, 12) : [];
+  const tradesToDisplay = Array.isArray(recentTrades) ? recentTrades : [];
 
   return (
     <div className="min-h-screen bg-[#0E0E0E]" style={{ fontFamily: 'gilroy, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
@@ -932,7 +932,7 @@ const PolymarketStyleTrading = () => {
             {/* Tabs */}
             <div className="space-y-4 sm:space-y-6">
               <div className="flex items-center justify-between border border-white/25 rounded-[18px] sm:rounded-[22px] px-1 sm:px-2 py-1">
-                {['market', 'rules', 'trades'].map((tab) => {
+                {['trades', 'market', 'rules'].map((tab) => {
                   const isActive = activeTab === tab;
                   return (
                     <button
