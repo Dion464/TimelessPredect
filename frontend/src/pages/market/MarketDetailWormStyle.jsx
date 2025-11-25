@@ -7,6 +7,7 @@ import toast from 'react-hot-toast';
 import WormStyleNavbar from '../../components/modern/WormStyleNavbar';
 import PolymarketChart from '../../components/charts/PolymarketChart';
 import MarketCountdown from '../../components/common/MarketCountdown';
+import Web3TradingInterface from '../../components/trading/Web3TradingInterface';
 import { 
   createOrderWithDefaults, 
   signOrder, 
@@ -630,54 +631,99 @@ const MarketDetailWormStyle = () => {
       <WormStyleNavbar />
       
       <div className="max-w-7xl mx-auto px-4 pt-24 pb-12">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left Column - Market Info */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Market Header */}
-            <div className="space-y-4">
-              {/* Creator Info */}
-              <div className="flex items-center justify-between bg-white/[0.08] backdrop-blur-xl rounded-[16px] p-4 border border-white/20 shadow-lg">
-                <div className="flex items-center gap-2 text-sm text-gray-400">
-                  <span className="font-space-grotesk">Creator:</span>
-                  <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white/15 backdrop-blur-md rounded-lg border border-white/10 text-white hover:text-gray-300 transition-colors cursor-pointer">
-                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+        {/* Full Width Title Section at Top */}
+        <div className="mb-8">
+          {/* Creator Info */}
+          <div className="flex items-center justify-between bg-white/[0.08] backdrop-blur-xl rounded-[16px] p-4 border border-white/20 shadow-lg mb-4">
+            <div className="flex items-center gap-2 text-sm text-gray-400">
+              <span className="font-space-grotesk">Creator:</span>
+              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white/15 backdrop-blur-md rounded-lg border border-white/10 text-white hover:text-gray-300 transition-colors cursor-pointer">
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                </svg>
+                <span className="font-space-grotesk font-medium">@{market.creator.slice(2, 8)}</span>
+              </div>
+            </div>
+            <button className="p-2 hover:bg-white/15 rounded-lg transition-colors backdrop-blur-md">
+              <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Market Countdown */}
+          <div className="flex justify-center mb-4">
+            <MarketCountdown 
+              endTime={market.endTime} 
+              variant="detail"
+              showLabel={true}
+            />
+          </div>
+
+          {/* Full Width Question/Title */}
+          <div className="bg-white/[0.08] backdrop-blur-xl rounded-[24px] p-6 sm:p-8 border border-white/20 shadow-lg mb-8">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-white leading-tight font-space-grotesk break-words text-center">
+              {market.question}
+            </h1>
+          </div>
+
+          {/* Trading Interface - Full Width Below Title */}
+          <div className="bg-white/[0.08] backdrop-blur-xl rounded-[24px] p-6 border border-white/20 shadow-lg">
+            {isMarketEnded ? (
+              /* Market Ended Message */
+              <div className="text-center py-12">
+                <div className="mb-4">
+                  <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-red-500/20 border-2 border-red-500/30 mb-4">
+                    <svg className="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    <span className="font-space-grotesk font-medium">@{market.creator.slice(2, 8)}</span>
                   </div>
                 </div>
-                <button className="p-2 hover:bg-white/15 rounded-lg transition-colors backdrop-blur-md">
-                  <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-                  </svg>
-                </button>
+                <h3 className="text-xl font-bold text-white mb-2 font-space-grotesk">Market Has Ended</h3>
+                <p className="text-gray-400 text-sm font-space-grotesk mb-6">
+                  Trading is no longer available for this market. Awaiting resolution.
+                </p>
+                <div className="bg-white/5 backdrop-blur-md rounded-xl p-4 border border-white/10">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-gray-400 text-sm font-space-grotesk">Final Prices</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                      <span className="text-white font-semibold font-space-grotesk">Yes</span>
+                    </div>
+                    <span className="text-white font-bold text-lg font-space-grotesk">{market.yesPrice}%</span>
+                  </div>
+                  <div className="flex items-center justify-between mt-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                      <span className="text-white font-semibold font-space-grotesk">No</span>
+                    </div>
+                    <span className="text-white font-bold text-lg font-space-grotesk">{market.noPrice}%</span>
+                  </div>
+                </div>
               </div>
+            ) : (
+              <Web3TradingInterface
+                marketId={id}
+                market={market}
+                onTradeComplete={fetchData}
+              />
+            )}
+          </div>
+        </div>
 
-              {/* Market Countdown */}
-              <div className="flex justify-center">
-                <MarketCountdown 
-                  endTime={market.endTime} 
-                  variant="detail"
-                  showLabel={true}
-                />
-              </div>
-
-              {/* Question */}
-              <div className="bg-white/[0.08] backdrop-blur-xl rounded-[24px] p-6 sm:p-8 border border-white/20 shadow-lg">
-                <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-white leading-tight font-space-grotesk break-words">
-                  {market.question}
-                </h1>
-              </div>
-
-              {/* Market Image */}
-              <div className="relative rounded-[24px] overflow-hidden border border-white/20 shadow-lg" style={{ height: '300px' }}>
-                <img
-                  src={getMarketImage(market, id)}
-                  alt={market.question}
-                  className="w-full h-full object-cover"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent"></div>
-              </div>
+        <div className="grid grid-cols-1 gap-8 mt-8">
+          {/* Full Width Market Info */}
+          <div className="space-y-6">
+            {/* Market Image */}
+            <div className="relative rounded-[24px] overflow-hidden border border-white/20 shadow-lg" style={{ height: '300px' }}>
+              <img
+                src={getMarketImage(market, id)}
+                alt={market.question}
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent"></div>
             </div>
 
             {/* Chart Section */}
@@ -802,182 +848,6 @@ const MarketDetailWormStyle = () => {
                     </div>
                   </div>
                 )}
-              </div>
-            </div>
-          </div>
-
-          {/* Right Column - Trading Interface */}
-          <div className="lg:col-span-1 space-y-6">
-            {/* Trading Card */}
-            <div className="bg-white/[0.08] backdrop-blur-xl rounded-[24px] p-6 border border-white/20 shadow-lg sticky top-24">
-              {isMarketEnded ? (
-                /* Market Ended Message */
-                <div className="text-center py-12">
-                  <div className="mb-4">
-                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-red-500/20 border-2 border-red-500/30 mb-4">
-                      <svg className="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                    </div>
-                  </div>
-                  <h3 className="text-xl font-bold text-white mb-2 font-space-grotesk">Market Has Ended</h3>
-                  <p className="text-gray-400 text-sm font-space-grotesk mb-6">
-                    Trading is no longer available for this market. Awaiting resolution.
-                  </p>
-                  <div className="bg-white/5 backdrop-blur-md rounded-xl p-4 border border-white/10">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-gray-400 text-sm font-space-grotesk">Final Prices</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                        <span className="text-white font-semibold font-space-grotesk">Yes</span>
-                      </div>
-                      <span className="text-white font-bold text-lg font-space-grotesk">{market.yesPrice}%</span>
-                    </div>
-                    <div className="flex items-center justify-between mt-2">
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                        <span className="text-white font-semibold font-space-grotesk">No</span>
-                      </div>
-                      <span className="text-white font-bold text-lg font-space-grotesk">{market.noPrice}%</span>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  {/* Buy/Sell Toggle */}
-                  <div className="flex gap-2 mb-4 p-1 bg-white/5 backdrop-blur-md rounded-full border border-white/10">
-                    <button
-                      onClick={() => setTradeType('buy')}
-                      className={`flex-1 py-2 rounded-full font-semibold text-sm transition-all font-space-grotesk ${
-                        tradeType === 'buy'
-                          ? 'bg-white/20 text-white backdrop-blur-md'
-                          : 'text-gray-400 hover:text-white hover:bg-white/10'
-                      }`}
-                    >
-                      Buy
-                    </button>
-                    <button
-                      onClick={() => setTradeType('sell')}
-                      className={`flex-1 py-2 rounded-full font-semibold text-sm transition-all font-space-grotesk ${
-                        tradeType === 'sell'
-                          ? 'bg-white/20 text-white backdrop-blur-md'
-                          : 'text-gray-400 hover:text-white hover:bg-white/10'
-                      }`}
-                    >
-                      Sell
-                    </button>
-                  </div>
-
-                  <div className="h-px bg-white/10 my-4"></div>
-
-                  {/* Yes/No Toggle */}
-                  <div className="flex gap-2 mb-6 p-1 bg-white/5 backdrop-blur-md rounded-full border border-white/10">
-                    <button
-                      onClick={() => setOutcome('yes')}
-                      className={`flex-1 py-3 rounded-full font-semibold text-sm transition-all font-space-grotesk ${
-                        outcome === 'yes'
-                          ? 'bg-green-600/80 text-white backdrop-blur-md border border-green-500/30'
-                          : 'text-gray-400 hover:text-white hover:bg-white/10'
-                      }`}
-                    >
-                      <div>Yes</div>
-                      <div className="text-xs">{market.yesPrice}%</div>
-                    </button>
-                    <button
-                      onClick={() => setOutcome('no')}
-                      className={`flex-1 py-3 rounded-full font-semibold text-sm transition-all font-space-grotesk ${
-                        outcome === 'no'
-                          ? 'bg-red-600/80 text-white backdrop-blur-md border border-red-500/30'
-                          : 'text-gray-400 hover:text-white hover:bg-white/10'
-                      }`}
-                    >
-                      <div>No</div>
-                      <div className="text-xs">{market.noPrice}%</div>
-                    </button>
-                  </div>
-
-                  {/* Amount Input */}
-                  <div className="mb-6">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm text-gray-400 font-space-grotesk">Amount</span>
-                      <span className="text-sm text-gray-400 font-space-grotesk">
-                        {tradeType === 'buy' 
-                          ? `Balance: ${parseFloat(ethBalance).toFixed(2)} ${currencySymbol}`
-                          : `Shares: ${parseFloat(outcome === 'yes' ? position.yesShares : position.noShares).toFixed(2)}`
-                        }
-                      </span>
-                    </div>
-                    <div className="relative">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-white font-semibold font-space-grotesk">
-                        $
-                      </span>
-                      <input
-                        type="number"
-                        value={amount}
-                        onChange={(e) => setAmount(e.target.value)}
-                        placeholder="0"
-                        className="w-full bg-white/5 backdrop-blur-md text-white pl-8 pr-20 py-4 rounded-xl border border-white/10 focus:border-white/30 focus:outline-none text-lg font-semibold font-space-grotesk"
-                      />
-                      <button
-                        onClick={() => {
-                          if (tradeType === 'buy') {
-                            setAmount(ethBalance);
-                          } else {
-                            const shares = outcome === 'yes' ? position.yesShares : position.noShares;
-                            setAmount(shares);
-                          }
-                        }}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-white/15 backdrop-blur-md text-white text-sm font-semibold rounded-lg hover:bg-white/25 transition-colors border border-white/10 font-space-grotesk"
-                      >
-                        Max
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Potential Win */}
-                  <div className="mb-6">
-                    <div className="h-px bg-white/10 mb-4"></div>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1 text-sm text-gray-400 font-space-grotesk">
-                        <span>To potentially win</span>
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                      </div>
-                      <span className="text-white font-bold text-lg font-space-grotesk">${potentialWin}</span>
-                    </div>
-                  </div>
-
-                  {/* Trade Button */}
-                  {isConnected ? (
-                    <button
-                      onClick={handleTrade}
-                      disabled={isTrading || !amount}
-                      className="w-full py-4 bg-white/10 hover:bg-white/20 text-white rounded-full font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed backdrop-blur-md border border-white/20 font-space-grotesk"
-                    >
-                      {isTrading ? 'Processing...' : `${tradeType === 'buy' ? 'Buy' : 'Sell'} ${outcome === 'yes' ? 'Yes' : 'No'}`}
-                    </button>
-                  ) : (
-                    <button
-                      onClick={connectWallet}
-                      className="w-full py-4 bg-white/10 hover:bg-white/20 text-white rounded-full font-bold transition-all backdrop-blur-md border border-white/20 font-space-grotesk"
-                    >
-                      Connect Wallet
-                    </button>
-                  )}
-                </>
-              )}
-            </div>
-
-            {/* Trending Markets */}
-            <div className="bg-white/[0.08] backdrop-blur-xl rounded-[24px] p-6 border border-white/20 shadow-lg">
-              <h3 className="text-lg font-bold text-white mb-4 font-space-grotesk">Trending Markets</h3>
-              <div className="space-y-3">
-                <div className="text-center py-8 text-gray-500 text-sm font-space-grotesk">
-                  Loading trending markets...
-                </div>
               </div>
             </div>
           </div>

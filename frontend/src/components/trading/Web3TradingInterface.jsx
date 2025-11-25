@@ -762,7 +762,7 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
 
   if (!isConnected) {
     return (
-      <div className="glass-card rounded-[12px] sm:rounded-[16px] backdrop-blur-[32px] relative w-full max-w-[384px] mx-auto px-3 sm:px-4" style={{ background: 'transparent', minHeight: '200px', paddingTop: '17px', paddingBottom: '17px' }}>
+      <div className="glass-card rounded-[12px] sm:rounded-[16px] backdrop-blur-[32px] relative w-full px-3 sm:px-4" style={{ background: 'transparent', minHeight: '200px', paddingTop: '17px', paddingBottom: '17px' }}>
         <div className="w-full h-full flex items-center justify-center py-6">
           <button
             onClick={connectWallet}
@@ -787,7 +787,7 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
   }
 
   return (
-    <div className="glass-card rounded-[12px] sm:rounded-[16px] backdrop-blur-[32px] relative w-full max-w-[384px] mx-auto px-3 sm:px-4" style={{ background: 'transparent', minHeight: '620px', paddingTop: '17px', paddingBottom: '17px' }}>
+    <div className="glass-card rounded-[12px] sm:rounded-[16px] backdrop-blur-[32px] relative w-full px-3 sm:px-4" style={{ background: 'transparent', minHeight: '620px', paddingTop: '17px', paddingBottom: '17px' }}>
       <div className="relative w-full min-h-[560px]">
         
         {/* Buy/Sell + 2x Badge - Row at y:0 */}

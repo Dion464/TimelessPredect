@@ -861,6 +861,30 @@ const PolymarketStyleTrading = () => {
       <WormStyleNavbar />
       
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 sm:pt-24 pb-12">
+        {/* Market Header - Full Width */}
+        <div className="mb-6 sm:mb-8">
+          <div className="glass-card rounded-[16px] sm:rounded-[24px] p-4 sm:p-6 lg:p-8 border border-white/20 bg-transparent shadow-lg">
+            <div className="flex flex-col sm:flex-row items-start sm:items-start gap-4 sm:gap-6">
+              <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-white leading-tight flex-1">
+                {market.questionTitle}
+              </h1>
+
+              {/* Market Image - Right Side on Desktop, Below Title on Mobile */}
+              <div className="relative rounded-[12px] sm:rounded-[16px] overflow-hidden flex-shrink-0 border border-white/20 shadow-lg w-full sm:w-[180px] lg:w-[200px]" style={{ height: '120px', maxHeight: '150px' }}>
+                <img
+                  src={getMarketImage(market, marketId)}
+                  alt={market.questionTitle}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                    e.target.parentElement.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Two Column Layout - Mobile: Stack vertically, Desktop: Side by side */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 lg:gap-8">
           {/* Mobile: Trading Interface First, Desktop: Left Side (1/3 width) */}
@@ -874,43 +898,11 @@ const PolymarketStyleTrading = () => {
 
           {/* Mobile: Market Info Second, Desktop: Right Side (2/3 width) */}
           <div className="lg:col-span-8 space-y-4 sm:space-y-6 order-2 lg:order-2">
-            {/* Market Header */}
-            <div className="glass-card rounded-[16px] sm:rounded-[24px] p-4 sm:p-6 lg:p-8 border border-white/20 bg-transparent shadow-lg">
-              <div className="flex flex-col sm:flex-row items-start sm:items-start gap-4 sm:gap-6">
-                <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-white leading-tight flex-1">
-                  {market.questionTitle}
-                </h1>
-
-                {/* Market Image - Right Side on Desktop, Below Title on Mobile */}
-                <div className="relative rounded-[12px] sm:rounded-[16px] overflow-hidden flex-shrink-0 border border-white/20 shadow-lg w-full sm:w-[180px] lg:w-[200px]" style={{ height: '120px', maxHeight: '150px' }}>
-                  <img
-                    src={getMarketImage(market, marketId)}
-                    alt={market.questionTitle}
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      e.target.style.display = 'none';
-                      e.target.parentElement.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
-                    }}
-                  />
-                </div>
-              </div>
-                </div>
-
             {/* Percentage Display */}
-            <div className="flex items-baseline gap-2 px-4 sm:px-0">
-              <span
-                className="text-[24px] sm:text-[28px] lg:text-[32px] font-semibold text-white"
-                style={{ fontFamily: "'Clash Grotesk Variable', 'Clash Grotesk', sans-serif" }}
-              >
-                {market?.yesPrice ? `${market.yesPrice.toFixed(0)}%` : '50%'}
-                    </span>
-              <span className="text-gray-400 text-sm sm:text-base" style={{ fontFamily: "'Clash Grotesk Variable', 'Clash Grotesk', sans-serif" }}>
-                chance
-                    </span>
-            </div>
+           
 
             {/* Price History Chart */}
-            <div className="px-4 sm:px-0">
+            <div>
               <PolymarketChart 
                 yesPriceHistory={yesPriceHistory}
                 noPriceHistory={noPriceHistory}
@@ -932,7 +924,7 @@ const PolymarketStyleTrading = () => {
             </div>
 
             {/* Tabs */}
-            <div className="space-y-4 sm:space-y-6 px-4 sm:px-0">
+            <div className="space-y-4 sm:space-y-6">
               <div className="flex items-center justify-between border border-white/25 rounded-[18px] sm:rounded-[22px] px-1 sm:px-2 py-1">
                 {['market', 'rules', 'trades'].map((tab) => {
                   const isActive = activeTab === tab;
@@ -956,7 +948,7 @@ const PolymarketStyleTrading = () => {
                     </button>
                   );
                 })}
-                  </div>
+              </div>
               
               {/* Tab Content */}
               <div className="glass-card rounded-[16px] sm:rounded-[24px] border border-white/20 backdrop-blur-2xl px-4 sm:px-6 lg:px-9 pb-8 sm:pb-10 lg:pb-12 pt-6 sm:pt-8 lg:pt-10" style={{ background: 'rgba(12,12,12,0.55)' }}>
@@ -968,9 +960,9 @@ const PolymarketStyleTrading = () => {
                         {market.description ||
                           "Will the Phoenix Suns defeat the Dallas Mavericks in the NBA game held at the American Airlines Center, Dallas, Texas, on 12 November 2025? Market resolves to 'Yes' if the Suns are the official winner. Outcome certified by the NBA's official box score."}
                       </p>
-                  </div>
                     </div>
-                  )}
+                  </div>
+                )}
 
                 {activeTab === 'rules' && (
                   <div className="space-y-6 text-[#E4E4E4]" style={{ fontFamily: "'Clash Grotesk Variable', sans-serif" }}>
@@ -983,12 +975,12 @@ const PolymarketStyleTrading = () => {
                             style={{ boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)' }}
                           >
                             {index + 1}
-                </div>
+                          </div>
                           <p className="pt-1">{rule}</p>
-                </div>
+                        </div>
                       ))}
-              </div>
-            </div>
+                    </div>
+                  </div>
                 )}
 
                 {activeTab === 'trades' && (
@@ -996,8 +988,8 @@ const PolymarketStyleTrading = () => {
                     {tradesToDisplay.length === 0 ? (
                       <div className="text-white/50 text-sm text-center py-16">
                         No trades yet. Activity will appear here once trading begins.
-                </div>
-              ) : (
+                      </div>
+                    ) : (
                       <div className="space-y-3">
                         {tradesToDisplay.map((trade, index) => (
                           <div
@@ -1007,9 +999,9 @@ const PolymarketStyleTrading = () => {
                             <div className="flex items-center justify-between text-sm">
                               <span className={`uppercase tracking-[0.28em] ${trade.side === 'yes' ? 'text-[#FFE600]' : 'text-white/60'}`}>
                                 {trade.side === 'yes' ? 'Yes' : 'No'}
-                            </span>
+                              </span>
                               <span className="text-white/70">{(trade.price * 100).toFixed(1)}%</span>
-                          </div>
+                            </div>
                             <div className="flex items-center justify-between text-xs text-white/50">
                               <span>{parseFloat(trade.amount).toFixed(2)} shares</span>
                               <span>{new Date(trade.timestamp).toLocaleString()}</span>
@@ -1019,17 +1011,17 @@ const PolymarketStyleTrading = () => {
                                 {trade.trader.slice(0, 6)}…{trade.trader.slice(-4)}
                               </span>
                             )}
-                            </div>
-                        ))}
                           </div>
-                    )}
-                        </div>
-                  )}
-                        </div>
+                        ))}
                       </div>
-                </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
+        </div>
+      </div>
 
       {/* Footer */}
       <footer className="border-t border-white/10 mt-20">
@@ -1042,7 +1034,7 @@ const PolymarketStyleTrading = () => {
               <button className="text-gray-400 hover:text-white transition-colors font-medium">
                 Privacy Policy
               </button>
-          </div>
+            </div>
             
             <button className="text-gray-400 hover:text-white transition-colors text-sm font-medium">
               How it Works?
@@ -1064,9 +1056,9 @@ const PolymarketStyleTrading = () => {
                   <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12a12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472c-.18 1.898-.962 6.502-1.36 8.627c-.168.9-.499 1.201-.82 1.23c-.696.065-1.225-.46-1.9-.902c-1.056-.693-1.653-1.124-2.678-1.8c-1.185-.78-.417-1.21.258-1.91c.177-.184 3.247-2.977 3.307-3.23c.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345c-.48.33-.913.49-1.302.48c-.428-.008-1.252-.241-1.865-.44c-.752-.245-1.349-.374-1.297-.789c.027-.216.325-.437.893-.663c3.498-1.524 5.83-2.529 6.998-3.014c3.332-1.386 4.025-1.627 4.476-1.635z"/>
                 </svg>
               </a>
+            </div>
+          </div>
         </div>
-      </div>
-                          </div>
       </footer>
     </div>
   );
