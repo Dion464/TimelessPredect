@@ -325,10 +325,27 @@ const PolymarketStyleTrading = () => {
             contractToQuery = contracts.predictionMarket;
           }
 
-          // If no provider, try to create one
+          // If no provider, try to create one - MetaMask only
           if (!provider) {
-            if (typeof window !== 'undefined' && window.ethereum) {
-              provider = new ethers.providers.Web3Provider(window.ethereum);
+            // Helper to get MetaMask provider only
+            const getMetaMaskProvider = () => {
+              if (typeof window === 'undefined' || typeof window.ethereum === 'undefined') {
+                return null;
+              }
+              // If multiple providers exist, find MetaMask only
+              if (window.ethereum.providers && Array.isArray(window.ethereum.providers)) {
+                const metamaskProvider = window.ethereum.providers.find(
+                  (p) => p.isMetaMask && !p.isBraveWallet
+                );
+                return metamaskProvider || null;
+              }
+              // If it's MetaMask directly, use it
+              return window.ethereum.isMetaMask ? window.ethereum : null;
+            };
+            
+            const metamaskProvider = getMetaMaskProvider();
+            if (metamaskProvider) {
+              provider = new ethers.providers.Web3Provider(metamaskProvider);
             } else if (RPC_URL) {
               provider = new ethers.providers.JsonRpcProvider(RPC_URL);
             }

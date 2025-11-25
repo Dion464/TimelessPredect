@@ -152,15 +152,44 @@ export const Web3Provider = ({ children }) => {
     }
   }, [provider, account]);
 
+  // Get MetaMask provider only - strict MetaMask-only connection
+  const getEthereumProvider = useCallback(() => {
+    if (typeof window === 'undefined' || typeof window.ethereum === 'undefined') {
+      return null;
+    }
+
+    // If multiple providers exist, find MetaMask only
+    if (window.ethereum.providers && Array.isArray(window.ethereum.providers)) {
+      // Strictly find MetaMask - ignore all other wallets
+      const metamaskProvider = window.ethereum.providers.find(
+        (p) => p.isMetaMask && !p.isBraveWallet
+      );
+      if (metamaskProvider) {
+        return metamaskProvider;
+      }
+      // MetaMask not found in providers array - return null
+      return null;
+    }
+
+    // If it's MetaMask directly, use it
+    if (window.ethereum.isMetaMask) {
+      return window.ethereum;
+    }
+
+    // Not MetaMask - return null to reject connection
+    return null;
+  }, []);
+
   // Add network to MetaMask - optimized for speed
   const addNetwork = useCallback(async (targetChainId = CHAIN_ID) => {
-    if (typeof window.ethereum === 'undefined') {
+    const ethereumProvider = getEthereumProvider();
+    if (!ethereumProvider) {
       return false;
     }
 
     try {
       // Check current chain first - skip if already on correct network
-      const currentChainId = await window.ethereum.request({ method: 'eth_chainId' });
+      const currentChainId = await ethereumProvider.request({ method: 'eth_chainId' });
       if (parseInt(currentChainId, 16) === targetChainId) {
         return true; // Already on correct network, no need to switch
       }
@@ -180,7 +209,7 @@ export const Web3Provider = ({ children }) => {
       
       // Try to switch to the network first
       try {
-        await window.ethereum.request({
+        await ethereumProvider.request({
           method: 'wallet_switchEthereumChain',
           params: [{ chainId: config.chainId }],
         });
@@ -188,7 +217,7 @@ export const Web3Provider = ({ children }) => {
       } catch (switchError) {
         // If network doesn't exist, add it
         if (switchError.code === 4902) {
-          await window.ethereum.request({
+          await ethereumProvider.request({
             method: 'wallet_addEthereumChain',
             params: [config],
           });
@@ -199,7 +228,7 @@ export const Web3Provider = ({ children }) => {
     } catch (error) {
       return false;
     }
-  }, []);
+  }, [getEthereumProvider]);
 
   // Connect wallet
   const connectWallet = useCallback(async () => {
@@ -208,8 +237,10 @@ export const Web3Provider = ({ children }) => {
       return false;
     }
     
-    // Check if MetaMask is available
-    if (typeof window.ethereum === 'undefined') {
+    // Get MetaMask provider only
+    const ethereumProvider = getEthereumProvider();
+    
+    if (!ethereumProvider) {
       // On mobile, try to open MetaMask app
       const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
       if (isMobile) {
@@ -218,7 +249,20 @@ export const Web3Provider = ({ children }) => {
         window.location.href = metamaskAppDeepLink;
         return false;
       }
-      setError('MetaMask not detected. Please install MetaMask.');
+      
+      // Check if other wallets are installed but MetaMask is not
+      if (typeof window.ethereum !== 'undefined') {
+        const hasOtherWallets = (window.ethereum.providers && window.ethereum.providers.length > 0) || 
+                                (!window.ethereum.isMetaMask);
+        if (hasOtherWallets) {
+          setError('MetaMask not found. Please install or enable MetaMask extension. Other wallet extensions are not supported.');
+          toast.error('Only MetaMask is supported. Please install or enable the MetaMask extension.');
+          return false;
+        }
+      }
+      
+      setError('MetaMask not detected. Please install MetaMask to continue.');
+      toast.error('MetaMask is required. Please install the MetaMask browser extension.');
       return false;
     }
 
@@ -228,7 +272,7 @@ export const Web3Provider = ({ children }) => {
 
     try {
       // Request account access first (fastest)
-      const accounts = await window.ethereum.request({
+      const accounts = await ethereumProvider.request({
         method: 'eth_requestAccounts',
       });
 
@@ -236,7 +280,7 @@ export const Web3Provider = ({ children }) => {
         throw new Error('No accounts found');
       }
 
-      const web3Provider = new ethers.providers.Web3Provider(window.ethereum);
+      const web3Provider = new ethers.providers.Web3Provider(ethereumProvider);
       const network = await web3Provider.getNetwork();
       const web3Signer = web3Provider.getSigner();
 
@@ -269,14 +313,32 @@ export const Web3Provider = ({ children }) => {
       toast.success('✅ Wallet connected!');
       return true;
     } catch (err) {
-      setError(err.message);
+      console.error('Wallet connection error:', err);
+      
+      // Handle various error types
+      let errorMessage = err.message || 'Unknown error occurred';
       
       // Check if it's a circuit breaker error
-      if (err.message && err.message.includes('circuit breaker')) {
-        toast.error('MetaMask circuit breaker is open. Please reset MetaMask or wait a few seconds and try again.');
-      } else {
-        toast.error(`Failed to connect wallet: ${err.message}`);
+      if (errorMessage.includes('circuit breaker')) {
+        errorMessage = 'MetaMask circuit breaker is open. Please reset MetaMask or wait a few seconds and try again.';
+        toast.error(errorMessage);
+      } 
+      // Check for extension selection errors (like evmAsk errors)
+      else if (errorMessage.includes('Unexpected error') || errorMessage.includes('selectExtension') || err.code === -32002) {
+        errorMessage = 'Wallet connection error. Please disable other wallet extensions and use only MetaMask.';
+        toast.error(errorMessage);
       }
+      // Check if user rejected the request
+      else if (err.code === 4001 || errorMessage.includes('User rejected') || errorMessage.includes('user rejected')) {
+        errorMessage = 'Connection request was rejected. Please try again and approve the connection.';
+        toast.error(errorMessage);
+      }
+      // Generic error
+      else {
+        toast.error(`Failed to connect wallet: ${errorMessage}`);
+      }
+      
+      setError(errorMessage);
       setIsConnecting(false);
       connectingRef.current = false;
       return false;
@@ -284,7 +346,7 @@ export const Web3Provider = ({ children }) => {
       setIsConnecting(false);
       connectingRef.current = false;
     }
-  }, [initializeContracts, addNetwork, updateEthBalance, isConnecting]);
+  }, [initializeContracts, addNetwork, updateEthBalance, isConnecting, getEthereumProvider]);
 
   // Disconnect wallet
   const disconnectWallet = useCallback(() => {
@@ -686,7 +748,8 @@ export const Web3Provider = ({ children }) => {
 
   // Listen for account changes
   useEffect(() => {
-    if (typeof window.ethereum !== 'undefined') {
+    const ethereumProvider = getEthereumProvider();
+    if (ethereumProvider) {
       const handleAccountsChanged = (accounts) => {
         if (accounts.length === 0) {
           disconnectWallet();
@@ -700,15 +763,17 @@ export const Web3Provider = ({ children }) => {
         window.location.reload(); // Reload to reinitialize contracts
       };
 
-      window.ethereum.on('accountsChanged', handleAccountsChanged);
-      window.ethereum.on('chainChanged', handleChainChanged);
+      ethereumProvider.on('accountsChanged', handleAccountsChanged);
+      ethereumProvider.on('chainChanged', handleChainChanged);
 
       return () => {
-        window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
-        window.ethereum.removeListener('chainChanged', handleChainChanged);
+        if (ethereumProvider.removeListener) {
+          ethereumProvider.removeListener('accountsChanged', handleAccountsChanged);
+          ethereumProvider.removeListener('chainChanged', handleChainChanged);
+        }
       };
     }
-  }, [account, disconnectWallet]);
+  }, [account, disconnectWallet, getEthereumProvider]);
 
   // Auto-connect if previously connected (only once on mount)
   useEffect(() => {
@@ -718,9 +783,10 @@ export const Web3Provider = ({ children }) => {
     }
 
     const autoConnect = async () => {
-      if (typeof window.ethereum !== 'undefined') {
+      const ethereumProvider = getEthereumProvider();
+      if (ethereumProvider) {
         try {
-          const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+          const accounts = await ethereumProvider.request({ method: 'eth_accounts' });
           if (accounts.length > 0 && !isConnected && !connectingRef.current) {
             autoConnectedRef.current = true;
             await connectWallet();
