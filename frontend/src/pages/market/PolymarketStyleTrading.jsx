@@ -180,6 +180,13 @@ const PolymarketStyleTrading = () => {
     return [];
   }, []);
 
+  const formatCreatorHandle = useCallback((creator) => {
+    if (!creator) return '@unknown';
+    if (creator.startsWith('@')) return creator;
+    if (creator.length <= 12) return `@${creator}`;
+    return `@${creator.slice(0, 4)}…${creator.slice(-4)}`;
+  }, []);
+
   const getBlockExplorerUrl = useCallback((txHash) => {
     if (!txHash) return null;
     const explorerBase = BLOCK_EXPLORER_URL || 'https://etherscan.io';
@@ -187,6 +194,29 @@ const PolymarketStyleTrading = () => {
     const base = explorerBase.replace(/\/$/, '');
     return `${base}/tx/${txHash}`;
   }, []);
+
+  const handleShareClick = useCallback(async () => {
+    try {
+      if (typeof window === 'undefined') return;
+      const shareUrl = window.location?.href || `${API_BASE}/markets/${marketId}`;
+      const shareData = {
+        title: market?.questionTitle || 'PolyDegen Market',
+        text: market?.questionTitle || 'Check out this PolyDegen market',
+        url: shareUrl
+      };
+
+      if (navigator.share) {
+        await navigator.share(shareData);
+        return;
+      }
+
+      if (navigator.clipboard && shareUrl) {
+        await navigator.clipboard.writeText(shareUrl);
+      }
+    } catch (err) {
+      console.warn('Share failed:', err);
+    }
+  }, [API_BASE, market?.questionTitle, marketId]);
 
   const getPredictionMarketContract = useCallback(async () => {
     if (contracts?.predictionMarket) {
@@ -865,6 +895,8 @@ const PolymarketStyleTrading = () => {
     : (Array.isArray(market?.rules) && market.rules.length > 0 ? market.rules : defaultRules);
 
   const tradesToDisplay = Array.isArray(recentTrades) ? recentTrades : [];
+  const creatorHandle = formatCreatorHandle(market?.creatorUsername || market?.creator);
+  const heroImageUrl = getMarketImage(market, marketId);
 
   return (
     <div className="min-h-screen bg-[#0E0E0E]" style={{ fontFamily: 'gilroy, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
@@ -873,30 +905,80 @@ const PolymarketStyleTrading = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 sm:pt-24 pb-12">
         {/* Market Header - Full Width */}
         <div className="mb-6 sm:mb-8">
-          <div className="glass-card rounded-[16px] sm:rounded-[24px] p-4 sm:p-6 lg:p-8 border border-white/20 bg-transparent shadow-lg">
-            <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6 ">
-              <h1 className="text-lg sm:text-xl lg:text-[24px] font-medium font-space-grotesk text-white leading-tight flex-1 mt-8">
-                {market.questionTitle}
-              </h1>
-
-              {/* Market Image - Right Side on Desktop, Below Title on Mobile */}
-              <div className="relative rounded-[12px] sm:rounded-[16px] overflow-hidden flex-shrink-0 border border-white/20 shadow-lg w-full sm:w-[200px] lg:w-[280px]" style={{ minHeight: '120px', height: '140px' }}>
+          <div className="glass-card rounded-[24px] p-4 sm:p-6 lg:p-8 border border-white/20 bg-transparent shadow-lg relative overflow-hidden min-h-[200px] lg:min-h-[240px]">
+            {/* Image overlay for desktop */}
+            <div className="hidden sm:block absolute inset-y-0 right-0 w-1/2 max-w-[420px] min-w-[260px]">
+              <div className="relative h-full bg-white/5" style={{ borderRadius: '0px 24px 24px 0px' }}>
                 <img
-                  src={getMarketImage(market, marketId)}
+                  src={heroImageUrl}
                   alt={market.questionTitle}
                   className="w-full h-full object-cover"
-                  style={{ minHeight: '120px', display: 'block' }}
                   onError={(e) => {
                     e.target.style.display = 'none';
                     const parent = e.target.parentElement;
                     if (parent) {
                       parent.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
-                      parent.style.minHeight = '120px';
-                      parent.style.height = '140px';
                     }
                   }}
                 />
+                <div className="absolute inset-0 pointer-events-none bg-gradient-to-r from-[#0E0E0E] via-[#0E0E0E]/60 to-transparent" />
               </div>
+            </div>
+
+            <div className="relative z-10 sm:pr-[45%] lg:pr-[420px]">
+            {/* Creator badge */}
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex items-center gap-2 px-4 py-2 rounded-full border border-white/15 bg-white/5 backdrop-blur-md">
+                <span className="text-white/60 text-[11px] tracking-[0.35em] uppercase">Creator</span>
+                <span className="text-white text-sm font-semibold tracking-wide">{creatorHandle}</span>
+              </div>
+              <button
+                type="button"
+                onClick={handleShareClick}
+                className="w-9 h-9 rounded-full border border-white/15 bg-white/5 flex items-center justify-center text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+                title="Share market"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 12v7a1 1 0 001 1h14a1 1 0 001-1v-7" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16 6l-4-4-4 4" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 2v14" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-4 sm:gap-6">
+              <h1
+                className="flex-1 text-white font-space-grotesk font-medium leading-[1.32]"
+                style={{
+                  fontWeight: 500,
+                  fontSize: '24px',
+                  lineHeight: '1.32',
+                  letterSpacing: '-0.01em'
+                }}
+              >
+                <span className="block text-[24px] sm:text-[32px] lg:text-[40px] max-w-[700px]">
+                  {market.questionTitle}
+                </span>
+              </h1>
+              {/* Mobile image */}
+              <div className="sm:hidden rounded-[20px] bg-white/5 overflow-hidden">
+                <div className="relative h-[180px]">
+                  <img
+                    src={heroImageUrl}
+                    alt={market.questionTitle}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                      const parent = e.target.parentElement;
+                      if (parent) {
+                        parent.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+                      }
+                    }}
+                  />
+                  <div className="absolute inset-0 pointer-events-none bg-gradient-to-r from-[#0E0E0E] via-transparent to-transparent" />
+                </div>
+              </div>
+            </div>
             </div>
           </div>
         </div>
