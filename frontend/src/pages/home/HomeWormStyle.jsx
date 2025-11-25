@@ -142,14 +142,16 @@ const HomeWormStyle = () => {
   const handleSearch = (e) => {
     e.preventDefault();
     // Search happens in real-time via filteredMarkets, no need to navigate
+    // Focus stays on input for continued typing
   };
 
   const filteredMarkets = markets.filter(market => {
     const matchesCategory = selectedCategory === 'All' || market.category === selectedCategory;
-    const matchesSearch = !searchQuery.trim() || 
-      market.question.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      market.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      market.creator.toLowerCase().includes(searchQuery.toLowerCase());
+    const query = searchQuery.trim().toLowerCase();
+    const matchesSearch = !query || 
+      market.question.toLowerCase().includes(query) ||
+      (market.category && market.category.toLowerCase().includes(query)) ||
+      (market.creator && market.creator.toLowerCase().includes(query));
     return matchesCategory && matchesSearch;
   });
 
@@ -235,9 +237,10 @@ const HomeWormStyle = () => {
                 <button
                   type="submit"
                   className="absolute right-3 top-1/2 -translate-y-1/2 bg-white/20 hover:bg-white/30 text-white p-3 rounded-full transition-colors backdrop-blur-md"
+                  aria-label="Search markets"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                   </svg>
                 </button>
               </div>
@@ -249,12 +252,13 @@ const HomeWormStyle = () => {
       {/* Main Content Section - Moved up with negative margin */}
       <div className="max-w-6xl mx-auto px-4 -mt-40 relative z-10">
 
-        {/* Trending Section */}
-        <div className="mb-12">
-          <div className="flex items-center justify-between mb-6">
-          </div>
-          
-          {trendingMarkets.length > 0 && (
+        {/* Trending Section - Hide when searching */}
+        {!searchQuery.trim() && (
+          <div className="mb-12">
+            <div className="flex items-center justify-between mb-6">
+            </div>
+            
+            {trendingMarkets.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
               {trendingMarkets.map((market) => (
                 <div
@@ -321,8 +325,9 @@ const HomeWormStyle = () => {
                 </div>
               ))}
             </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
 
         {/* Results Counter */}
         {!loading && (searchQuery.trim() || selectedCategory !== 'All') && (
