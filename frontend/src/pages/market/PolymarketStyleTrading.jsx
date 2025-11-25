@@ -864,13 +864,13 @@ const PolymarketStyleTrading = () => {
         {/* Market Header - Full Width */}
         <div className="mb-6 sm:mb-8">
           <div className="glass-card rounded-[16px] sm:rounded-[24px] p-4 sm:p-6 lg:p-8 border border-white/20 bg-transparent shadow-lg">
-            <div className="flex flex-col sm:flex-row items-start sm:items-start gap-4 sm:gap-6">
-              <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-white leading-tight flex-1">
+            <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6 ">
+              <h1 className="text-lg sm:text-xl lg:text-[24px] font-medium font-clash-grotesk text-white leading-tight flex-1 mt-8">
                 {market.questionTitle}
               </h1>
 
               {/* Market Image - Right Side on Desktop, Below Title on Mobile */}
-              <div className="relative rounded-[12px] sm:rounded-[16px] overflow-hidden flex-shrink-0 border border-white/20 shadow-lg w-full sm:w-[180px] lg:w-[200px]" style={{ height: '120px', maxHeight: '150px' }}>
+              <div className="relative rounded-[12px] sm:rounded-[16px] overflow-hidden flex-shrink-0 border border-white/20 shadow-lg w-full sm:w-[180px] lg:w-[300px] h-[200px]" style={{ height: '120px', maxHeight: '150px' }}>
                 <img
                   src={getMarketImage(market, marketId)}
                   alt={market.questionTitle}
