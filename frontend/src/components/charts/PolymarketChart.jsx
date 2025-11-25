@@ -257,6 +257,7 @@ const PolymarketChart = ({
       const firstTime = new Date(sortedYesHistory[0].timestamp).getTime();
       const lastTime = new Date(sortedYesHistory[sortedYesHistory.length - 1].timestamp).getTime();
       const timeRange = Math.max(lastTime - firstTime, 1); // Avoid division by zero
+      const hasMeaningfulTimeRange = timeRange > 60 * 1000; // Require at least 1 minute spread to map by timestamp
       
       ctx.strokeStyle = '#FFE600'; // Yellow color like Polymarket
       ctx.lineWidth = 3.5; // Thicker line for better visibility
@@ -273,8 +274,8 @@ const PolymarketChart = ({
         const point = sortedYesHistory[0];
         const priceInCents = point.price * 100;
         const y = padding + (height - 2 * padding) * (1 - (priceInCents - minPrice) / priceRange);
-        // Place single point at the right edge (or center if preferred)
-        const x = width - padding;
+        // Keep single points centered so the line never sticks to the edges
+        const x = padding + (width - 2 * padding) / 2;
         points.push({ x, y, time: firstTime, price: priceInCents });
       } else {
         // Multiple points: filter to reduce noise - only show meaningful price changes
@@ -288,8 +289,11 @@ const PolymarketChart = ({
           
           // Always include first and last points
           if (i === 0 || i === sortedYesHistory.length - 1) {
-            const timePercent = timeRange > 0 ? (pointTime - firstTime) / timeRange : 0;
-            const x = padding + (width - 2 * padding) * Math.max(0, Math.min(1, timePercent));
+            const progress = hasMeaningfulTimeRange && sortedYesHistory.length > 1
+              ? (pointTime - firstTime) / timeRange
+              : i / Math.max(sortedYesHistory.length - 1, 1);
+            const timePercent = Math.max(0, Math.min(1, progress));
+            const x = padding + (width - 2 * padding) * timePercent;
             const y = padding + (height - 2 * padding) * (1 - (priceInCents - minPrice) / priceRange);
             points.push({ x, y, time: pointTime, price: priceInCents });
             continue;
@@ -312,8 +316,11 @@ const PolymarketChart = ({
             }
           }
           
-          const timePercent = timeRange > 0 ? (pointTime - firstTime) / timeRange : 0;
-          const x = padding + (width - 2 * padding) * Math.max(0, Math.min(1, timePercent));
+          const progress = hasMeaningfulTimeRange && sortedYesHistory.length > 1
+            ? (pointTime - firstTime) / timeRange
+            : i / Math.max(sortedYesHistory.length - 1, 1);
+          const timePercent = Math.max(0, Math.min(1, progress));
+          const x = padding + (width - 2 * padding) * timePercent;
           const y = padding + (height - 2 * padding) * (1 - (priceInCents - minPrice) / priceRange);
           points.push({ x, y, time: pointTime, price: priceInCents });
         }
@@ -430,6 +437,7 @@ const PolymarketChart = ({
       const firstTime = new Date(sortedNoHistory[0].timestamp).getTime();
       const lastTime = new Date(sortedNoHistory[sortedNoHistory.length - 1].timestamp).getTime();
       const timeRange = Math.max(lastTime - firstTime, 1); // Avoid division by zero
+      const hasMeaningfulTimeRange = timeRange > 60 * 1000;
       
       ctx.strokeStyle = '#ef4444'; // Red color for No line
       ctx.lineWidth = 3.5; // Thicker line for better visibility
@@ -446,8 +454,7 @@ const PolymarketChart = ({
         const point = sortedNoHistory[0];
         const priceInCents = point.price * 100;
         const y = padding + (height - 2 * padding) * (1 - (priceInCents - minPrice) / priceRange);
-        // Place single point at the right edge (or center if preferred)
-        const x = width - padding;
+        const x = padding + (width - 2 * padding) / 2;
         points.push({ x, y, time: firstTime, price: priceInCents });
       } else {
         // Multiple points: filter to reduce noise - only show meaningful price changes
@@ -461,8 +468,11 @@ const PolymarketChart = ({
           
           // Always include first and last points
           if (i === 0 || i === sortedNoHistory.length - 1) {
-            const timePercent = timeRange > 0 ? (pointTime - firstTime) / timeRange : 0;
-            const x = padding + (width - 2 * padding) * Math.max(0, Math.min(1, timePercent));
+            const progress = hasMeaningfulTimeRange && sortedNoHistory.length > 1
+              ? (pointTime - firstTime) / timeRange
+              : i / Math.max(sortedNoHistory.length - 1, 1);
+            const timePercent = Math.max(0, Math.min(1, progress));
+            const x = padding + (width - 2 * padding) * timePercent;
             const y = padding + (height - 2 * padding) * (1 - (priceInCents - minPrice) / priceRange);
             points.push({ x, y, time: pointTime, price: priceInCents });
             continue;
@@ -485,8 +495,11 @@ const PolymarketChart = ({
             }
           }
           
-          const timePercent = timeRange > 0 ? (pointTime - firstTime) / timeRange : 0;
-          const x = padding + (width - 2 * padding) * Math.max(0, Math.min(1, timePercent));
+          const progress = hasMeaningfulTimeRange && sortedNoHistory.length > 1
+            ? (pointTime - firstTime) / timeRange
+            : i / Math.max(sortedNoHistory.length - 1, 1);
+          const timePercent = Math.max(0, Math.min(1, progress));
+          const x = padding + (width - 2 * padding) * timePercent;
           const y = padding + (height - 2 * padding) * (1 - (priceInCents - minPrice) / priceRange);
           points.push({ x, y, time: pointTime, price: priceInCents });
         }
@@ -706,18 +719,26 @@ const PolymarketChart = ({
         const firstYesTime = new Date(yesFiltered[0].timestamp).getTime();
         const lastYesTime = new Date(yesFiltered[yesFiltered.length - 1].timestamp).getTime();
         const yesTimeRange = Math.max(lastYesTime - firstYesTime, 1);
+        const yesHasMeaningfulRange = yesTimeRange > 60 * 1000;
         
         const firstNoTime = new Date(noFiltered[0].timestamp).getTime();
         const lastNoTime = new Date(noFiltered[noFiltered.length - 1].timestamp).getTime();
         const noTimeRange = Math.max(lastNoTime - firstNoTime, 1);
+        const noHasMeaningfulRange = noTimeRange > 60 * 1000;
         
-        // Calculate time position based on X coordinate
-        const xPercent = (x - padding) / chartWidth;
-        const hoverTimeYes = firstYesTime + (yesTimeRange * xPercent);
-        const hoverTimeNo = firstNoTime + (noTimeRange * xPercent);
-        
-        // Find the closest actual data point (not interpolated)
-        const findClosestPoint = (history, targetTime) => {
+        const getClosestPoint = (history, hasRange, firstTime, timeRange) => {
+          if (history.length === 1) {
+            return history[0];
+          }
+          
+          const xPercent = Math.max(0, Math.min(1, (x - padding) / chartWidth));
+          
+          if (!hasRange) {
+            const targetIndex = Math.round(xPercent * (history.length - 1));
+            return history[targetIndex];
+          }
+          
+          const targetTime = firstTime + (timeRange * xPercent);
           let closest = history[0];
           let minDiff = Math.abs(new Date(history[0].timestamp).getTime() - targetTime);
           
@@ -731,8 +752,8 @@ const PolymarketChart = ({
           return closest;
         };
         
-        const closestYes = findClosestPoint(yesFiltered, hoverTimeYes);
-        const closestNo = findClosestPoint(noFiltered, hoverTimeNo);
+        const closestYes = getClosestPoint(yesFiltered, yesHasMeaningfulRange, firstYesTime, yesTimeRange);
+        const closestNo = getClosestPoint(noFiltered, noHasMeaningfulRange, firstNoTime, noTimeRange);
         
         const tooltipData = {
           yesPrice: closestYes.price * 100, // Convert to cents - use ACTUAL database price
