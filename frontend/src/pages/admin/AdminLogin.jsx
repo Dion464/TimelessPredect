@@ -69,7 +69,7 @@ const AdminLogin = () => {
   // If wallet is admin, show button to navigate (NO AUTO-REDIRECT)
   if (isWalletAdmin) {
     return (
-      <div className="min-h-screen bg-[#050505] flex items-center justify-center px-4 py-12" style={{ fontFamily: "'Clash Grotesk Variable', sans-serif" }}>
+      <div className="min-h-screen bg-[#050505] flex items-center justify-center px-4 py-12" style={{ fontFamily: 'gilroy, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
         <div className="max-w-md w-full text-center">
           <div className="glass-card rounded-[24px] border border-white/10 bg-white/5 backdrop-blur-xl p-8">
             <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-[#FFE600] to-yellow-400 rounded-full mb-4">
@@ -99,7 +99,7 @@ const AdminLogin = () => {
 
   // Show login form for everyone else
   return (
-    <div className="min-h-screen bg-[#050505] flex items-center justify-center px-4 py-12" style={{ fontFamily: "'Clash Grotesk Variable', sans-serif" }}>
+    <div className="min-h-screen bg-[#050505] flex items-center justify-center px-4 py-12" style={{ fontFamily: 'gilroy, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
       <div className="max-w-md w-full">
         {/* Logo/Header */}
         <div className="text-center mb-8">

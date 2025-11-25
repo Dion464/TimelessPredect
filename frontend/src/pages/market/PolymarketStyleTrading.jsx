@@ -20,7 +20,7 @@ const SkeletonBlock = ({ className = '', style = {} }) => (
 );
 
 const MarketDetailSkeleton = () => (
-  <div className="min-h-screen bg-[#0E0E0E] text-white" style={{ fontFamily: "'Clash Grotesk Variable', 'Space Grotesk', sans-serif" }}>
+  <div className="min-h-screen bg-[#0E0E0E] text-white" style={{ fontFamily: 'gilroy, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
     <WormStyleNavbar />
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 sm:pt-24 pb-12 space-y-8">
       <div className="glass-card rounded-[20px] p-6 sm:p-8 backdrop-blur-[32px] border border-white/10">
@@ -865,7 +865,7 @@ const PolymarketStyleTrading = () => {
         <div className="mb-6 sm:mb-8">
           <div className="glass-card rounded-[16px] sm:rounded-[24px] p-4 sm:p-6 lg:p-8 border border-white/20 bg-transparent shadow-lg">
             <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6 ">
-              <h1 className="text-lg sm:text-xl lg:text-[24px] font-medium font-clash-grotesk text-white leading-tight flex-1 mt-8">
+              <h1 className="text-lg sm:text-xl lg:text-[24px] font-medium font-space-grotesk text-white leading-tight flex-1 mt-8">
                 {market.questionTitle}
               </h1>
 
@@ -944,7 +944,7 @@ const PolymarketStyleTrading = () => {
                           : 'text-[#9F9F9F] border border-transparent hover:text-white'
                       }`}
                       style={{
-                        fontFamily: "'Clash Grotesk Variable', 'Clash Grotesk', sans-serif",
+                        fontFamily: 'gilroy, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                         padding: '8px 0',
                         borderRadius: '16px',
                         background: isActive ? 'rgba(255,255,255,0.04)' : 'transparent'
@@ -959,7 +959,7 @@ const PolymarketStyleTrading = () => {
               {/* Tab Content */}
               <div className="glass-card rounded-[16px] sm:rounded-[24px] border border-white/20 backdrop-blur-2xl px-4 sm:px-6 lg:px-9 pb-8 sm:pb-10 lg:pb-12 pt-6 sm:pt-8 lg:pt-10" style={{ background: 'rgba(12,12,12,0.55)' }}>
                 {activeTab === 'market' && (
-                  <div className="space-y-8 text-[#E4E4E4]" style={{ fontFamily: "'Clash Grotesk Variable', sans-serif" }}>
+                  <div className="space-y-8 text-[#E4E4E4]" style={{ fontFamily: 'gilroy, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
                     <div className="space-y-3">
                       <h3 className="text-[12px] font-semibold uppercase tracking-[0.3em] text-[#969696] letter-[0.32em]">Description</h3>
                       <p className="text-[16px] leading-7 text-[#EFEFEF]">
@@ -971,7 +971,7 @@ const PolymarketStyleTrading = () => {
                 )}
 
                 {activeTab === 'rules' && (
-                  <div className="space-y-6 text-[#E4E4E4]" style={{ fontFamily: "'Clash Grotesk Variable', sans-serif" }}>
+                  <div className="space-y-6 text-[#E4E4E4]" style={{ fontFamily: 'gilroy, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
                     <p className="text-sm text-white/45 tracking-[0.2em] uppercase">Creator Rules</p>
                     <div className="space-y-4 text-[#D8D8D8] text-[15px] leading-7">
                       {rulesToRender.map((rule, index) => (
@@ -990,7 +990,7 @@ const PolymarketStyleTrading = () => {
                 )}
 
                 {activeTab === 'trades' && (
-                  <div className="space-y-4" style={{ fontFamily: "'Clash Grotesk Variable', sans-serif" }}>
+                  <div className="space-y-4" style={{ fontFamily: 'gilroy, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
                     {tradesToDisplay.length === 0 ? (
                       <div className="text-white/50 text-sm text-center py-16">
                         No trades yet. Activity will appear here once trading begins.

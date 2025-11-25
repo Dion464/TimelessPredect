@@ -69,7 +69,7 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
   } = web3Context;
   
   const currencySymbol = getCurrencySymbol(chainId);
-  const clashFont = "'Clash Grotesk Variable', 'Clash Grotesk', sans-serif";
+  const homePageFont = 'gilroy, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
   const getOutcomeButtonStyle = (isActive, width) => ({
     width,
     height: '40px',
@@ -93,7 +93,7 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      fontFamily: clashFont,
+      fontFamily: homePageFont,
       fontWeight: 300,
       fontSize: '14px',
       lineHeight: '20px',
@@ -147,8 +147,8 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
       };
 
   const amountInputTextStyle = orderType === 'market'
-    ? { fontFamily: clashFont, fontWeight: 600, fontSize: '28px', lineHeight: '32px', color: '#FFFFFF', letterSpacing: '-0.3px' }
-    : { fontFamily: clashFont, fontWeight: 400, fontSize: '14px', lineHeight: '20px', color: '#FFFFFF' };
+    ? { fontFamily: homePageFont, fontWeight: 600, fontSize: '28px', lineHeight: '32px', color: '#FFFFFF', letterSpacing: '-0.3px' }
+    : { fontFamily: homePageFont, fontWeight: 400, fontSize: '14px', lineHeight: '20px', color: '#FFFFFF' };
 
   // Fetch market data and user position
   const fetchData = useCallback(async () => {
@@ -772,7 +772,7 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
               background: 'transparent',
               border: '1px solid #FFE600',
               backdropFilter: 'blur(32px)',
-              fontFamily: clashFont,
+              fontFamily: homePageFont,
               fontWeight: 600,
               fontSize: '13px',
               lineHeight: '18px',
@@ -799,7 +799,7 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
               style={{ 
                 height: '24px', 
                 background: activeTab === 'buy' ? '#171717' : 'transparent',
-                fontFamily: clashFont, 
+                fontFamily: homePageFont, 
                 fontWeight: 300, 
                 fontSize: '12px', 
                 lineHeight: '16px', 
@@ -814,7 +814,7 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
               style={{ 
                 height: '24px', 
                 background: activeTab === 'sell' ? '#171717' : 'transparent',
-                fontFamily: clashFont, 
+                fontFamily: homePageFont, 
                 fontWeight: 300, 
                 fontSize: '12px', 
                 lineHeight: '16px', 
@@ -847,8 +847,8 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
             className="transition-all flex-1"
             style={getOutcomeButtonStyle(tradeSide === 'yes', 'auto')}
           >
-            <span style={{ fontFamily: clashFont, fontWeight: 400, fontSize: '14px', lineHeight: '20px', color: '#F3F3F3' }}>Yes</span>
-            <span style={{ fontFamily: clashFont, fontWeight: 400, fontSize: '14px', lineHeight: '20px', color: '#F3F3F3' }}>{Math.round(yesPrice)}%</span>
+            <span style={{ fontFamily: homePageFont, fontWeight: 400, fontSize: '14px', lineHeight: '20px', color: '#F3F3F3' }}>Yes</span>
+            <span style={{ fontFamily: homePageFont, fontWeight: 400, fontSize: '14px', lineHeight: '20px', color: '#F3F3F3' }}>{Math.round(yesPrice)}%</span>
           </button>
           
           <button
@@ -856,8 +856,8 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
             className="transition-all flex-1"
             style={getOutcomeButtonStyle(tradeSide === 'no', 'auto')}
           >
-            <span style={{ fontFamily: clashFont, fontWeight: 400, fontSize: '14px', lineHeight: '20px', color: '#F3F3F3' }}>No</span>
-            <span style={{ fontFamily: clashFont, fontWeight: 400, fontSize: '14px', lineHeight: '20px', color: '#F3F3F3' }}>{Math.round(noPrice)}%</span>
+            <span style={{ fontFamily: homePageFont, fontWeight: 400, fontSize: '14px', lineHeight: '20px', color: '#F3F3F3' }}>No</span>
+            <span style={{ fontFamily: homePageFont, fontWeight: 400, fontSize: '14px', lineHeight: '20px', color: '#F3F3F3' }}>{Math.round(noPrice)}%</span>
           </button>
         </div>
 
@@ -871,7 +871,7 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
               background: orderType === 'market' ? 'rgba(255,255,255,0.04)' : 'transparent',
               backdropFilter: orderType === 'market' ? 'blur(32px)' : 'none',
               border: orderType === 'market' ? '1px solid #FFE600' : 'none', 
-              fontFamily: clashFont, 
+              fontFamily: homePageFont, 
               fontWeight: 300, 
               fontSize: '14px', 
               lineHeight: '20px', 
@@ -890,7 +890,7 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
               background: orderType === 'limit' ? 'rgba(255,255,255,0.04)' : 'transparent',
               backdropFilter: orderType === 'limit' ? 'blur(32px)' : 'none',
               border: orderType === 'limit' ? '1px solid #FFE600' : 'none', 
-              fontFamily: clashFont, 
+              fontFamily: homePageFont, 
               fontWeight: 300, 
               fontSize: '14px', 
               lineHeight: '20px', 
@@ -906,8 +906,8 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
           <>
             <div className="absolute" style={{ left: 0, top: '186px', width: '100%' }}>
               <div className="flex items-center justify-between mb-1">
-                <span style={{ fontFamily: clashFont, fontWeight: 300, fontSize: '14px', lineHeight: '20px', color: '#FFFFFF' }}>Limit Price</span>
-                <span style={{ fontFamily: clashFont, fontWeight: 300, fontSize: '14px', lineHeight: '20px', color: '#FFFFFF' }}>Current: {(currentPrice / 100).toFixed(2)}TCENT</span>
+                <span style={{ fontFamily: homePageFont, fontWeight: 300, fontSize: '14px', lineHeight: '20px', color: '#FFFFFF' }}>Limit Price</span>
+                <span style={{ fontFamily: homePageFont, fontWeight: 300, fontSize: '14px', lineHeight: '20px', color: '#FFFFFF' }}>Current: {(currentPrice / 100).toFixed(2)}TCENT</span>
               </div>
               
               <div
@@ -927,7 +927,7 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
                   onChange={(e) => setLimitPrice(e.target.value)}
                   placeholder="50:00"
                   className="flex-1 bg-transparent outline-none"
-                  style={{ fontFamily: clashFont, fontWeight: 400, fontSize: '14px', lineHeight: '20px', color: '#FFFFFF' }}
+                  style={{ fontFamily: homePageFont, fontWeight: 400, fontSize: '14px', lineHeight: '20px', color: '#FFFFFF' }}
                 />
               </div>
             </div>
@@ -977,8 +977,8 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
           width: '100%'
         }}>
           <div className="flex items-center justify-between mb-1">
-            <span style={{ fontFamily: clashFont, fontWeight: 300, fontSize: '14px', lineHeight: '20px', color: '#FFFFFF' }}>Amount</span>
-            <span style={{ fontFamily: clashFont, fontWeight: 300, fontSize: '14px', lineHeight: '20px', color: '#FFFFFF' }}>
+            <span style={{ fontFamily: homePageFont, fontWeight: 300, fontSize: '14px', lineHeight: '20px', color: '#FFFFFF' }}>Amount</span>
+            <span style={{ fontFamily: homePageFont, fontWeight: 300, fontSize: '14px', lineHeight: '20px', color: '#FFFFFF' }}>
               Balance: {activeTab === 'buy' ? `${parseFloat(ethBalance).toFixed(3)} TCENT` : `${parseFloat(tradeSide === 'yes' ? position.yesShares : position.noShares).toFixed(3)} shares`}
             </span>
           </div>
@@ -1001,12 +1001,12 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
           
           <div className="flex flex-col gap-3">
             <div className="flex items-center justify-between">
-              <span style={{ fontFamily: clashFont, fontWeight: 300, fontSize: '12px', lineHeight: '16px', color: '#8B8B8B' }}>Entry Price</span>
-              <span style={{ fontFamily: clashFont, fontWeight: 400, fontSize: '13px', lineHeight: '16px', color: '#FFFFFF' }}>${(currentPrice / 100).toFixed(2)}</span>
+              <span style={{ fontFamily: homePageFont, fontWeight: 300, fontSize: '12px', lineHeight: '16px', color: '#8B8B8B' }}>Entry Price</span>
+              <span style={{ fontFamily: homePageFont, fontWeight: 400, fontSize: '13px', lineHeight: '16px', color: '#FFFFFF' }}>${(currentPrice / 100).toFixed(2)}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span style={{ fontFamily: clashFont, fontWeight: 300, fontSize: '12px', lineHeight: '16px', color: '#8B8B8B' }}>Liquidation Price</span>
-              <span style={{ fontFamily: clashFont, fontWeight: 400, fontSize: '13px', lineHeight: '16px', color: '#FFFFFF' }}>${((currentPrice / 100) * 0.5).toFixed(2)}</span>
+              <span style={{ fontFamily: homePageFont, fontWeight: 300, fontSize: '12px', lineHeight: '16px', color: '#8B8B8B' }}>Liquidation Price</span>
+              <span style={{ fontFamily: homePageFont, fontWeight: 400, fontSize: '13px', lineHeight: '16px', color: '#FFFFFF' }}>${((currentPrice / 100) * 0.5).toFixed(2)}</span>
             </div>
           </div>
         </div>
@@ -1027,7 +1027,7 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontFamily: clashFont, 
+            fontFamily: homePageFont, 
             fontWeight: 700,
             fontSize: '17px',
             letterSpacing: '0.2px',

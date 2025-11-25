@@ -407,7 +407,7 @@ const MarketCreation = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white py-16 px-4 sm:px-8 font-['Clash Grotesk Variable']">
+    <div className="min-h-screen bg-[#050505] text-white py-16 px-4 sm:px-8" style={{ fontFamily: 'gilroy, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
       <div className="max-w-5xl mx-auto space-y-10">
         <div className="glass-card border border-white/15 rounded-[28px] px-10 py-8 flex flex-col md:flex-row md:items-center md:justify-between gap-6 bg-transparent">
           <div>

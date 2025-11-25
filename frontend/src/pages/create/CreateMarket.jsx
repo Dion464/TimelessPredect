@@ -50,8 +50,8 @@ const CreateMarket = () => {
     return '';
   };
 
-  const clashFont = {
-    fontFamily: 'Clash Grotesk Variable, -apple-system, BlinkMacSystemFont, sans-serif'
+  const homePageFont = {
+    fontFamily: 'gilroy, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
   };
 
   const categories = [
@@ -275,7 +275,7 @@ const CreateMarket = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#0E0E0E]" style={clashFont}>
+    <div className="min-h-screen bg-[#0E0E0E]" style={homePageFont}>
       <WormStyleNavbar />
       
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-12">

@@ -20,8 +20,8 @@ const PendingMarkets = () => {
   const [filter, setFilter] = useState('PENDING'); // PENDING, APPROVED, REJECTED, ALL
   const [processingId, setProcessingId] = useState(null);
 
-  const clashFont = {
-    fontFamily: 'Clash Grotesk Variable, -apple-system, BlinkMacSystemFont, sans-serif'
+  const homePageFont = {
+    fontFamily: 'gilroy, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
   };
 
   const explorerBase = (BLOCK_EXPLORER_URL || 'https://explorer.incentiv.io/').replace(/\/?$/, '/');
@@ -426,7 +426,7 @@ const PendingMarkets = () => {
   // Show loading state while checking admin status (only if wallet is connecting, not for localStorage admin)
   if (!isLocalStorageAdmin && isConnected === false && account === null) {
     return (
-      <div className="min-h-screen bg-[#050505]" style={clashFont}>
+      <div className="min-h-screen bg-[#050505]" style={homePageFont}>
         <WormStyleNavbar />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-12">
           <div className="glass-card rounded-[20px] border border-white/10 bg-white/5 text-center py-16">
@@ -441,7 +441,7 @@ const PendingMarkets = () => {
   // Show access denied if not admin (only if not localStorage admin AND not wallet admin)
   if (!isAdmin) {
     return (
-      <div className="min-h-screen bg-[#050505]" style={clashFont}>
+      <div className="min-h-screen bg-[#050505]" style={homePageFont}>
         <WormStyleNavbar />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-12">
           <div className="glass-card rounded-[20px] border border-white/10 bg-white/5 text-center py-16">
@@ -459,7 +459,7 @@ const PendingMarkets = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#050505]" style={clashFont}>
+    <div className="min-h-screen bg-[#050505]" style={homePageFont}>
       <WormStyleNavbar />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-12 space-y-8">
         <div className="glass-card rounded-[24px] border border-white/10 bg-white/5 px-6 sm:px-8 py-8">
