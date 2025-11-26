@@ -444,10 +444,8 @@ const MarketDetailWormStyle = () => {
         } else if (result.status === 'partial') {
           toast.success('Order partially filled!');
         } else {
-          // Fallback to AMM
-          const amountWei = ethers.utils.parseUnits(amount, 18);
-          const tx = await buyShares(id, outcome === 'yes', amountWei);
-          await tx.wait();
+          // Fallback to AMM (pass human-readable ETH amount; hook handles conversion)
+          const tx = await buyShares(id, outcome === 'yes', amount);
           toast.success(`Bought ${outcome.toUpperCase()} shares via AMM!`);
         }
 
