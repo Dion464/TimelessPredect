@@ -211,6 +211,29 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
     return str;
   };
 
+  const computeAvgPriceCents = (result, fallbackCents) => {
+    const validFromArray = (arr) => {
+      if (!Array.isArray(arr) || arr.length === 0) return null;
+      const nums = arr
+        .map((x) => {
+          const raw = x?.fillPrice ?? x?.priceTicks ?? x?.price_ticks ?? null;
+          if (raw === null || raw === undefined) return null;
+          const n = parseInt(raw.toString(), 10);
+          return Number.isFinite(n) ? n : null;
+        })
+        .filter((n) => n !== null);
+      if (!nums.length) return null;
+      const avgTicks = nums.reduce((s, n) => s + n, 0) / nums.length;
+      return ticksToCents(avgTicks);
+    };
+
+    const fromFills = validFromArray(result?.fills);
+    if (fromFills !== null) return fromFills;
+    const fromMatches = validFromArray(result?.matches);
+    if (fromMatches !== null) return fromMatches;
+    return fallbackCents;
+  };
+
   // Estimate filled TCENT amount using AMM logic
   const calculateEstimatedShares = useCallback(() => {
     if (!tradeAmount || parseFloat(tradeAmount) <= 0) {
@@ -489,12 +512,7 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
 
         if (result.status === 'matched' || result.status === 'partially_filled') {
           const orderType = tradeSide === 'yes' ? 'YES' : 'NO';
-          const fillCount = result.fills?.length || result.matches?.length || 1;
-          const avgPrice = result.fills && result.fills.length > 0
-            ? result.fills.reduce((sum, f) => sum + ticksToCents(parseInt(f.fillPrice)), 0) / result.fills.length
-            : result.matches && result.matches.length > 0
-            ? ticksToCents(parseInt(result.matches[0].fillPrice))
-            : currentPrice;
+          const avgPrice = computeAvgPriceCents(result, currentPrice);
           const totalAmount = result.fills && result.fills.length > 0
             ? result.fills.reduce((sum, f) => {
                 const raw = f?.fillSize ?? f?.sizeWei ?? f?.size_wei ?? null;
@@ -715,12 +733,7 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
 
         if (result.status === 'matched' || result.status === 'partially_filled') {
           const orderType = tradeSide === 'yes' ? 'YES' : 'NO';
-          const fillCount = result.fills?.length || result.matches?.length || 1;
-          const avgPrice = result.fills && result.fills.length > 0
-            ? result.fills.reduce((sum, f) => sum + ticksToCents(parseInt(f.fillPrice)), 0) / result.fills.length
-            : result.matches && result.matches.length > 0
-            ? ticksToCents(parseInt(result.matches[0].fillPrice))
-            : currentPrice;
+          const avgPrice = computeAvgPriceCents(result, currentPrice);
           const totalAmount = result.fills && result.fills.length > 0
             ? result.fills.reduce((sum, f) => sum + parseFloat(ethers.utils.formatEther(f.fillSize)), 0)
             : parseFloat(tradeAmount);
