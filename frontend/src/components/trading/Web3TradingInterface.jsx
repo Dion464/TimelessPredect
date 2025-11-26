@@ -923,9 +923,9 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
               >
                 <input
                   type="text"
-                  value={limitPrice || '50:00'}
+                  value={limitPrice || '0.00'}
                   onChange={(e) => setLimitPrice(e.target.value)}
-                  placeholder="50:00"
+                  placeholder="0.00"
                   className="flex-1 bg-transparent outline-none"
                   style={{ fontFamily: homePageFont, fontWeight: 400, fontSize: '14px', lineHeight: '20px', color: '#FFFFFF' }}
                 />
@@ -988,7 +988,7 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
               type="text"
               value={tradeAmount}
               onChange={(e) => setTradeAmount(e.target.value)}
-              placeholder="50:00"
+              placeholder="0.00"
               className="flex-1 bg-transparent outline-none"
               style={amountInputTextStyle}
             />
