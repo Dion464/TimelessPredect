@@ -297,6 +297,14 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
       return;
     }
 
+    let normalizedAmount;
+    try {
+      normalizedAmount = normalizeDecimal(tradeAmount);
+    } catch (err) {
+      toast.error(err.message || 'Invalid amount');
+      return;
+    }
+
     if (parseFloat(tradeAmount) > parseFloat(ethBalance)) {
       toast.error(`Insufficient ${currencySymbol} balance`);
       return;
@@ -425,7 +433,7 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
           marketId: marketId.toString(),
           outcomeId: outcomeId.toString(),
           price: centsToTicks(currentPrice).toString(),
-          size: ethers.utils.parseUnits(normalizeDecimal(tradeAmount), 18).toString(),
+          size: ethers.utils.parseUnits(normalizedAmount, 18).toString(),
           side: true
         };
 
@@ -500,11 +508,11 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
           });
 
           try {
-            const receipt = await buyShares(marketId, tradeSide === 'yes', tradeAmount);
+            const receipt = await buyShares(marketId, tradeSide === 'yes', normalizedAmount);
             showTransactionToast({
               icon: '✅',
               title: `${tradeSide === 'yes' ? 'YES' : 'NO'} position confirmed`,
-              description: `${parseFloat(tradeAmount).toFixed(4)} ${currencySymbol} filled via AMM.`,
+              description: `${parseFloat(normalizedAmount).toFixed(4)} ${currencySymbol} filled via AMM.`,
               txHash: receipt?.transactionHash || receipt?.hash
             });
           } catch (ammError) {
