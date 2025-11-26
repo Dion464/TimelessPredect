@@ -25,18 +25,27 @@ const CONTRACT_ADDRESSES = {
 const Web3Context = createContext();
 
 const normalizeMarketId = (rawMarketId) => {
-  let marketId;
+  
+  if (rawMarketId === null || rawMarketId === undefined) {
+    throw new Error("Market ID is missing");
+  }
 
+  // Convert empty string or weird values to a number
+  let cleaned = rawMarketId.toString().trim();
+
+  if (cleaned === "") {
+    throw new Error("Market ID cannot be empty");
+  }
+
+  let marketId;
   try {
-    marketId = ethers.BigNumber.isBigNumber(rawMarketId)
-      ? rawMarketId
-      : ethers.BigNumber.from(rawMarketId);
+    marketId = ethers.BigNumber.from(cleaned);
   } catch (err) {
-    throw new Error(`Invalid market id: ${err.message}`);
+    throw new Error(`Invalid market id: ${cleaned}`);
   }
 
   if (marketId.lte(0)) {
-    throw new Error('Market id must be greater than zero');
+    throw new Error("Market ID must be greater than zero");
   }
 
   return marketId;
