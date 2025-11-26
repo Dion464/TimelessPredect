@@ -201,15 +201,15 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
   }, [isConnected, contracts.predictionMarket, marketId]);
 
   const normalizeDecimal = (value) => {
-      if (value === null || value === undefined) return "0";
-    
-      const str = value.toString().trim().replace(/,/g, ".");
-    
-      // If string is empty or invalid → return "0"
-      if (!str || str === "." || str === "-" || isNaN(Number(str))) return "0";
-    
-      return str;
-    };
+    if (value === null || value === undefined || value === '') {
+      throw new Error('Invalid amount: value cannot be empty');
+    }
+    const str = value.toString().trim().replace(/,/g, '.');
+    if (!str || str === '.' || str === '-' || isNaN(Number(str))) {
+      throw new Error('Invalid amount: please enter a valid number');
+    }
+    return str;
+  };
 
   // Estimate filled TCENT amount using AMM logic
   const calculateEstimatedShares = useCallback(() => {
@@ -388,7 +388,15 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
             ? `@ ${centsToTCENT(ticksToCents(parseInt(result.matches[0].fillPrice)))} TCENT`
             : `@ ${centsToTCENT(limitPrice)} TCENT`;
           const fillAmount = result.matches && result.matches.length > 0
-            ? result.matches.reduce((sum, m) => sum + parseFloat(ethers.utils.formatEther(m.fillSize)), 0)
+            ? result.matches.reduce((sum, m) => {
+                const raw = m?.fillSize ?? m?.sizeWei ?? m?.size_wei ?? null;
+                if (!raw) return sum;
+                try {
+                  return sum + parseFloat(ethers.utils.formatEther(raw));
+                } catch {
+                  return sum;
+                }
+              }, 0)
             : parseFloat(tradeAmount);
           
           showGlassToast({
@@ -488,7 +496,15 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
             ? ticksToCents(parseInt(result.matches[0].fillPrice))
             : currentPrice;
           const totalAmount = result.fills && result.fills.length > 0
-            ? result.fills.reduce((sum, f) => sum + parseFloat(ethers.utils.formatEther(f.fillSize)), 0)
+            ? result.fills.reduce((sum, f) => {
+                const raw = f?.fillSize ?? f?.sizeWei ?? f?.size_wei ?? null;
+                if (!raw) return sum;
+                try {
+                  return sum + parseFloat(ethers.utils.formatEther(raw));
+                } catch {
+                  return sum;
+                }
+              }, 0)
             : parseFloat(tradeAmount);
           
           showGlassToast({
