@@ -407,9 +407,7 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
 
         if (result.status === 'matched' || result.status === 'partially_filled') {
           const orderType = tradeSide === 'yes' ? 'YES' : 'NO';
-          const priceInfo = result.matches && result.matches.length > 0 
-            ? `@ ${centsToTCENT(ticksToCents(parseInt(result.matches[0].fillPrice)))} TCENT`
-            : `@ ${centsToTCENT(limitPrice)} TCENT`;
+          const avgPrice = computeAvgPriceCents(result, parseFloat(limitPrice));
           const fillAmount = result.matches && result.matches.length > 0
             ? result.matches.reduce((sum, m) => {
                 const raw = m?.fillSize ?? m?.sizeWei ?? m?.size_wei ?? null;
@@ -425,7 +423,7 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
           showGlassToast({
             icon: '💰',
             title: `${orderType} TCENT ${result.status === 'matched' ? 'filled' : 'partially filled'}`,
-            description: `${fillAmount.toFixed(4)} ${currencySymbol} ${priceInfo}. ${result.status === 'matched' ? 'Settlement executing on-chain.' : 'Remaining amount stays on the book.'}`,
+            description: `${fillAmount.toFixed(4)} ${currencySymbol} @ ${centsToTCENT(avgPrice)} TCENT. ${result.status === 'matched' ? 'Settlement executing on-chain.' : 'Remaining amount stays on the book.'}`,
             duration: 5200
           });
           
@@ -661,17 +659,23 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
 
         if (result.status === 'matched' || result.status === 'partially_filled') {
           const orderType = tradeSide === 'yes' ? 'YES' : 'NO';
-          const priceInfo = result.matches && result.matches.length > 0 
-            ? `@ ${centsToTCENT(ticksToCents(parseInt(result.matches[0].fillPrice)))} TCENT`
-            : `@ ${centsToTCENT(limitPrice)} TCENT`;
+          const avgPrice = computeAvgPriceCents(result, parseFloat(limitPrice));
           const fillAmount = result.matches && result.matches.length > 0
-            ? result.matches.reduce((sum, m) => sum + parseFloat(ethers.utils.formatEther(m.fillSize)), 0)
+            ? result.matches.reduce((sum, m) => {
+                const raw = m?.fillSize ?? m?.sizeWei ?? m?.size_wei ?? null;
+                if (!raw) return sum;
+                try {
+                  return sum + parseFloat(ethers.utils.formatEther(raw));
+                } catch {
+                  return sum;
+                }
+              }, 0)
             : parseFloat(tradeAmount);
           
           showGlassToast({
             icon: '💸',
             title: `${orderType} TCENT ${result.status === 'matched' ? 'filled' : 'partially filled'}`,
-            description: `${fillAmount.toFixed(4)} ${currencySymbol} ${priceInfo}. ${result.status === 'matched' ? 'Settlement executing on-chain.' : 'Remaining amount stays on the book.'}`,
+            description: `${fillAmount.toFixed(4)} ${currencySymbol} @ ${centsToTCENT(avgPrice)} TCENT. ${result.status === 'matched' ? 'Settlement executing on-chain.' : 'Remaining amount stays on the book.'}`,
             duration: 5200
           });
           
@@ -682,7 +686,7 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
           showGlassToast({
             icon: '📤',
             title: 'Limit sell order placed',
-            description: `Queued at ${centsToTCENT(limitPrice)} TCENT. We’ll process it once matched.`,
+            description: `Queued at ${centsToTCENT(limitPrice)} TCENT. We'll process it once matched.`,
             duration: 4800
           });
           // Update immediately - no delay
@@ -735,7 +739,15 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
           const orderType = tradeSide === 'yes' ? 'YES' : 'NO';
           const avgPrice = computeAvgPriceCents(result, currentPrice);
           const totalAmount = result.fills && result.fills.length > 0
-            ? result.fills.reduce((sum, f) => sum + parseFloat(ethers.utils.formatEther(f.fillSize)), 0)
+            ? result.fills.reduce((sum, f) => {
+                const raw = f?.fillSize ?? f?.sizeWei ?? f?.size_wei ?? null;
+                if (!raw) return sum;
+                try {
+                  return sum + parseFloat(ethers.utils.formatEther(raw));
+                } catch {
+                  return sum;
+                }
+              }, 0)
             : parseFloat(tradeAmount);
           
           showGlassToast({
