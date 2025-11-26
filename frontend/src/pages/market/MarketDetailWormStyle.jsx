@@ -239,83 +239,93 @@ const MarketDetailWormStyle = () => {
     fetchData();
   }, [fetchData]);
 
-  // Real-time price updates with recording
+  // Event-driven price updates with recording (replaces 30s polling)
   useEffect(() => {
     if (!contracts.predictionMarket || !id) return;
+
+    const contract = contracts.predictionMarket;
+    let normalizedMarketId;
+    try {
+      normalizedMarketId = ethers.BigNumber.from(id);
+    } catch {
+      return;
+    }
 
     let lastYesPriceBps = null;
     let lastNoPriceBps = null;
 
-    const updatePrices = async () => {
-      try {
-        const yesPrice = await contracts.predictionMarket.getCurrentPrice(id, true);
-        const noPrice = await contracts.predictionMarket.getCurrentPrice(id, false);
-        
-        const yesPriceBps = parseFloat(yesPrice.toString());
-        const noPriceBps = parseFloat(noPrice.toString());
-        const yesPriceCents = yesPriceBps / 100;
-        const noPriceCents = noPriceBps / 100;
-        
-        // Update UI
-        setMarketData(prev => {
-          if (prev?.yesPrice === yesPriceCents && prev?.noPrice === noPriceCents) {
-            return prev;
-          }
-          return {
-            ...prev,
-            yesPrice: yesPriceCents,
-            noPrice: noPriceCents
-          };
-        });
+    // Helper to update prices and record to DB
+    const updatePricesFromEvent = async (newPriceBps, isYes) => {
+      const yesPriceBps = isYes ? newPriceBps : (10000 - newPriceBps);
+      const noPriceBps = isYes ? (10000 - newPriceBps) : newPriceBps;
+      const yesPriceCents = yesPriceBps / 100;
+      const noPriceCents = noPriceBps / 100;
 
-        // Also update market state
-        setMarket(prev => prev ? {
-          ...prev,
-          yesPrice: Math.round(yesPriceCents),
-          noPrice: Math.round(noPriceCents)
-        } : prev);
+      // Update UI immediately
+      setMarketData(prev => ({ ...prev, yesPrice: yesPriceCents, noPrice: noPriceCents }));
+      setMarket(prev => prev ? { ...prev, yesPrice: Math.round(yesPriceCents), noPrice: Math.round(noPriceCents) } : prev);
 
-        // Record price snapshot to DB if price changed
-        if (lastYesPriceBps !== yesPriceBps || lastNoPriceBps !== noPriceBps) {
-          console.log('💰 Price changed! Recording to DB:', {
-            previous: { yes: lastYesPriceBps, no: lastNoPriceBps },
-            current: { yes: yesPriceBps, no: noPriceBps }
+      // Record price snapshot to DB if changed
+      if (lastYesPriceBps !== yesPriceBps || lastNoPriceBps !== noPriceBps) {
+        try {
+          await fetch(`${API_BASE}/api/record-price`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              marketId: id.toString(),
+              yesPriceBps: Math.round(yesPriceBps),
+              noPriceBps: Math.round(noPriceBps),
+              blockNumber: null
+            })
           });
-
-          try {
-            const response = await fetch(`${API_BASE}/api/record-price`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                marketId: id.toString(),
-                yesPriceBps: Math.round(yesPriceBps),
-                noPriceBps: Math.round(noPriceBps),
-                blockNumber: null
-              })
-            });
-
-            if (response.ok) {
-              console.log('✅ Price snapshot recorded');
-              lastYesPriceBps = yesPriceBps;
-              lastNoPriceBps = noPriceBps;
-              
-              // Refresh price history immediately
-              fetchData();
-            }
-          } catch (err) {
-            console.error('Failed to record price snapshot:', err);
-          }
+          lastYesPriceBps = yesPriceBps;
+          lastNoPriceBps = noPriceBps;
+          fetchData(); // Refresh price history
+        } catch (err) {
+          // Silent fail
         }
-      } catch (err) {
-        console.log('Failed to update prices:', err.message);
       }
     };
 
-    const interval = setInterval(updatePrices, 30000); // Every 30 seconds
-    updatePrices(); // Initial update
+    // Event handler for trades
+    const handleTradeEvent = (eventMarketId, _addr, isYes, _shares, _amount, newPrice) => {
+      if (!eventMarketId.eq(normalizedMarketId)) return;
+      updatePricesFromEvent(parseFloat(newPrice.toString()), isYes);
+    };
 
-    return () => clearInterval(interval);
-  }, [contracts.predictionMarket, id]);
+    // Initial price fetch
+    const fetchInitialPrices = async () => {
+      try {
+        const yesPrice = await contract.getCurrentPrice(id, true);
+        const noPrice = await contract.getCurrentPrice(id, false);
+        const yesPriceBps = parseFloat(yesPrice.toString());
+        const noPriceBps = parseFloat(noPrice.toString());
+        lastYesPriceBps = yesPriceBps;
+        lastNoPriceBps = noPriceBps;
+        setMarketData(prev => ({ ...prev, yesPrice: yesPriceBps / 100, noPrice: noPriceBps / 100 }));
+        setMarket(prev => prev ? { ...prev, yesPrice: Math.round(yesPriceBps / 100), noPrice: Math.round(noPriceBps / 100) } : prev);
+      } catch (err) {
+        // Silent fail
+      }
+    };
+
+    // Subscribe to trade events
+    const purchaseFilter = contract.filters.SharesPurchased(id);
+    const sellFilter = contract.filters.SharesSold(id);
+    contract.on(purchaseFilter, handleTradeEvent);
+    contract.on(sellFilter, handleTradeEvent);
+
+    fetchInitialPrices();
+
+    // Fallback: poll every 5 minutes
+    const fallbackInterval = setInterval(fetchInitialPrices, 300000);
+
+    return () => {
+      contract.off(purchaseFilter, handleTradeEvent);
+      contract.off(sellFilter, handleTradeEvent);
+      clearInterval(fallbackInterval);
+    };
+  }, [contracts.predictionMarket, id, fetchData]);
 
   const handleTrade = async () => {
     if (!isConnected) {

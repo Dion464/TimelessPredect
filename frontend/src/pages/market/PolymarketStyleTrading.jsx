@@ -693,93 +693,49 @@ const PolymarketStyleTrading = () => {
     };
   }, [contracts?.predictionMarket, marketId, isConnected, refreshAllData, recordPriceSnapshot]);
 
-  // Real-time price updates from chain - records to DB and updates UI
+  // Initial price fetch only (events handle real-time updates)
   useEffect(() => {
     if (!isConnected || !contracts?.predictionMarket || !marketId) return;
 
-    let lastYesPriceBps = null;
-    let lastNoPriceBps = null;
-
-    const updatePrices = async () => {
+    const fetchInitialPrices = async () => {
       try {
-        // Fetch current prices from chain
         const yesPrice = await contracts.predictionMarket.getCurrentPrice(marketId, true);
         const noPrice = await contracts.predictionMarket.getCurrentPrice(marketId, false);
         
-        // Convert to basis points (prices come as basis points from contract)
         const yesPriceBps = parseFloat(yesPrice.toString());
         const noPriceBps = parseFloat(noPrice.toString());
-        
-        // Convert to cents for display (5000 -> 50¢)
         const yesPriceCents = yesPriceBps / 100;
         const noPriceCents = noPriceBps / 100;
 
-        // Update market state with prices from chain
         setMarket(prev => prev ? {
           ...prev,
           yesPrice: yesPriceCents,
           noPrice: noPriceCents,
           currentProbability: yesPriceBps / 10000
         } : prev);
-
-        // Record price snapshot to DB if price changed
-        if (lastYesPriceBps !== yesPriceBps || lastNoPriceBps !== noPriceBps) {
-          console.log('💰 Price changed! Recording to DB:', {
-            previous: { yes: lastYesPriceBps, no: lastNoPriceBps },
-            current: { yes: yesPriceBps, no: noPriceBps }
-          });
-          await recordPriceSnapshot(yesPriceBps, noPriceBps, null);
-          lastYesPriceBps = yesPriceBps;
-          lastNoPriceBps = noPriceBps;
-        } else {
-          console.log('💰 Price unchanged, skipping DB record:', {
-            yes: yesPriceBps,
-            no: noPriceBps
-          });
-        }
       } catch (err) {
-        console.log('Failed to update prices from chain:', err.message);
+        // Silent fail - events will update prices
       }
     };
 
-    // Update prices every 30 seconds and only record if price changed
-    const interval = setInterval(async () => {
-      try {
-        // Only update if price actually changed
-        const currentYesPrice = await contracts.predictionMarket.getCurrentPrice(marketId, true);
-        const currentNoPrice = await contracts.predictionMarket.getCurrentPrice(marketId, false);
-        const yesPriceBps = parseFloat(currentYesPrice.toString());
-        const noPriceBps = parseFloat(currentNoPrice.toString());
-        
-        // Check if prices changed before recording
-        const yesPriceCents = yesPriceBps / 100;
-        const noPriceCents = noPriceBps / 100;
-        
-        // Only record if price changed significantly (at least 0.01 cent difference)
-        const priceChanged = Math.abs(yesPriceCents - (market?.yesPrice || 0)) > 0.01 ||
-                            Math.abs(noPriceCents - (market?.noPrice || 0)) > 0.01;
-        
-        if (priceChanged) {
-          await recordPriceSnapshot(yesPriceBps, noPriceBps, null);
-        }
-      } catch (err) {
-        console.log('Failed to update prices from chain:', err.message);
-      }
-    }, 30000); // Check every 30 seconds (reduced from 5 seconds)
-    
-    updatePrices(); // Initial update
-    return () => clearInterval(interval);
-  }, [isConnected, contracts?.predictionMarket, marketId, recordPriceSnapshot]);
+    fetchInitialPrices();
 
-  // Periodic refresh of DB-backed data (price history)
+    // Fallback: poll every 5 minutes as safety net
+    const fallbackInterval = setInterval(fetchInitialPrices, 300000);
+    
+    return () => clearInterval(fallbackInterval);
+  }, [isConnected, contracts?.predictionMarket, marketId]);
+
+  // Periodic refresh of DB-backed data (price history) - events trigger immediate refresh
   useEffect(() => {
     if (!marketId || !isConnected || !contracts?.predictionMarket) {
       return;
     }
 
+    // Fallback: refresh every 5 minutes (events handle immediate updates)
     const interval = setInterval(async () => {
       await fetchPriceHistoryFromDb();
-    }, 60000); // Refresh every 60 seconds (reduced from 20 seconds)
+    }, 300000);
 
     return () => clearInterval(interval);
   }, [contracts?.predictionMarket, fetchPriceHistoryFromDb, isConnected, marketId]);

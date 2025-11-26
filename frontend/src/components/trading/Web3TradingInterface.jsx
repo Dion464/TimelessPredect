@@ -167,14 +167,23 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
     }
   }, [isConnected, contracts.predictionMarket, marketId, getMarketData, getUserPosition]);
 
-  // Real-time price updates
+  // Event-driven price updates (replaces 30s polling)
   useEffect(() => {
-    if (!isConnected || !contracts.predictionMarket || !marketId) return;
+    if (!contracts.predictionMarket || !marketId) return;
 
-    const updatePrices = async () => {
+    const contract = contracts.predictionMarket;
+    let normalizedMarketId;
+    try {
+      normalizedMarketId = ethers.BigNumber.from(marketId);
+    } catch {
+      return;
+    }
+
+    // Initial price fetch (only once on mount)
+    const fetchPrices = async () => {
       try {
-        const yesPrice = await contracts.predictionMarket.getCurrentPrice(marketId, true);
-        const noPrice = await contracts.predictionMarket.getCurrentPrice(marketId, false);
+        const yesPrice = await contract.getCurrentPrice(marketId, true);
+        const noPrice = await contract.getCurrentPrice(marketId, false);
         
         const yesPriceCents = parseFloat(yesPrice.toString()) / 100;
         const noPriceCents = parseFloat(noPrice.toString()) / 100;
@@ -183,22 +192,43 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
           if (prev?.yesPrice === yesPriceCents && prev?.noPrice === noPriceCents) {
             return prev;
           }
-          return {
-            ...prev,
-            yesPrice: yesPriceCents,
-            noPrice: noPriceCents
-          };
+          return { ...prev, yesPrice: yesPriceCents, noPrice: noPriceCents };
         });
       } catch (err) {
-        console.log('Failed to update prices:', err.message);
+        // Silent fail - prices will update via events
       }
     };
 
-    const interval = setInterval(updatePrices, 30000);
-    updatePrices();
+    // Event handler - updates price instantly when trade happens
+    const handlePriceUpdate = (eventMarketId, _addr, isYes, _shares, _amount, newPrice) => {
+      if (!eventMarketId.eq(normalizedMarketId)) return;
+      
+      const priceCents = parseFloat(newPrice.toString()) / 100;
+      const yesPrice = isYes ? priceCents : (100 - priceCents);
+      const noPrice = isYes ? (100 - priceCents) : priceCents;
+      
+      setMarketData(prev => ({ ...prev, yesPrice, noPrice }));
+    };
 
-    return () => clearInterval(interval);
-  }, [isConnected, contracts.predictionMarket, marketId]);
+    // Subscribe to trade events (filtered by marketId for efficiency)
+    const purchaseFilter = contract.filters.SharesPurchased(marketId);
+    const sellFilter = contract.filters.SharesSold(marketId);
+    
+    contract.on(purchaseFilter, handlePriceUpdate);
+    contract.on(sellFilter, handlePriceUpdate);
+
+    // Initial fetch
+    fetchPrices();
+
+    // Fallback: refresh every 5 minutes as safety net
+    const fallbackInterval = setInterval(fetchPrices, 300000);
+
+    return () => {
+      contract.off(purchaseFilter, handlePriceUpdate);
+      contract.off(sellFilter, handlePriceUpdate);
+      clearInterval(fallbackInterval);
+    };
+  }, [contracts.predictionMarket, marketId]);
 
   const normalizeDecimal = (value) => {
     if (value === null || value === undefined || value === '') {
@@ -280,19 +310,50 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
     }
   }, [tradeAmount, tradeSide, activeTab, marketData, market]);
 
-  // Fetch market data and user position
+  // Fetch market data and user position (event-driven + fallback)
   useEffect(() => {
-    if (!isConnected || !contracts.predictionMarket || !marketId) return;
+    if (!isConnected || !contracts.predictionMarket || !marketId || !account) return;
 
+    const contract = contracts.predictionMarket;
+    let normalizedMarketId;
+    try {
+      normalizedMarketId = ethers.BigNumber.from(marketId);
+    } catch {
+      return;
+    }
+
+    // Initial fetch
     fetchData();
-    
-    const interval = setInterval(() => {
-      if (isConnected && contracts.predictionMarket && marketId) {
-        fetchData();
+
+    // Update position when current user trades
+    const handleUserTrade = (eventMarketId, trader) => {
+      if (!eventMarketId.eq(normalizedMarketId)) return;
+      if (trader.toLowerCase() !== account.toLowerCase()) return;
+      
+      // Refresh position after own trade
+      if (getUserPosition) {
+        getUserPosition(marketId).then(pos => {
+          if (pos) setPosition(pos);
+        }).catch(() => {});
       }
-    }, 60000);
-    return () => clearInterval(interval);
-  }, [isConnected, contracts.predictionMarket, marketId, fetchData]);
+    };
+
+    // Subscribe to user's trades only
+    const purchaseFilter = contract.filters.SharesPurchased(marketId, account);
+    const sellFilter = contract.filters.SharesSold(marketId, account);
+    
+    contract.on(purchaseFilter, handleUserTrade);
+    contract.on(sellFilter, handleUserTrade);
+
+    // Fallback: refresh every 5 minutes
+    const fallbackInterval = setInterval(fetchData, 300000);
+
+    return () => {
+      contract.off(purchaseFilter, handleUserTrade);
+      contract.off(sellFilter, handleUserTrade);
+      clearInterval(fallbackInterval);
+    };
+  }, [isConnected, contracts.predictionMarket, marketId, account, fetchData, getUserPosition]);
 
   useEffect(() => {
     if (tradeAmount && parseFloat(tradeAmount) > 0) {

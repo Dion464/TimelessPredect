@@ -61,6 +61,8 @@ export const useWeb3 = () => {
 
 export const Web3Provider = ({ children }) => {
   const [provider, setProvider] = useState(null);
+  const [web3Provider, setWeb3Provider] = useState(null);
+  
   const [signer, setSigner] = useState(null);
   const [account, setAccount] = useState(null);
   const [chainId, setChainId] = useState(null);
@@ -115,7 +117,12 @@ export const Web3Provider = ({ children }) => {
 
       if (!predictionMarketInterface.functions['getMarket(uint256)']) {
         throw new Error('Prediction market ABI is missing required getMarket(uint256) function');
+
       }
+      if (!predictionMarketInterface.functions['buyShares(uint256,bool) payable']) {
+        throw new Error('Prediction market ABI is missing required buyShares(uint256,bool) function');
+      }
+
 
       // Skip contract code verification for speed - assume it exists if ABI is correct
       // const contractCode = await web3Signer.provider.getCode(addresses.ETH_PREDICTION_MARKET);
@@ -754,6 +761,36 @@ export const Web3Provider = ({ children }) => {
       updateEthBalance();
     }
   }, [isConnected, account, provider, updateEthBalance]);
+
+  // Event-driven balance updates - listen for user's trades
+  useEffect(() => {
+    if (!contracts.predictionMarket || !account) return;
+
+    const contract = contracts.predictionMarket;
+
+    // Update balance when current user buys or sells
+    const handleUserTrade = (marketId, trader) => {
+      if (trader.toLowerCase() !== account.toLowerCase()) return;
+      // Balance changed - update it
+      updateEthBalance();
+    };
+
+    // Listen for user's trades (filtered by account)
+    const purchaseFilter = contract.filters.SharesPurchased(null, account);
+    const sellFilter = contract.filters.SharesSold(null, account);
+
+    contract.on(purchaseFilter, handleUserTrade);
+    contract.on(sellFilter, handleUserTrade);
+
+    // Fallback: update balance every 5 minutes
+    const fallbackInterval = setInterval(updateEthBalance, 300000);
+
+    return () => {
+      contract.off(purchaseFilter, handleUserTrade);
+      contract.off(sellFilter, handleUserTrade);
+      clearInterval(fallbackInterval);
+    };
+  }, [contracts.predictionMarket, account, updateEthBalance]);
 
   // Listen for account changes
   useEffect(() => {
