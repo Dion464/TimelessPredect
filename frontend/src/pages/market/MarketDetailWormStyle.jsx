@@ -446,7 +446,7 @@ const MarketDetailWormStyle = () => {
         } else {
           // Fallback to AMM (pass human-readable ETH amount; hook handles conversion)
           const tx = await buyShares(id, outcome === 'yes', amount);
-          toast.success(`Bought ${outcome.toUpperCase()} shares via AMM!`);
+          toast.success(`Bought ${amount} TCENT of ${outcome.toUpperCase()} via AMM!`);
         }
 
         setAmount('');
@@ -467,7 +467,7 @@ const MarketDetailWormStyle = () => {
     const availableShares = outcome === 'yes' ? position.yesShares : position.noShares;
     
     if (parseFloat(amount) > parseFloat(availableShares)) {
-      toast.error(`Insufficient ${outcome.toUpperCase()} shares`);
+      toast.error(`Insufficient ${outcome.toUpperCase()} TCENT balance`);
       return;
     }
 
@@ -576,7 +576,7 @@ const MarketDetailWormStyle = () => {
         } else {
           // Fallback to AMM (pass share amount directly; hook handles conversion)
           await sellShares(id, outcome === 'yes', amount);
-          toast.success(`Sold ${outcome.toUpperCase()} shares via AMM!`);
+          toast.success(`Sold ${amount} TCENT of ${outcome.toUpperCase()} via AMM!`);
         }
 
         setAmount('');

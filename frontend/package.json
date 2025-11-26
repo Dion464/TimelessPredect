@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
-    "@prisma/client": "^5.17.0",
     "@canvasjs/react-charts": "^1.0.2",
+    "@prisma/client": "^5.17.0",
     "@testing-library/jest-dom": "^5.17.0",
     "@testing-library/react": "^13.4.0",
     "@testing-library/user-event": "^13.5.0",
@@ -13,6 +13,8 @@
     "d3": "^7.8.5",
     "emoji-picker-react": "^4.14.0",
     "ethers": "^5.7.2",
+    "highcharts": "^11.4.8",
+    "highcharts-react-official": "^3.2.3",
     "jwt-decode": "^4.0.0",
     "path-to-regexp": ">=8.2.0",
     "react": "^18.2.0",
@@ -60,17 +62,17 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "prisma": "^5.17.0",
     "@tailwindcss/typography": "^0.5.16",
     "@vitejs/plugin-react": "^4.7.0",
     "autoprefixer": "^10.4.17",
     "esbuild": "0.25.9",
     "path-to-regexp": ">=8.2.0",
     "postcss": "^8.4.35",
+    "prisma": "^5.17.0",
     "rollup": ">=4.22.4",
+    "tailwind-merge": "^3.3.1",
     "tailwindcss": "^3.4.1",
     "tailwindcss-animate": "^1.0.7",
-    "tailwind-merge": "^3.3.1",
     "vite": "^7.1.5"
   }
 }

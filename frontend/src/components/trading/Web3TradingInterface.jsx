@@ -208,7 +208,7 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
     return trimmed.replace(/,/g, '.');
   };
 
-  // Calculate estimated shares using AMM logic
+  // Estimate filled TCENT amount using AMM logic
   const calculateEstimatedShares = useCallback(() => {
     if (!tradeAmount || parseFloat(tradeAmount) <= 0) {
       setEstimatedShares('0');
@@ -249,7 +249,7 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
 
       setEstimatedShares(estimatedShares.toFixed(4));
     } catch (err) {
-      console.error('Failed to calculate shares:', err);
+      console.error('Failed to estimate TCENT amount:', err);
       setEstimatedShares(parseFloat(tradeAmount).toFixed(4));
     }
   }, [tradeAmount, tradeSide, activeTab, marketData, market]);
@@ -382,7 +382,7 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
           
           showGlassToast({
             icon: '💰',
-            title: `${orderType} shares ${result.status === 'matched' ? 'filled' : 'partially filled'}`,
+            title: `${orderType} TCENT ${result.status === 'matched' ? 'filled' : 'partially filled'}`,
             description: `${fillAmount.toFixed(4)} ${currencySymbol} ${priceInfo}. ${result.status === 'matched' ? 'Settlement executing on-chain.' : 'Remaining amount stays on the book.'}`,
             duration: 5200
           });
@@ -482,7 +482,7 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
           
           showGlassToast({
             icon: '💰',
-            title: `${orderType} shares ${result.status === 'matched' ? 'filled' : 'partially filled'}`,
+            title: `${orderType} TCENT ${result.status === 'matched' ? 'filled' : 'partially filled'}`,
             description: `${totalAmount.toFixed(4)} ${currencySymbol} @ ${centsToTCENT(avgPrice)} TCENT. ${result.status === 'matched' ? 'Settlement executing on-chain.' : 'Remaining amount stays on the book.'}`,
             duration: 5200
           });
@@ -541,7 +541,7 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
 
     const availableShares = tradeSide === 'yes' ? position.yesShares : position.noShares;
     if (parseFloat(tradeAmount) > parseFloat(availableShares)) {
-      toast.error(`Insufficient ${tradeSide.toUpperCase()} shares`);
+      toast.error(`Insufficient ${tradeSide.toUpperCase()} TCENT balance`);
       return;
     }
 
@@ -625,7 +625,7 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
           
           showGlassToast({
             icon: '💸',
-            title: `${orderType} shares ${result.status === 'matched' ? 'filled' : 'partially filled'}`,
+            title: `${orderType} TCENT ${result.status === 'matched' ? 'filled' : 'partially filled'}`,
             description: `${fillAmount.toFixed(4)} ${currencySymbol} ${priceInfo}. ${result.status === 'matched' ? 'Settlement executing on-chain.' : 'Remaining amount stays on the book.'}`,
             duration: 5200
           });
@@ -700,7 +700,7 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
           
           showGlassToast({
             icon: '💸',
-            title: `${orderType} shares ${result.status === 'matched' ? 'filled' : 'partially filled'}`,
+            title: `${orderType} TCENT ${result.status === 'matched' ? 'filled' : 'partially filled'}`,
             description: `${totalAmount.toFixed(4)} ${currencySymbol} @ ${centsToTCENT(avgPrice)} TCENT. ${result.status === 'matched' ? 'Settlement executing on-chain.' : 'Remaining amount stays on the book.'}`,
             duration: 5200
           });
@@ -720,13 +720,13 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
           try {
             // Validate tradeAmount before selling
             if (!tradeAmount || parseFloat(tradeAmount) <= 0) {
-              throw new Error('Invalid amount: Please enter a valid number of shares to sell');
+              throw new Error('Invalid amount: Please enter a valid TCENT amount to sell');
             }
             
             const receipt = await sellShares(marketId, tradeSide === 'yes', tradeAmount);
             showTransactionToast({
               icon: '✅',
-              title: `${tradeSide === 'yes' ? 'YES' : 'NO'} shares sold`,
+              title: `${tradeSide === 'yes' ? 'YES' : 'NO'} TCENT sold`,
               description: `${parseFloat(tradeAmount).toFixed(4)} ${currencySymbol} released via AMM.`,
               txHash: receipt?.transactionHash || receipt?.hash
             });
@@ -978,8 +978,10 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
         }}>
           <div className="flex items-center justify-between mb-1">
             <span style={{ fontFamily: homePageFont, fontWeight: 300, fontSize: '14px', lineHeight: '20px', color: '#FFFFFF' }}>Amount</span>
-            <span style={{ fontFamily: homePageFont, fontWeight: 300, fontSize: '14px', lineHeight: '20px', color: '#FFFFFF' }}>
-              Balance: {activeTab === 'buy' ? `${parseFloat(ethBalance).toFixed(3)} TCENT` : `${parseFloat(tradeSide === 'yes' ? position.yesShares : position.noShares).toFixed(3)} shares`}
+      <span style={{ fontFamily: homePageFont, fontWeight: 300, fontSize: '14px', lineHeight: '20px', color: '#FFFFFF' }}>
+              Balance: {activeTab === 'buy'
+                ? `${parseFloat(ethBalance).toFixed(3)} TCENT`
+                : `${parseFloat(tradeSide === 'yes' ? position.yesShares : position.noShares).toFixed(3)} TCENT`}
             </span>
           </div>
           
