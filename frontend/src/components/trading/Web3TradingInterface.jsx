@@ -201,12 +201,15 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
   }, [isConnected, contracts.predictionMarket, marketId]);
 
   const normalizeDecimal = (value) => {
-    if (value === null || value === undefined) return '0';
-    if (typeof value === 'number') return value.toString();
-    const trimmed = value.toString().trim();
-    if (!trimmed) return '0';
-    return trimmed.replace(/,/g, '.');
-  };
+      if (value === null || value === undefined) return "0";
+    
+      const str = value.toString().trim().replace(/,/g, ".");
+    
+      // If string is empty or invalid → return "0"
+      if (!str || str === "." || str === "-" || isNaN(Number(str))) return "0";
+    
+      return str;
+    };
 
   // Estimate filled TCENT amount using AMM logic
   const calculateEstimatedShares = useCallback(() => {
