@@ -447,6 +447,7 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
         // Update immediately - no delay
         fetchData();
       } else {
+        // Market order - buy directly via AMM (instant on-chain)
         if (!signer) {
           toast.error('Please connect your wallet');
           setLoading(false);
@@ -459,104 +460,14 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
           return;
         }
 
-        const outcomeId = tradeSide === 'yes' ? 0 : 1;
-        const orderData = {
-          maker: account,
-          marketId: marketId.toString(),
-          outcomeId: outcomeId.toString(),
-          price: centsToTicks(currentPrice).toString(),
-          size: ethers.utils.parseUnits(normalizedAmount, 18).toString(),
-          side: true
-        };
-
-        const order = createOrderWithDefaults(orderData);
+        const receipt = await buyShares(marketId, tradeSide === 'yes', normalizedAmount);
         
-        console.log('🔍 Signing order with:', {
-          chainId: chainId,
-          exchangeContract: EXCHANGE_CONTRACT,
-          order: order,
-          orderMaker: order.maker,
-          account: account
+        showTransactionToast({
+          icon: '✅',
+          title: `${tradeSide === 'yes' ? 'YES' : 'NO'} TCENT purchased`,
+          description: `${parseFloat(normalizedAmount).toFixed(4)} ${currencySymbol} filled via AMM.`,
+          txHash: receipt?.transactionHash || receipt?.hash
         });
-        
-        const signature = await signOrder(order, chainId, EXCHANGE_CONTRACT, signer);
-        
-        console.log('✅ Order signed:', {
-          signature: signature.substring(0, 20) + '...',
-          orderPrice: order.price,
-          orderSize: order.size
-        });
-
-        const response = await fetch(`${API_BASE}/api/orders`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            order,
-            signature,
-            isMarketOrder: true
-          })
-        });
-
-        console.log('Market order response status:', response.status);
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({ error: 'Failed to place market order' }));
-          console.error('Market order API error:', errorData);
-          throw new Error(errorData.error || errorData.suggestion || `HTTP ${response.status}: Failed to place market order`);
-        }
-
-        const result = await response.json();
-        console.log('Market order result:', result);
-
-        if (result.status === 'matched' || result.status === 'partially_filled') {
-          const orderType = tradeSide === 'yes' ? 'YES' : 'NO';
-          const avgPrice = computeAvgPriceCents(result, currentPrice);
-          const totalAmount = result.fills && result.fills.length > 0
-            ? result.fills.reduce((sum, f) => {
-                const raw = f?.fillSize ?? f?.sizeWei ?? f?.size_wei ?? null;
-                if (!raw) return sum;
-                try {
-                  return sum + parseFloat(ethers.utils.formatEther(raw));
-                } catch {
-                  return sum;
-                }
-              }, 0)
-            : parseFloat(tradeAmount);
-          
-          showGlassToast({
-            icon: '💰',
-            title: `${orderType} TCENT ${result.status === 'matched' ? 'filled' : 'partially filled'}`,
-            description: `${totalAmount.toFixed(4)} ${currencySymbol} @ ${centsToTCENT(avgPrice)} TCENT. ${result.status === 'matched' ? 'Settlement executing on-chain.' : 'Remaining amount stays on the book.'}`,
-            duration: 5200
-          });
-        } else if (result.status === 'no_matches' || (result.status === 'open' && (!result.matches || result.matches.length === 0) && (!result.fills || result.fills.length === 0))) {
-          // No matches found - fallback to AMM
-          if (!buyShares) {
-            throw new Error('Buy function not available. Please reconnect your wallet.');
-          }
-
-          showGlassToast({
-            icon: '🔄',
-            title: 'Routing through AMM',
-            description: 'No matching sell orders were found. Executing directly against the prediction market.',
-            duration: 4200
-          });
-
-          try {
-            const receipt = await buyShares(marketId, tradeSide === 'yes', normalizedAmount);
-            showTransactionToast({
-              icon: '✅',
-              title: `${tradeSide === 'yes' ? 'YES' : 'NO'} position confirmed`,
-              description: `${parseFloat(normalizedAmount).toFixed(4)} ${currencySymbol} filled via AMM.`,
-              txHash: receipt?.transactionHash || receipt?.hash
-            });
-          } catch (ammError) {
-            throw new Error(`AMM buy failed: ${ammError.message}`);
-          }
-        } else {
-          console.warn('Unexpected market order result:', result);
-          toast.error(`Market order could not be filled. Status: ${result.status || 'unknown'}`);
-        }
 
         setTradeAmount('');
       }
@@ -699,95 +610,27 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
         // Update immediately - no delay
         fetchData();
       } else {
+        // Market order - sell directly via AMM (instant on-chain)
         if (!signer) {
           toast.error('Please connect your wallet');
           setLoading(false);
           return;
         }
 
-        const outcomeId = tradeSide === 'yes' ? 0 : 1;
-        const orderData = {
-          maker: account,
-          marketId: marketId.toString(),
-          outcomeId: outcomeId.toString(),
-          price: centsToTicks(currentPrice).toString(),
-          size: ethers.utils.parseUnits(tradeAmount || '0', 18).toString(),
-          side: false
-        };
+        if (!sellShares) {
+          toast.error('Sell function not available. Please reconnect your wallet.');
+          setLoading(false);
+          return;
+        }
 
-        const order = createOrderWithDefaults(orderData);
-        const signature = await signOrder(order, chainId, EXCHANGE_CONTRACT, signer);
-
-        const response = await fetch(`${API_BASE}/api/orders`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            order,
-            signature,
-            isMarketOrder: true
-          })
+        const receipt = await sellShares(marketId, tradeSide === 'yes', tradeAmount);
+        
+        showTransactionToast({
+          icon: '✅',
+          title: `${tradeSide === 'yes' ? 'YES' : 'NO'} TCENT sold`,
+          description: `${parseFloat(tradeAmount).toFixed(4)} ${currencySymbol} released via AMM.`,
+          txHash: receipt?.transactionHash || receipt?.hash
         });
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({ error: 'Failed to place market order' }));
-          throw new Error(errorData.error || errorData.suggestion || `HTTP ${response.status}: Failed to place market order`);
-        }
-
-        const result = await response.json();
-
-        if (result.status === 'matched' || result.status === 'partially_filled') {
-          const orderType = tradeSide === 'yes' ? 'YES' : 'NO';
-          const avgPrice = computeAvgPriceCents(result, currentPrice);
-          const totalAmount = result.fills && result.fills.length > 0
-            ? result.fills.reduce((sum, f) => {
-                const raw = f?.fillSize ?? f?.sizeWei ?? f?.size_wei ?? null;
-                if (!raw) return sum;
-                try {
-                  return sum + parseFloat(ethers.utils.formatEther(raw));
-                } catch {
-                  return sum;
-                }
-              }, 0)
-            : parseFloat(tradeAmount);
-          
-          showGlassToast({
-            icon: '💸',
-            title: `${orderType} TCENT ${result.status === 'matched' ? 'filled' : 'partially filled'}`,
-            description: `${totalAmount.toFixed(4)} ${currencySymbol} @ ${centsToTCENT(avgPrice)} TCENT. ${result.status === 'matched' ? 'Settlement executing on-chain.' : 'Remaining amount stays on the book.'}`,
-            duration: 5200
-          });
-        } else if (result.status === 'no_matches' || (result.status === 'open' && (!result.matches || result.matches.length === 0) && (!result.fills || result.fills.length === 0))) {
-          // No matches found - fallback to AMM
-          if (!sellShares) {
-            throw new Error('Sell function not available. Please reconnect your wallet.');
-          }
-
-          showGlassToast({
-            icon: '🔄',
-            title: 'Routing through AMM',
-            description: 'No matching buy orders were found. Executing directly against the prediction market.',
-            duration: 4200
-          });
-
-          try {
-            // Validate tradeAmount before selling
-            if (!tradeAmount || parseFloat(tradeAmount) <= 0) {
-              throw new Error('Invalid amount: Please enter a valid TCENT amount to sell');
-            }
-            
-            const receipt = await sellShares(marketId, tradeSide === 'yes', tradeAmount);
-            showTransactionToast({
-              icon: '✅',
-              title: `${tradeSide === 'yes' ? 'YES' : 'NO'} TCENT sold`,
-              description: `${parseFloat(tradeAmount).toFixed(4)} ${currencySymbol} released via AMM.`,
-              txHash: receipt?.transactionHash || receipt?.hash
-            });
-          } catch (ammError) {
-            throw new Error(`AMM sell failed: ${ammError.message}`);
-          }
-        } else {
-          toast.error('Market sell order could not be filled - no matching buy orders');
-        }
 
         setTradeAmount('');
       }
