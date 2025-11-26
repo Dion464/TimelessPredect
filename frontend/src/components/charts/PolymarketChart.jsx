@@ -164,6 +164,12 @@ const PolymarketChart = ({
 
     const series = [];
 
+    const compareConfig = {
+      compare: 'percent',
+      compareStart: true,
+      compareBase: 0
+    };
+
     if (yesSeries.length) {
       series.push({
         type: 'line',
@@ -175,7 +181,8 @@ const PolymarketChart = ({
         states: {
           hover: { lineWidth: 4 }
         },
-        showInNavigator: true
+        showInNavigator: true,
+        ...compareConfig
       });
     }
 
@@ -188,7 +195,8 @@ const PolymarketChart = ({
         lineWidth: 2,
         dashStyle: 'ShortDash',
         tooltip: { valueDecimals: 4, valueSuffix: ' TCENT' },
-        showInNavigator: true
+        showInNavigator: true,
+        ...compareConfig
       });
     }
 
@@ -201,7 +209,8 @@ const PolymarketChart = ({
         fillOpacity: 0.08,
         lineWidth: 1.5,
         tooltip: { valueDecimals: 4, valueSuffix: ' TCENT' },
-        showInNavigator: false
+        showInNavigator: false,
+        ...compareConfig
       });
     }
 
@@ -264,15 +273,28 @@ const PolymarketChart = ({
         }
       },
       yAxis: {
-        min: 0,
-        max: 1,
+        opposite: false,
+        softMin: -20,
+        softMax: 20,
+        tickInterval: 5,
         gridLineColor: 'rgba(255,255,255,0.05)',
         labels: {
           style: { color: '#9ca3af', fontSize: '11px' },
           formatter() {
-            return `${this.value.toFixed(2)} TCENT`;
+            const value = Highcharts.numberFormat(this.value, 0);
+            const sign = this.value > 0 ? '+' : '';
+            return `${sign}${value}%`;
           }
         },
+        plotLines: [
+          {
+            value: 0,
+            color: 'rgba(255,255,255,0.15)',
+            width: 1,
+            dashStyle: 'ShortDash',
+            zIndex: 3
+          }
+        ],
         title: { text: null }
       },
       tooltip: {
@@ -286,12 +308,14 @@ const PolymarketChart = ({
             this.x
           )}</span>`;
           const points = (this.points || [])
-            .map(
-              (point) =>
-                `<span style="color:${point.color}">●</span> ${point.series.name}: <b>${point.y.toFixed(
-                  4
-                )} TCENT</b>`
-            )
+            .map((point) => {
+              const tcents = (point.y * 100).toFixed(2);
+              const change =
+                typeof point.change === 'number'
+                  ? `${point.change > 0 ? '+' : ''}${point.change.toFixed(2)}%`
+                  : '0%';
+              return `<span style="color:${point.color}">●</span> ${point.series.name}: <b>${tcents} TCENT</b> (${change})`;
+            })
             .join('<br/>');
           return `${header}<br/>${points}`;
         }
