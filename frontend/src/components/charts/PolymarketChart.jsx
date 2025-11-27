@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import ReactECharts from 'echarts-for-react';
+import '../../pages/market/MarketDetailGlass.css';
 
 const DEFAULT_RANGES = [
   { label: '1H', value: '1h' },
@@ -164,8 +165,8 @@ const PolymarketChart = ({
   noPriceHistory = [],
   currentYesPrice = 0.5,
   currentNoPrice = 0.5,
-  accentYes = '#4B7CFD',
-  accentNo = '#9C4BFD',
+  accentYes = '#FFE600',
+  accentNo = '#7C3AED',
   height = 320,
   selectedRange = 'all',
   onRangeChange = () => {},
@@ -293,91 +294,99 @@ const PolymarketChart = ({
       .filter(Boolean)
       .sort((a, b) => a.latest - b.latest); // Smaller value drawn first, largest on top
 
-    // Ensure lines are always visually separated and the higher value is more prominent
+    // Polymarket-style: area fills under lines, smooth curves, always separated
     const series = sortedSeries.map((seriesItem, idx) => {
       const isTopLine = idx === sortedSeries.length - 1; // Higher value line
+      
+      // Convert hex to rgba for area fill
+      const hexToRgba = (hex, alpha) => {
+        const r = parseInt(hex.slice(1, 3), 16);
+        const g = parseInt(hex.slice(3, 5), 16);
+        const b = parseInt(hex.slice(5, 7), 16);
+        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+      };
       
       return {
         name: seriesItem.key,
         type: 'line',
-        smooth: 0.7, // Smoother curves
+        smooth: 0.6, // Smooth curves like Polymarket
         symbol: 'none',
         showSymbol: false,
-        step: false, // No step transitions - smooth lines only
-        sampling: 'average', // Better sampling for smooth lines
-        zlevel: isTopLine ? 10 : 5, // Higher value line on top
+        step: false,
+        sampling: 'lttb', // Large-Than-Tiny-Buckets for better performance
+        zlevel: isTopLine ? 10 : 5,
         z: isTopLine ? 100 : 50,
         lineStyle: {
-          width: isTopLine ? 3.5 : 2.5, // Top line is thicker and more visible
+          width: 2.5,
           color: seriesItem.color,
-          type: 'solid' // Solid lines, no dashes
+          type: 'solid'
         },
-        // NO area fills - they cause overlap and clutter
+        // Polymarket-style area fills
+        areaStyle: {
+          color: {
+            type: 'linear',
+            x: 0,
+            y: 0,
+            x2: 0,
+            y2: 1,
+            colorStops: [
+              { offset: 0, color: hexToRgba(seriesItem.color, 0.25) },
+              { offset: 0.5, color: hexToRgba(seriesItem.color, 0.15) },
+              { offset: 1, color: hexToRgba(seriesItem.color, 0.05) }
+            ]
+          }
+        },
         emphasis: {
           focus: 'series',
           lineStyle: {
-            width: isTopLine ? 4.5 : 3.5,
-            shadowBlur: 10,
+            width: 3.5,
+            shadowBlur: 12,
             shadowColor: seriesItem.color
-          }
-        },
-        endLabel: {
-          show: true,
-          formatter: (params) => {
-            const val = Array.isArray(params.value) ? params.value[1] : params.value;
-            return `${seriesItem.key} ${Number(val).toFixed(1)}%`;
           },
-          color: seriesItem.color,
-          fontSize: 11,
-          fontWeight: isTopLine ? 'bold' : 'normal',
-          padding: [2, 8, 2, 8],
-          backgroundColor: 'rgba(255, 255, 255, 0.95)',
-          borderColor: seriesItem.color,
-          borderWidth: 1.5,
-          borderRadius: 4
+          areaStyle: {
+            opacity: 0.4
+          }
         },
         data: seriesItem.data
       };
     });
 
     return {
-      backgroundColor: '#ffffff',
+      backgroundColor: 'transparent',
       animation: true,
-      animationDuration: 750,
+      animationDuration: 600,
       grid: {
-        left: '8%',
-        right: '12%', // More space on right for end labels
-        top: '12%',
-        bottom: '12%',
-        containLabel: true
+        left: '10%',
+        right: '10%',
+        top: '20%',
+        bottom: '15%',
+        containLabel: false
       },
       tooltip: {
         trigger: 'axis',
-        backgroundColor: 'rgba(0, 0, 0, 0.75)',
-        borderColor: 'rgba(255, 255, 255, 0.25)',
+        backgroundColor: 'rgba(0, 0, 0, 0.85)',
+        borderColor: 'rgba(255, 255, 255, 0.2)',
         borderWidth: 1,
         textStyle: {
           color: '#fff',
           fontSize: 12
         },
         axisPointer: {
-          type: 'cross',
+          type: 'line',
           lineStyle: {
-            color: '#999',
-            type: 'dashed'
-          },
-          crossStyle: {
-            color: '#999'
+            color: 'rgba(255, 255, 255, 0.3)',
+            type: 'solid',
+            width: 1
           }
         },
         formatter: function(params) {
           if (!params || params.length === 0) return '';
-          let result = `<div style="padding: 4px 0; font-weight: 600;">${params[0].axisValueLabel}</div>`;
+          let result = `<div style="padding: 4px 0 6px 0; font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.1);">${params[0].axisValueLabel}</div>`;
           params.forEach((item) => {
             const value = Array.isArray(item.value) ? item.value[1] : item.value;
-            result += `<div style="display: flex; align-items: center; padding: 2px 0;">
-              <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: ${item.color}; margin-right: 6px;"></span>
-              <span style="color: ${item.color};">${item.seriesName}: ${Number(value).toFixed(2)}%</span>
+            result += `<div style="display: flex; align-items: center; padding: 4px 0;">
+              <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: ${item.color}; margin-right: 8px;"></span>
+              <span style="color: #fff;">${item.seriesName}: <span style="color: ${item.color}; font-weight: 600;">${Number(value).toFixed(2)}%</span></span>
             </div>`;
           });
           return result;
@@ -385,16 +394,24 @@ const PolymarketChart = ({
       },
       legend: {
         data: ['YES', 'NO'],
-        left: 'center',
-        top: '5%',
+        left: '10%',
+        top: '8%',
         textStyle: {
-          color: '#333',
+          color: 'rgba(255, 255, 255, 0.8)',
           fontSize: 12,
           fontWeight: 'normal'
         },
-        itemGap: 30,
-        itemWidth: 25,
-        itemHeight: 14
+        itemGap: 40,
+        itemWidth: 10,
+        itemHeight: 10,
+        formatter: function(name) {
+          const seriesItem = sortedSeries.find(s => s.key === name);
+          if (seriesItem) {
+            const val = seriesItem.latest;
+            return `${name} ${val.toFixed(1)}%`;
+          }
+          return name;
+        }
       },
       xAxis: {
         type: 'time',
@@ -402,27 +419,25 @@ const PolymarketChart = ({
         axisLine: {
           show: true,
           lineStyle: {
-            color: '#999',
+            color: 'rgba(255, 255, 255, 0.15)',
             width: 1
           }
         },
         axisLabel: {
           show: true,
-          color: '#666',
+          color: 'rgba(255, 255, 255, 0.6)',
           fontSize: 11,
           formatter: function(value) {
             const date = new Date(value);
+            const month = date.toLocaleString('default', { month: 'short' });
+            const day = date.getDate();
             const hours = date.getHours().toString().padStart(2, '0');
             const minutes = date.getMinutes().toString().padStart(2, '0');
-            return `${hours}:${minutes}`;
+            return `${month} ${day} ${hours}:${minutes}`;
           }
         },
         splitLine: {
-          show: true,
-          lineStyle: {
-            color: '#f0f0f0',
-            type: 'dashed'
-          }
+          show: false
         },
         min: minTime,
         max: maxTime
@@ -432,24 +447,25 @@ const PolymarketChart = ({
         min: 0,
         max: 100,
         interval: 20,
-        scale: false, // Don't auto-scale - always show 0-100% for clear separation
+        scale: false,
+        position: 'right',
         axisLine: {
           show: true,
           lineStyle: {
-            color: '#ccc',
+            color: 'rgba(255, 255, 255, 0.15)',
             width: 1
           }
         },
         axisLabel: {
           show: true,
-          color: '#666',
+          color: 'rgba(255, 255, 255, 0.6)',
           fontSize: 11,
           formatter: (val) => `${val}%`
         },
         splitLine: {
           show: true,
           lineStyle: {
-            color: '#f5f5f5',
+            color: 'rgba(255, 255, 255, 0.08)',
             type: 'solid',
             width: 1
           }
@@ -462,8 +478,8 @@ const PolymarketChart = ({
   if (!hasData || !chartOptions) {
   return (
       <div
-        className="flex items-center justify-center rounded-2xl border border-white/5 bg-[#08142a] text-sm text-slate-400"
-        style={{ height }}
+        className="glass-card flex items-center justify-center rounded-[24px] border border-white/20 backdrop-blur-xl text-sm text-white/60"
+        style={{ height, background: 'rgba(12,12,12,0.55)' }}
       >
         No price data available yet
           </div>
@@ -471,19 +487,22 @@ const PolymarketChart = ({
   }
 
   const renderRangeButtons = () => (
-    <div className="mb-3 flex items-center gap-2 text-xs font-medium text-gray-600">
-      <span className="text-gray-700">Zoom</span>
+    <div className="mb-4 flex items-center gap-2">
+      <span className="text-white/60 text-xs font-medium mr-1">Zoom</span>
       {rangeButtons.map((btn, index) => {
         const isActive = index === selectedRangeIndex;
         return (
           <button
             key={btn.text + btn.dataRangeValue}
             onClick={() => onRangeChange?.(btn.dataRangeValue)}
-            className={`px-3 py-1.5 rounded transition-colors text-xs font-medium ${
+            className={`px-3 py-1.5 rounded-full transition-all text-xs font-medium ${
               isActive
-                ? 'bg-blue-500 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
+                ? 'bg-white/15 text-white border border-white/20'
+                : 'bg-white/5 text-white/60 hover:bg-white/10 border border-transparent'
+            } backdrop-blur-md`}
+            style={{
+              fontFamily: 'gilroy, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+            }}
           >
             {btn.text}
           </button>
@@ -493,14 +512,11 @@ const PolymarketChart = ({
   );
 
   return (
-    <div className="w-full rounded-lg border border-gray-200 bg-gray-50 px-6 py-5 shadow-sm">
-      <div className="mb-3 text-center text-sm font-semibold text-gray-700 uppercase tracking-wide">
-        {title}
-      </div>
+    <div className="glass-card w-full rounded-[24px] border border-white/20 backdrop-blur-xl p-6" style={{ background: 'rgba(12,12,12,0.55)' }}>
       {renderRangeButtons()}
-      <div className="overflow-hidden rounded-lg bg-white border border-gray-100">
+      <div className="overflow-hidden rounded-[16px]" style={{ height }}>
         <ReactECharts option={chartOptions} style={{ height, width: '100%' }} />
-        </div>
+      </div>
     </div>
   );
 };
