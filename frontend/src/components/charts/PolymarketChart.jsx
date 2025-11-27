@@ -209,74 +209,226 @@ const PolymarketChart = ({
     const yesData = yesLineData.map(([ts, value]) => [ts, Number(value || 0) * 100]);
     const noData = noLineData.map(([ts, value]) => [ts, Number(value || 0) * 100]);
 
+    // Calculate time range for dataZoom
+    const allTimestamps = [...yesData, ...noData].map(([ts]) => ts).filter(Number.isFinite);
+    const minTime = allTimestamps.length > 0 ? Math.min(...allTimestamps) : Date.now() - 86400000;
+    const maxTime = allTimestamps.length > 0 ? Math.max(...allTimestamps) : Date.now();
+
     return {
-      backgroundColor,
-      grid: { left: 40, right: 16, top: 32, bottom: 32 },
+      backgroundColor: 'transparent',
+      animation: true,
+      animationDuration: 750,
+      grid: [
+        {
+          left: '3%',
+          right: '4%',
+          top: '10%',
+          bottom: '15%',
+          containLabel: false
+        }
+      ],
       tooltip: {
         trigger: 'axis',
-        backgroundColor: 'rgba(6,11,24,0.95)',
-        borderColor: 'rgba(255,255,255,0.1)',
-        textStyle: { color: '#f1f5f9', fontSize: 12 },
-        axisPointer: { type: 'line' },
-        valueFormatter: (val) => `${Number(val).toFixed(2)}%`
+        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        borderColor: 'rgba(255, 255, 255, 0.2)',
+        borderWidth: 1,
+        textStyle: {
+          color: '#fff',
+          fontSize: 12
+        },
+        axisPointer: {
+          type: 'cross',
+          label: {
+            backgroundColor: 'rgba(0, 0, 0, 0.8)'
+          }
+        },
+        formatter: function(params) {
+          let result = `<div style="padding: 4px 0;">${params[0].axisValueLabel}</div>`;
+          params.forEach((item) => {
+            result += `<div style="display: flex; align-items: center; padding: 2px 0;">
+              <span style="display: inline-block; width: 10px; height: 2px; background: ${item.color}; margin-right: 6px;"></span>
+              <span style="color: ${item.color};">${item.seriesName}: ${Number(item.value[1] || item.value).toFixed(2)}%</span>
+            </div>`;
+          });
+          return result;
+        }
       },
       legend: {
         data: ['YES', 'NO'],
-        left: 24,
+        left: 'center',
         top: 0,
-        textStyle: { color: '#94a3b8', fontWeight: 600 }
+        textStyle: {
+          color: '#94a3b8',
+          fontSize: 12,
+          fontWeight: 600
+        },
+        itemGap: 20
       },
+      dataZoom: [
+        {
+          type: 'slider',
+          show: true,
+          xAxisIndex: [0],
+          start: 0,
+          end: 100,
+          bottom: '2%',
+          height: 20,
+          borderColor: 'rgba(255,255,255,0.1)',
+          fillerColor: 'rgba(255,255,255,0.1)',
+          handleIcon: 'path://M30.9,53.2C16.8,53.2,5.3,41.7,5.3,27.6S16.8,2,30.9,2C45,2,56.4,13.5,56.4,27.6S45,53.2,30.9,53.2z M30.9,3.5C17.6,3.5,6.8,14.4,6.8,27.6c0,13.3,10.8,24.1,24.1,24.1C44.2,51.7,55,40.9,55,27.6C54.9,14.4,44.1,3.5,30.9,3.5z M36.9,35.8c0,0.6-0.4,1-1,1H26.8c-0.6,0-1-0.4-1-1V19.5c0-0.6,0.4-1,1-1h9.2c0.6,0,1,0.4,1,1V35.8z',
+          handleSize: '80%',
+          handleStyle: {
+            color: '#fff',
+            borderColor: 'rgba(255,255,255,0.5)'
+          },
+          textStyle: {
+            color: '#6f819f',
+            fontSize: 10
+          }
+        },
+        {
+          type: 'inside',
+          xAxisIndex: [0],
+          start: 0,
+          end: 100
+        }
+      ],
       xAxis: {
         type: 'time',
         boundaryGap: false,
-        axisLine: { lineStyle: { color: 'rgba(255,255,255,0.08)' } },
-        axisLabel: { color: '#6f819f', fontSize: 11, fontWeight: 500 },
-        splitLine: { show: true, lineStyle: { color: 'rgba(255,255,255,0.03)' } }
+        axisLine: {
+          show: true,
+          lineStyle: {
+            color: 'rgba(255,255,255,0.15)',
+            width: 1
+          }
+        },
+        axisLabel: {
+          show: true,
+          color: '#6f819f',
+          fontSize: 11,
+          fontWeight: 500,
+          formatter: function(value) {
+            const date = new Date(value);
+            const hours = date.getHours().toString().padStart(2, '0');
+            const minutes = date.getMinutes().toString().padStart(2, '0');
+            return `${hours}:${minutes}`;
+          }
+        },
+        splitLine: {
+          show: false
+        },
+        min: minTime,
+        max: maxTime
       },
       yAxis: {
         type: 'value',
         min: 0,
         max: 100,
+        axisLine: {
+          show: true,
+          lineStyle: {
+            color: 'rgba(255,255,255,0.15)',
+            width: 1
+          }
+        },
         axisLabel: {
+          show: true,
           color: '#6f819f',
           fontSize: 11,
           formatter: (val) => `${val}%`
         },
-        splitLine: { lineStyle: { color: 'rgba(255,255,255,0.04)' } }
+        splitLine: {
+          show: true,
+          lineStyle: {
+            color: 'rgba(255,255,255,0.06)',
+            type: 'dashed',
+            width: 1
+          }
+        }
       },
-      animation: true,
       series: [
-        yesData.length
+        yesData.length > 0
           ? {
               name: 'YES',
               type: 'line',
-              smooth: true,
-              showSymbol: false,
-              lineStyle: { color: accentYes, width: 3 },
-              areaStyle: {
-                opacity: 0.08,
+              smooth: 0.6,
+              symbol: 'none',
+              sampling: 'lttb',
+              itemStyle: {
                 color: accentYes
+              },
+              areaStyle: {
+                color: {
+                  type: 'linear',
+                  x: 0,
+                  y: 0,
+                  x2: 0,
+                  y2: 1,
+                  colorStops: [
+                    {
+                      offset: 0,
+                      color: accentYes + '33'
+                    },
+                    {
+                      offset: 1,
+                      color: accentYes + '00'
+                    }
+                  ]
+                }
+              },
+              lineStyle: {
+                width: 2.5,
+                color: accentYes
+              },
+              emphasis: {
+                focus: 'series'
               },
               data: yesData
             }
           : null,
-        noData.length
+        noData.length > 0
           ? {
               name: 'NO',
               type: 'line',
-              smooth: true,
-              showSymbol: false,
-              lineStyle: { color: accentNo, width: 2 },
-              areaStyle: {
-                opacity: 0.05,
+              smooth: 0.6,
+              symbol: 'none',
+              sampling: 'lttb',
+              itemStyle: {
                 color: accentNo
+              },
+              areaStyle: {
+                color: {
+                  type: 'linear',
+                  x: 0,
+                  y: 0,
+                  x2: 0,
+                  y2: 1,
+                  colorStops: [
+                    {
+                      offset: 0,
+                      color: accentNo + '33'
+                    },
+                    {
+                      offset: 1,
+                      color: accentNo + '00'
+                    }
+                  ]
+                }
+              },
+              lineStyle: {
+                width: 2.5,
+                color: accentNo
+              },
+              emphasis: {
+                focus: 'series'
               },
               data: noData
             }
           : null
       ].filter(Boolean)
     };
-  }, [accentNo, accentYes, backgroundColor, hasData, noLineData, yesLineData]);
+  }, [accentNo, accentYes, hasData, noLineData, yesLineData]);
 
   if (!hasData || !chartOptions) {
   return (
@@ -312,8 +464,12 @@ const PolymarketChart = ({
   return (
     <div className="w-full rounded-2xl border border-white/5 bg-[#050c1c] px-3 py-4 shadow-lg shadow-black/30">
       {renderRangeButtons()}
-      <div className="overflow-hidden rounded-xl border border-white/5 bg-[#07122c]">
-        <ReactECharts option={chartOptions} style={{ height }} />
+      <div className="overflow-hidden rounded-xl" style={{ background: backgroundColor }}>
+        <ReactECharts 
+          option={chartOptions} 
+          style={{ height, width: '100%' }}
+          opts={{ renderer: 'svg' }}
+        />
       </div>
     </div>
   );
