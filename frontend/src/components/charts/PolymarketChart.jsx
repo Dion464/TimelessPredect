@@ -110,8 +110,13 @@ const PolymarketChart = ({
   noPriceHistory = [],
   currentYesPrice = 0.5,
   currentNoPrice = 0.5,
-  height = 300,
-  selectedRange = '24h',
+  headlineLabel = 'chance',
+  headlineValue,
+  changePercent = 0,
+  accentColor = '#3BB8FF',
+  backgroundColor = '#08142a',
+  height = 320,
+  selectedRange = 'all',
   onRangeChange = () => {},
   ranges = DEFAULT_RANGES
 }) => {
@@ -158,61 +163,7 @@ const PolymarketChart = ({
   }, [rangeButtons, selectedRange]);
 
   const chartOptions = useMemo(() => {
-    if (!hasData) {
-      return null;
-    }
-
-    const series = [];
-
-    const compareConfig = {
-      compare: 'percent',
-      compareStart: true,
-      compareBase: 0
-    };
-
-    if (yesSeries.length) {
-      series.push({
-        type: 'line',
-        name: 'YES',
-        data: yesSeries,
-        color: '#FFE600',
-        lineWidth: 3,
-        tooltip: { valueDecimals: 4, valueSuffix: ' TCENT' },
-        states: {
-          hover: { lineWidth: 4 }
-        },
-        showInNavigator: true,
-        ...compareConfig
-      });
-    }
-
-    if (noSeries.length) {
-      series.push({
-        type: 'line',
-        name: 'NO',
-        data: noSeries,
-        color: '#7C3AED',
-        lineWidth: 2,
-        dashStyle: 'ShortDash',
-        tooltip: { valueDecimals: 4, valueSuffix: ' TCENT' },
-        showInNavigator: true,
-        ...compareConfig
-      });
-    }
-
-    if (aggregatedSeries.length) {
-      series.push({
-        type: 'areaspline',
-        name: 'Volume-weighted',
-        data: aggregatedSeries,
-        color: 'rgba(255,255,255,0.25)',
-        fillOpacity: 0.08,
-        lineWidth: 1.5,
-        tooltip: { valueDecimals: 4, valueSuffix: ' TCENT' },
-        showInNavigator: false,
-        ...compareConfig
-      });
-    }
+    if (!hasData) return null;
 
     const buttonConfigs = rangeButtons.map((btn) => ({
       ...btn,
@@ -227,118 +178,133 @@ const PolymarketChart = ({
 
     return {
       chart: {
-        backgroundColor: 'transparent',
-        height
+        backgroundColor,
+        height,
+        spacing: [16, 0, 0, 0]
       },
       credits: { enabled: false },
-      legend: {
-        enabled: true,
-        align: 'right',
-        verticalAlign: 'top',
-        itemStyle: { color: '#e5e7eb', fontWeight: '500' }
-      },
+      legend: { enabled: false },
       rangeSelector: {
         selected: selectedRangeIndex,
         buttonTheme: {
-          fill: 'rgba(255,255,255,0.06)',
-          stroke: 'rgba(255,255,255,0.12)',
-          r: 12,
-          style: { color: '#d1d5db', fontWeight: 500 },
+          fill: 'rgba(255,255,255,0.04)',
+          stroke: 'transparent',
+          r: 6,
+          style: { color: '#91A6C9', fontWeight: 600 },
           states: {
-            hover: { fill: 'rgba(255,255,255,0.12)', style: { color: '#fff' } },
+            hover: { fill: 'rgba(255,255,255,0.08)' },
             select: {
-              fill: 'rgba(255, 230, 0, 0.15)',
-              style: { color: '#FFE600', fontWeight: 600 }
+              fill: 'rgba(59, 184, 255, 0.18)',
+              style: { color: '#3BB8FF' }
             }
           }
         },
+        labelStyle: { color: '#7485a8', fontWeight: 500 },
         inputEnabled: false,
         buttons: buttonConfigs
       },
-      navigator: {
-        maskFill: 'rgba(255, 230, 0, 0.08)',
-        outlineColor: 'rgba(255,255,255,0.1)',
-        series: {
-          color: 'rgba(255, 230, 0, 0.6)',
-          lineWidth: 1
-        }
-      },
+      navigator: { enabled: false },
       scrollbar: { enabled: false },
       xAxis: {
         type: 'datetime',
-        lineColor: 'rgba(255,255,255,0.08)',
-        tickColor: 'rgba(255,255,255,0.08)',
+        lineColor: 'rgba(255,255,255,0.05)',
+        tickColor: 'rgba(255,255,255,0.05)',
+        gridLineColor: 'rgba(255,255,255,0.03)',
         labels: {
-          style: { color: '#9ca3af', fontSize: '11px' }
+          style: { color: '#6f819f', fontSize: '11px', fontWeight: 500 }
         }
       },
       yAxis: {
-        opposite: false,
-        softMin: -20,
-        softMax: 20,
-        tickInterval: 5,
-        gridLineColor: 'rgba(255,255,255,0.05)',
+        min: 0,
+        max: 1,
+        tickAmount: 5,
+        gridLineColor: 'rgba(255,255,255,0.04)',
+        title: { text: '' },
         labels: {
-          style: { color: '#9ca3af', fontSize: '11px' },
+          style: { color: '#6f819f', fontSize: '11px', fontWeight: 500 },
           formatter() {
-            const value = Highcharts.numberFormat(this.value, 0);
-            const sign = this.value > 0 ? '+' : '';
-            return `${sign}${value}%`;
+            return `${(this.value * 100).toFixed(0)}%`;
           }
-        },
-        plotLines: [
-          {
-            value: 0,
-            color: 'rgba(255,255,255,0.15)',
-            width: 1,
-            dashStyle: 'ShortDash',
-            zIndex: 3
-          }
-        ],
-        title: { text: null }
+        }
       },
       tooltip: {
         shared: true,
-        backgroundColor: 'rgba(15,15,15,0.9)',
-        borderColor: 'rgba(255,255,255,0.1)',
-        style: { color: '#f9fafb', fontSize: '12px' },
+        backgroundColor: 'rgba(7,12,26,0.95)',
+        borderColor: 'rgba(255,255,255,0.08)',
+        style: { color: '#f0f4ff', fontSize: '12px' },
         formatter() {
-          const header = `<span style="font-size:11px;color:#9ca3af">${Highcharts.dateFormat(
-            '%A, %b %e • %H:%M',
+          const header = `<span style="font-size:11px;color:#94a3b8">${Highcharts.dateFormat(
+            '%b %e, %Y • %H:%M',
             this.x
           )}</span>`;
           const points = (this.points || [])
-            .map((point) => {
-              const tcents = (point.y * 100).toFixed(2);
-              const change =
-                typeof point.change === 'number'
-                  ? `${point.change > 0 ? '+' : ''}${point.change.toFixed(2)}%`
-                  : '0%';
-              return `<span style="color:${point.color}">●</span> ${point.series.name}: <b>${tcents} TCENT</b> (${change})`;
-            })
+            .map(
+              (point) =>
+                `${(point.y * 100).toFixed(2)}%`
+            )
             .join('<br/>');
-          return `${header}<br/>${points}`;
+          return `${header}<br/><span style="font-size:14px;font-weight:600">${points}</span>`;
         }
       },
       plotOptions: {
         series: {
-          dataGrouping: {
-            enabled: true,
-            approximation: 'average'
-          },
-          marker: {
-            enabled: false
-          }
+          dataGrouping: { enabled: true, approximation: 'average' },
+          marker: { enabled: false }
         }
       },
-      series
+      series: [
+        yesSeries.length
+          ? {
+              type: 'areaspline',
+              name: 'YES',
+              data: yesSeries,
+              color: '#FFE600',
+              lineWidth: 3,
+              fillColor: {
+                linearGradient: { x1: 0, y1: 0, x2: 0, y2: 1 },
+                stops: [
+                  [0, Highcharts.color('#FFE600').setOpacity(0.2).get('rgba')],
+                  [1, 'rgba(255,230,0,0)']
+                ]
+              }
+            }
+          : null,
+        noSeries.length
+          ? {
+              type: 'areaspline',
+              name: 'NO',
+              data: noSeries,
+              color: '#7C3AED',
+              lineWidth: 2,
+              fillColor: {
+                linearGradient: { x1: 0, y1: 0, x2: 0, y2: 1 },
+                stops: [
+                  [0, Highcharts.color('#7C3AED').setOpacity(0.15).get('rgba')],
+                  [1, 'rgba(124,58,237,0)']
+                ]
+              }
+            }
+          : null,
+        aggregatedSeries.length
+          ? {
+              type: 'line',
+              name: 'Aggregate',
+              data: aggregatedSeries,
+              color: Highcharts.color(accentColor).setOpacity(0.6).get('rgba'),
+              lineWidth: 1.5,
+              dashStyle: 'ShortDash'
+            }
+          : null
+      ].filter(Boolean)
     };
   }, [
+    accentColor,
+    backgroundColor,
     aggregatedSeries,
     hasData,
     height,
-    noSeries,
     onRangeChange,
+    noSeries,
     rangeButtons,
     selectedRangeIndex,
     yesSeries
@@ -347,7 +313,7 @@ const PolymarketChart = ({
   if (!hasData || !chartOptions) {
     return (
       <div
-        className="flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-sm text-gray-300"
+        className="flex items-center justify-center rounded-2xl border border-white/5 bg-[#08142a] text-sm text-slate-400"
         style={{ height }}
       >
         No price data available yet
@@ -355,13 +321,40 @@ const PolymarketChart = ({
     );
   }
 
+  const fallbackSeries = yesSeries.length ? yesSeries : noSeries.length ? noSeries : aggregatedSeries;
+  const displayValue =
+    typeof headlineValue === 'number'
+      ? headlineValue
+      : (fallbackSeries[fallbackSeries.length - 1]?.[1] || 0) * 100;
+
+  const changeColor = changePercent >= 0 ? 'text-emerald-400' : 'text-rose-400';
+
   return (
-    <div className="w-full rounded-2xl border border-white/10 bg-black/10 p-2 backdrop-blur-xl">
-      <HighchartsReact
-        highcharts={Highcharts}
-        constructorType="stockChart"
-        options={chartOptions}
-      />
+    <div className="w-full rounded-2xl border border-white/5 bg-[#050c1c] px-4 py-5 shadow-lg shadow-black/30">
+      <div className="mb-4 flex items-start justify-between">
+        <div>
+          <p className="text-[11px] uppercase tracking-[0.35em] text-[#5a6b8f]">{headlineLabel}</p>
+          <div className="mt-2 flex items-baseline gap-3">
+            <span className="text-4xl font-semibold text-white">
+              {Number(displayValue).toFixed(0)}%
+            </span>
+            <span className={`text-sm font-semibold ${changeColor}`}>
+              {changePercent >= 0 ? '+' : ''}
+              {changePercent.toFixed(0)}%
+            </span>
+          </div>
+        </div>
+        <div className="text-xs font-semibold uppercase tracking-widest text-[#5a6b8f]">
+          Polymarket
+        </div>
+      </div>
+      <div className="overflow-hidden rounded-xl border border-white/5">
+        <HighchartsReact
+          highcharts={Highcharts}
+          constructorType="stockChart"
+          options={chartOptions}
+        />
+        </div>
     </div>
   );
 };
