@@ -3,7 +3,13 @@ import { ethers } from 'ethers';
 import toast from 'react-hot-toast';
 import { CONTRACT_ADDRESS, CHAIN_ID, CONTRACT_ABI, RPC_URL, NETWORK_NAME } from '../contracts/eth-config';
 
-// Environment configuration loaded
+// Environment configuration loaded - log for debugging on Vercel
+console.log('🔧 Web3 Config:', { 
+  CONTRACT_ADDRESS: CONTRACT_ADDRESS || 'NOT SET', 
+  CHAIN_ID: CHAIN_ID || 'NOT SET',
+  RPC_URL: RPC_URL ? 'SET' : 'NOT SET',
+  NETWORK_NAME: NETWORK_NAME || 'NOT SET'
+});
 
 const ETH_PREDICTION_MARKET_ABI = CONTRACT_ABI;
 
@@ -15,10 +21,13 @@ const PRICING_AMM_ABI = [
 ];
 
 // Contract addresses - dynamically set from environment variables
+// Guard against undefined/NaN CHAIN_ID
+const VALID_CHAIN_ID = CHAIN_ID && !isNaN(CHAIN_ID) ? CHAIN_ID : 28802; // Fallback to Incentiv testnet
+
 const CONTRACT_ADDRESSES = {
-  [CHAIN_ID]: {
+  [VALID_CHAIN_ID]: {
     ETH_PREDICTION_MARKET: CONTRACT_ADDRESS,
-    PRICING_AMM: "0x0000000000000000000000000000000000000000", // Will be set dynamically
+    PRICING_AMM: "0x0000000000000000000000000000000000000000",
   }
 };
 
@@ -89,11 +98,21 @@ export const Web3Provider = ({ children }) => {
   const initializeContracts = useCallback(async (web3Signer) => {
     try {
       const network = await web3Signer.provider.getNetwork();
-      const chainId = network.chainId;
+      const networkChainId = network.chainId;
       
-      const addresses = CONTRACT_ADDRESSES[chainId];
+      // Try to find addresses for the connected network, fallback to configured chain
+      let addresses = CONTRACT_ADDRESSES[networkChainId];
+      if (!addresses && CONTRACT_ADDRESS) {
+        // If network doesn't match but we have a contract address, use it anyway
+        // This handles cases where env vars might not be perfectly synced
+        console.warn(`Network ${networkChainId} not in CONTRACT_ADDRESSES, using configured CONTRACT_ADDRESS`);
+        addresses = {
+          ETH_PREDICTION_MARKET: CONTRACT_ADDRESS,
+          PRICING_AMM: "0x0000000000000000000000000000000000000000"
+        };
+      }
       if (!addresses) {
-        throw new Error(`Unsupported network: ${chainId}. Please switch to ${NETWORK_NAME} (Chain ID: ${CHAIN_ID}).`);
+        throw new Error(`Unsupported network: ${networkChainId}. Please switch to ${NETWORK_NAME} (Chain ID: ${CHAIN_ID}).`);
       }
 
       if (!addresses.ETH_PREDICTION_MARKET) {
