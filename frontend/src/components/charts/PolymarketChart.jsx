@@ -111,16 +111,20 @@ const easeInOutCubic = (t) => {
     : 1 - Math.pow(-2 * t + 2, 3) / 2;  // Ease out (cubic deceleration)
 };
 
-const densifySeries = (series = [], targetPoints = 2000) => {
+const densifySeries = (series = [], targetPoints = 500) => {
   if (!series || series.length === 0) {
     return [];
   }
 
+  // Safety limit: never create more than 10000 points total
+  const MAX_TOTAL_POINTS = 10000;
+  const MAX_POINTS_PER_SEGMENT = 50;
+
   if (series.length === 1) {
-    // If only one point, create a smooth horizontal segment
+    // If only one point, create a simple horizontal segment
     const [ts, val] = series[0];
     const now = Date.now();
-    const segments = 100;
+    const segments = Math.min(20, MAX_POINTS_PER_SEGMENT); // Limit segments
     const output = [];
     for (let i = 0; i <= segments; i++) {
       const ratio = i / segments;
@@ -133,23 +137,30 @@ const densifySeries = (series = [], targetPoints = 2000) => {
   const output = [];
   const totalSegments = series.length - 1;
   
-  // Much more points per segment for ultra-smooth heartbeat-like curves
-  const minPointsPerSegment = 150;
-  const maxPointsPerSegment = 600;
-  const pointsPerSegment = Math.max(
-    minPointsPerSegment,
-    Math.min(maxPointsPerSegment, Math.ceil(targetPoints / Math.max(1, totalSegments)))
-  );
+  // Calculate points per segment with safety limits
+  let pointsPerSegment = Math.ceil(targetPoints / Math.max(1, totalSegments));
+  pointsPerSegment = Math.min(pointsPerSegment, MAX_POINTS_PER_SEGMENT);
+  pointsPerSegment = Math.max(pointsPerSegment, 5); // Minimum 5 points per segment
+  
+  // Safety check: if this would exceed MAX_TOTAL_POINTS, reduce points per segment
+  if (totalSegments * pointsPerSegment > MAX_TOTAL_POINTS) {
+    pointsPerSegment = Math.floor(MAX_TOTAL_POINTS / totalSegments);
+    pointsPerSegment = Math.max(pointsPerSegment, 3); // Minimum 3 points
+  }
   
   for (let i = 0; i < totalSegments; i++) {
     const [t1, v1] = series[i];
     const [t2, v2] = series[i + 1];
     
+    // Safety check: skip invalid data points
+    if (!Number.isFinite(t1) || !Number.isFinite(v1) || !Number.isFinite(t2) || !Number.isFinite(v2)) {
+      continue;
+    }
+    
     // Always include the first point
     output.push([t1, v1]);
 
     // Use smooth cubic easing for natural heartbeat-like curves
-    // This eliminates blocky/square transitions
     for (let j = 1; j < pointsPerSegment; j++) {
       const ratio = j / pointsPerSegment;
       
@@ -159,12 +170,31 @@ const densifySeries = (series = [], targetPoints = 2000) => {
       const ts = t1 + (t2 - t1) * ratio;
       const value = v1 + (v2 - v1) * easedRatio;
       
-      output.push([ts, value]);
+      // Safety check before adding
+      if (Number.isFinite(ts) && Number.isFinite(value)) {
+        output.push([ts, value]);
+      }
+      
+      // Safety: prevent infinite loops
+      if (output.length > MAX_TOTAL_POINTS) {
+        console.warn('Densification exceeded MAX_TOTAL_POINTS, truncating');
+        break;
+      }
+    }
+    
+    // Safety: prevent infinite loops
+    if (output.length > MAX_TOTAL_POINTS) {
+      break;
     }
   }
 
-  // Always include the last point
-  output.push(series[series.length - 1]);
+  // Always include the last point if we have valid data
+  if (series.length > 0) {
+    const lastPoint = series[series.length - 1];
+    if (lastPoint && Number.isFinite(lastPoint[0]) && Number.isFinite(lastPoint[1])) {
+      output.push(lastPoint);
+    }
+  }
   
   return output;
 };
@@ -206,25 +236,26 @@ const PolymarketChart = ({
     let noData = [];
 
     // If we have separate YES and NO series, use them independently
+    // Reduced target points to prevent stack overflow (500 max per series = 1000 total max)
     if (yesSeries.length > 0 && noSeries.length > 0) {
-      yesData = densifySeries(yesSeries, 1000);
-      noData = densifySeries(noSeries, 1000);
+      yesData = densifySeries(yesSeries, 300);
+      noData = densifySeries(noSeries, 300);
     }
     // If we only have aggregated data, derive both from it
     else if (aggregatedSeries.length > 0) {
-      yesData = densifySeries(aggregatedSeries, 1000);
+      yesData = densifySeries(aggregatedSeries, 300);
       noData = densifySeries(
         aggregatedSeries.map(([ts, val]) => [ts, 1 - val]),
-        1000
+        300
       );
     }
     // Fallback: use individual series if available
     else {
       if (yesSeries.length > 0) {
-        yesData = densifySeries(yesSeries, 1000);
+        yesData = densifySeries(yesSeries, 300);
       }
       if (noSeries.length > 0) {
-        noData = densifySeries(noSeries, 1000);
+        noData = densifySeries(noSeries, 300);
       }
     }
 
