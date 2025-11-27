@@ -323,7 +323,7 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
     }
 
     // Initial fetch
-    fetchData();
+        fetchData();
 
     // Update position when current user trades
     const handleUserTrade = (eventMarketId, trader) => {
@@ -530,6 +530,47 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
           txHash: receipt?.transactionHash || receipt?.hash
         });
 
+        // Immediately record new price after trade
+        if (contracts?.predictionMarket && marketId) {
+          try {
+            // Wait a moment for blockchain state to update
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            
+            const yesPrice = await contracts.predictionMarket.getCurrentPrice(marketId, true);
+            const noPrice = await contracts.predictionMarket.getCurrentPrice(marketId, false);
+            const yesPriceBps = parseFloat(yesPrice.toString());
+            const noPriceBps = parseFloat(noPrice.toString());
+            
+            console.log('📊 Recording price after buy:', { yesPriceBps, noPriceBps });
+            
+            // Immediately update the displayed prices in the UI FIRST (for instant feedback)
+            const yesPriceCents = yesPriceBps / 100;
+            const noPriceCents = noPriceBps / 100;
+            setMarketData(prev => ({ 
+              ...prev, 
+              yesPrice: yesPriceCents, 
+              noPrice: noPriceCents 
+            }));
+            console.log('🔄 Updated UI prices immediately:', { yesPriceCents, noPriceCents });
+            
+            // Record price snapshot to database
+            await fetch(`${API_BASE}/api/record-price`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+                marketId: marketId.toString(),
+                yesPriceBps: Math.round(yesPriceBps),
+                noPriceBps: Math.round(noPriceBps),
+                blockNumber: receipt?.blockNumber?.toString() || null
+          })
+        });
+
+            console.log('✅ Price recorded to database');
+          } catch (priceErr) {
+            console.error('⚠️ Failed to record price after trade:', priceErr);
+          }
+        }
+
         setTradeAmount('');
       }
       
@@ -537,9 +578,12 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
       fetchData();
       fetchOpenOrders();
       
+      // Wait a bit for price to be recorded, then refresh chart
+      setTimeout(() => {
       if (onTradeComplete) {
         onTradeComplete();
       }
+      }, 800);
     } catch (err) {
       console.error(orderType === 'limit' ? 'Limit order failed:' : 'Buy failed:', err);
       toast.error(`${orderType === 'limit' ? 'Limit order' : 'Buy'} failed: ${err.message}`);
@@ -693,6 +737,47 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
           txHash: receipt?.transactionHash || receipt?.hash
         });
 
+        // Immediately record new price after trade
+        if (contracts?.predictionMarket && marketId) {
+          try {
+            // Wait a moment for blockchain state to update
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            
+            const yesPrice = await contracts.predictionMarket.getCurrentPrice(marketId, true);
+            const noPrice = await contracts.predictionMarket.getCurrentPrice(marketId, false);
+            const yesPriceBps = parseFloat(yesPrice.toString());
+            const noPriceBps = parseFloat(noPrice.toString());
+            
+            console.log('📊 Recording price after sell:', { yesPriceBps, noPriceBps });
+            
+            // Immediately update the displayed prices in the UI FIRST (for instant feedback)
+            const yesPriceCents = yesPriceBps / 100;
+            const noPriceCents = noPriceBps / 100;
+            setMarketData(prev => ({ 
+              ...prev, 
+              yesPrice: yesPriceCents, 
+              noPrice: noPriceCents 
+            }));
+            console.log('🔄 Updated UI prices immediately:', { yesPriceCents, noPriceCents });
+            
+            // Record price snapshot to database
+            await fetch(`${API_BASE}/api/record-price`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                marketId: marketId.toString(),
+                yesPriceBps: Math.round(yesPriceBps),
+                noPriceBps: Math.round(noPriceBps),
+                blockNumber: receipt?.blockNumber?.toString() || null
+              })
+            });
+            
+            console.log('✅ Price recorded to database');
+          } catch (priceErr) {
+            console.error('⚠️ Failed to record price after trade:', priceErr);
+          }
+        }
+
         setTradeAmount('');
       }
       
@@ -700,9 +785,12 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
       fetchData();
       fetchOpenOrders();
       
+      // Wait a bit for price to be recorded, then refresh chart
+      setTimeout(() => {
       if (onTradeComplete) {
         onTradeComplete();
       }
+      }, 800);
     } catch (err) {
       console.error(orderType === 'limit' ? 'Limit order failed:' : 'Sell failed:', err);
       toast.error(`${orderType === 'limit' ? 'Limit order' : 'Sell'} failed: ${err.message}`);
@@ -934,7 +1022,7 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
         }}>
           <div className="flex items-center justify-between mb-1">
             <span style={{ fontFamily: homePageFont, fontWeight: 300, fontSize: '14px', lineHeight: '20px', color: '#FFFFFF' }}>Amount</span>
-      <span style={{ fontFamily: homePageFont, fontWeight: 300, fontSize: '14px', lineHeight: '20px', color: '#FFFFFF' }}>
+            <span style={{ fontFamily: homePageFont, fontWeight: 300, fontSize: '14px', lineHeight: '20px', color: '#FFFFFF' }}>
               Balance: {activeTab === 'buy'
                 ? `${parseFloat(ethBalance).toFixed(3)} TCENT`
                 : `${parseFloat(tradeSide === 'yes' ? position.yesShares : position.noShares).toFixed(3)} TCENT`}

@@ -104,28 +104,38 @@ const parseRangeValue = (value = '') => {
   return { type: unitMap[unit] || 'day', count };
 };
 
-const densifySeries = (series = [], targetPoints = 800) => {
+// Smooth easing function for natural heartbeat-like curves
+const easeInOutCubic = (t) => {
+  return t < 0.5
+    ? 4 * t * t * t  // Ease in (cubic acceleration)
+    : 1 - Math.pow(-2 * t + 2, 3) / 2;  // Ease out (cubic deceleration)
+};
+
+const densifySeries = (series = [], targetPoints = 2000) => {
   if (!series || series.length === 0) {
     return [];
   }
 
   if (series.length === 1) {
-    // If only one point, create a small horizontal segment
+    // If only one point, create a smooth horizontal segment
     const [ts, val] = series[0];
     const now = Date.now();
-    return [
-      [ts - 3600000, val], // 1 hour before
-      [ts, val],
-      [now, val] // Current time
-    ];
+    const segments = 100;
+    const output = [];
+    for (let i = 0; i <= segments; i++) {
+      const ratio = i / segments;
+      const time = ts + (now - ts) * ratio;
+      output.push([time, val]);
+    }
+    return output;
   }
 
   const output = [];
   const totalSegments = series.length - 1;
   
-  // More points per segment for ultra-smooth lines
-  const minPointsPerSegment = 20;
-  const maxPointsPerSegment = 100;
+  // Much more points per segment for ultra-smooth heartbeat-like curves
+  const minPointsPerSegment = 150;
+  const maxPointsPerSegment = 600;
   const pointsPerSegment = Math.max(
     minPointsPerSegment,
     Math.min(maxPointsPerSegment, Math.ceil(targetPoints / Math.max(1, totalSegments)))
@@ -138,17 +148,17 @@ const densifySeries = (series = [], targetPoints = 800) => {
     // Always include the first point
     output.push([t1, v1]);
 
-    // Use smooth interpolation (easing function) for natural curves
+    // Use smooth cubic easing for natural heartbeat-like curves
+    // This eliminates blocky/square transitions
     for (let j = 1; j < pointsPerSegment; j++) {
       const ratio = j / pointsPerSegment;
       
-      // Smooth easing function for natural-looking transitions
-      const easedRatio = ratio < 0.5
-        ? 2 * ratio * ratio
-        : 1 - Math.pow(-2 * ratio + 2, 2) / 2;
+      // Apply cubic ease-in-out for smooth acceleration/deceleration
+      const easedRatio = easeInOutCubic(ratio);
       
       const ts = t1 + (t2 - t1) * ratio;
       const value = v1 + (v2 - v1) * easedRatio;
+      
       output.push([ts, value]);
     }
   }
@@ -308,11 +318,11 @@ const PolymarketChart = ({
       {
         name: activeSeries.key,
         type: 'line',
-        smooth: 0.6, // Smooth curves like Polymarket
+        smooth: true, // Ultra-smooth curves with bezier interpolation
         symbol: 'none',
         showSymbol: false,
         step: false,
-        sampling: 'lttb', // Large-Than-Tiny-Buckets for better performance
+        sampling: false, // Disable sampling to use all densified points
         lineStyle: {
           width: 2.5,
           color: activeSeries.color,

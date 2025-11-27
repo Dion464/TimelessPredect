@@ -53,6 +53,13 @@ const getResolutionMs = (timeframe = '24h') => {
   return resolutionMsMap[normalized] ?? null;
 };
 
+// Smooth easing function for natural heartbeat-like curves
+const easeInOutCubic = (t) => {
+  return t < 0.5
+    ? 4 * t * t * t  // Ease in (cubic acceleration)
+    : 1 - Math.pow(-2 * t + 2, 3) / 2;  // Ease out (cubic deceleration)
+};
+
 const densifySnapshots = (entries = [], resolutionMs) => {
   if (!resolutionMs || entries.length < 2) {
     return entries;
@@ -77,14 +84,28 @@ const densifySnapshots = (entries = [], resolutionMs) => {
       continue;
     }
 
-    for (let step = 1; step < steps; step++) {
-      const ratio = (resolutionMs * step) / timeDiff;
+    // Use more steps for smoother curves (at least 10 points between major changes)
+    const smoothSteps = Math.max(steps, 10);
+    
+    for (let step = 1; step < smoothSteps; step++) {
+      const linearRatio = step / smoothSteps;
+      
+      // Apply cubic easing for smooth, heartbeat-like transitions
+      const easedRatio = easeInOutCubic(linearRatio);
+      
+      // Add subtle sine wave for heartbeat rhythm (very subtle)
+      const heartbeat = Math.sin(linearRatio * Math.PI * 2) * 0.002;
+      const finalRatio = easedRatio + heartbeat;
+      
+      const yesDiff = next.yesPriceBps - current.yesPriceBps;
+      const noDiff = next.noPriceBps - current.noPriceBps;
+      
       const interpolated = {
         marketId: current.marketId,
-        yesPriceBps: Math.round(current.yesPriceBps + (next.yesPriceBps - current.yesPriceBps) * ratio),
-        noPriceBps: Math.round(current.noPriceBps + (next.noPriceBps - current.noPriceBps) * ratio),
+        yesPriceBps: Math.round(current.yesPriceBps + yesDiff * finalRatio),
+        noPriceBps: Math.round(current.noPriceBps + noDiff * finalRatio),
         blockNumber: current.blockNumber,
-        timestamp: new Date(currentTime + resolutionMs * step),
+        timestamp: new Date(currentTime + (timeDiff * linearRatio)),
         interpolated: true
       };
       output.push(interpolated);
