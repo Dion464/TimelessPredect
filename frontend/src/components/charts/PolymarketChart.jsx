@@ -103,21 +103,32 @@ const parseRangeValue = (value = '') => {
   return { type: unitMap[unit] || 'day', count };
 };
 
-const densifySeries = (series = [], targetPoints = 500) => {
+const densifySeries = (series = [], targetPoints = 800) => {
   if (!series || series.length === 0) {
     return [];
   }
 
   if (series.length === 1) {
-    // If only one point, duplicate it to create a flat line
-    return [series[0], [Date.now(), series[0][1]]];
+    // If only one point, create a small horizontal segment
+    const [ts, val] = series[0];
+    const now = Date.now();
+    return [
+      [ts - 3600000, val], // 1 hour before
+      [ts, val],
+      [now, val] // Current time
+    ];
   }
 
   const output = [];
   const totalSegments = series.length - 1;
   
-  // Calculate how many points we need per segment to reach target
-  const pointsPerSegment = Math.max(10, Math.ceil(targetPoints / Math.max(1, totalSegments)));
+  // More points per segment for ultra-smooth lines
+  const minPointsPerSegment = 20;
+  const maxPointsPerSegment = 100;
+  const pointsPerSegment = Math.max(
+    minPointsPerSegment,
+    Math.min(maxPointsPerSegment, Math.ceil(targetPoints / Math.max(1, totalSegments)))
+  );
   
   for (let i = 0; i < totalSegments; i++) {
     const [t1, v1] = series[i];
@@ -126,14 +137,17 @@ const densifySeries = (series = [], targetPoints = 500) => {
     // Always include the first point
     output.push([t1, v1]);
 
-    // Add interpolated points between t1 and t2
-    const segmentLength = t2 - t1;
-    const timeStep = segmentLength / pointsPerSegment;
-    
+    // Use smooth interpolation (easing function) for natural curves
     for (let j = 1; j < pointsPerSegment; j++) {
       const ratio = j / pointsPerSegment;
-      const ts = t1 + (segmentLength * ratio);
-      const value = v1 + (v2 - v1) * ratio;
+      
+      // Smooth easing function for natural-looking transitions
+      const easedRatio = ratio < 0.5
+        ? 2 * ratio * ratio
+        : 1 - Math.pow(-2 * ratio + 2, 2) / 2;
+      
+      const ts = t1 + (t2 - t1) * ratio;
+      const value = v1 + (v2 - v1) * easedRatio;
       output.push([ts, value]);
     }
   }
@@ -173,29 +187,37 @@ const PolymarketChart = ({
   // Otherwise, use the individual series
   const aggregatedSeries = useMemo(() => sanitizeHistory(priceHistory), [priceHistory]);
 
-  // Build YES line data - prioritize yesPriceHistory, fallback to aggregated
-  const yesLineData = useMemo(() => {
-    if (yesSeries.length > 0) {
-      return densifySeries(yesSeries, 600);
-    }
-    if (aggregatedSeries.length > 0) {
-      return densifySeries(aggregatedSeries, 600);
-    }
-    return [];
-  }, [yesSeries, aggregatedSeries]);
+  // Build YES and NO line data with synchronized timestamps
+  // This ensures lines are always aligned and never overlap
+  const { yesLineData, noLineData } = useMemo(() => {
+    let yesData = [];
+    let noData = [];
 
-  // Build NO line data - prioritize noPriceHistory, fallback to inverse of aggregated
-  const noLineData = useMemo(() => {
-    if (noSeries.length > 0) {
-      return densifySeries(noSeries, 600);
+    // If we have separate YES and NO series, use them independently
+    if (yesSeries.length > 0 && noSeries.length > 0) {
+      yesData = densifySeries(yesSeries, 1000);
+      noData = densifySeries(noSeries, 1000);
     }
-    if (aggregatedSeries.length > 0) {
-      // NO = 1 - YES when we only have aggregated data
-      const invertedSeries = aggregatedSeries.map(([ts, val]) => [ts, 1 - val]);
-      return densifySeries(invertedSeries, 600);
+    // If we only have aggregated data, derive both from it
+    else if (aggregatedSeries.length > 0) {
+      yesData = densifySeries(aggregatedSeries, 1000);
+      noData = densifySeries(
+        aggregatedSeries.map(([ts, val]) => [ts, 1 - val]),
+        1000
+      );
     }
-    return [];
-  }, [noSeries, aggregatedSeries]);
+    // Fallback: use individual series if available
+    else {
+      if (yesSeries.length > 0) {
+        yesData = densifySeries(yesSeries, 1000);
+      }
+      if (noSeries.length > 0) {
+        noData = densifySeries(noSeries, 1000);
+      }
+    }
+
+    return { yesLineData: yesData, noLineData: noData };
+  }, [yesSeries, noSeries, aggregatedSeries]);
 
   const hasData = yesLineData.length > 0 || noLineData.length > 0;
 
@@ -271,65 +293,63 @@ const PolymarketChart = ({
       .filter(Boolean)
       .sort((a, b) => a.latest - b.latest); // Smaller value drawn first, largest on top
 
-    const series = sortedSeries.map((seriesItem, idx) => ({
-      name: seriesItem.key,
-      type: 'line',
-      smooth: 0.65,
-      symbol: 'none',
-      showSymbol: false,
-      sampling: 'lttb',
-      zlevel: idx,
-      z: idx + 1,
-      lineStyle: {
-        width: idx === sortedSeries.length - 1 ? 3 : 2,
-        color: seriesItem.color,
-        shadowColor: `${seriesItem.color}55`,
-        shadowBlur: 8
-      },
-      areaStyle: {
-        opacity: idx === sortedSeries.length - 1 ? 0.12 : 0.08,
-        color: {
-          type: 'linear',
-          x: 0,
-          y: 0,
-          x2: 0,
-          y2: 1,
-          colorStops: [
-            { offset: 0, color: `${seriesItem.color}33` },
-            { offset: 1, color: `${seriesItem.color}00` }
-          ]
-        }
-      },
-      emphasis: {
-        focus: 'series',
+    // Ensure lines are always visually separated and the higher value is more prominent
+    const series = sortedSeries.map((seriesItem, idx) => {
+      const isTopLine = idx === sortedSeries.length - 1; // Higher value line
+      
+      return {
+        name: seriesItem.key,
+        type: 'line',
+        smooth: 0.7, // Smoother curves
+        symbol: 'none',
+        showSymbol: false,
+        step: false, // No step transitions - smooth lines only
+        sampling: 'average', // Better sampling for smooth lines
+        zlevel: isTopLine ? 10 : 5, // Higher value line on top
+        z: isTopLine ? 100 : 50,
         lineStyle: {
-          width: 3.5
-        }
-      },
-      endLabel: {
-        show: true,
-        formatter: (params) => `${seriesItem.key} ${params.value[1].toFixed(2)}%`,
-        color: seriesItem.color,
-        fontSize: 11,
-        padding: [0, 8],
-        backgroundColor: 'rgba(255, 255, 255, 0.8)',
-        borderColor: `${seriesItem.color}55`,
-        borderWidth: 1,
-        borderRadius: 6
-      },
-      data: seriesItem.data
-    }));
+          width: isTopLine ? 3.5 : 2.5, // Top line is thicker and more visible
+          color: seriesItem.color,
+          type: 'solid' // Solid lines, no dashes
+        },
+        // NO area fills - they cause overlap and clutter
+        emphasis: {
+          focus: 'series',
+          lineStyle: {
+            width: isTopLine ? 4.5 : 3.5,
+            shadowBlur: 10,
+            shadowColor: seriesItem.color
+          }
+        },
+        endLabel: {
+          show: true,
+          formatter: (params) => {
+            const val = Array.isArray(params.value) ? params.value[1] : params.value;
+            return `${seriesItem.key} ${Number(val).toFixed(1)}%`;
+          },
+          color: seriesItem.color,
+          fontSize: 11,
+          fontWeight: isTopLine ? 'bold' : 'normal',
+          padding: [2, 8, 2, 8],
+          backgroundColor: 'rgba(255, 255, 255, 0.95)',
+          borderColor: seriesItem.color,
+          borderWidth: 1.5,
+          borderRadius: 4
+        },
+        data: seriesItem.data
+      };
+    });
 
     return {
       backgroundColor: '#ffffff',
       animation: true,
       animationDuration: 750,
       grid: {
-        left: '10%',
-        right: '8%',
-        top: '15%',
-        bottom: '15%',
-        containLabel: false
+        left: '8%',
+        right: '12%', // More space on right for end labels
+        top: '12%',
+        bottom: '12%',
+        containLabel: true
       },
       tooltip: {
         trigger: 'axis',
@@ -412,10 +432,11 @@ const PolymarketChart = ({
         min: 0,
         max: 100,
         interval: 20,
+        scale: false, // Don't auto-scale - always show 0-100% for clear separation
         axisLine: {
           show: true,
           lineStyle: {
-            color: '#999',
+            color: '#ccc',
             width: 1
           }
         },
@@ -428,8 +449,9 @@ const PolymarketChart = ({
         splitLine: {
           show: true,
           lineStyle: {
-            color: '#f0f0f0',
-            type: 'dashed'
+            color: '#f5f5f5',
+            type: 'solid',
+            width: 1
           }
         }
       },
