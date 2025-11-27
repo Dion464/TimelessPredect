@@ -126,6 +126,7 @@ const PolymarketStyleTrading = () => {
   const [liquidity, setLiquidity] = useState(0);
   const [timeframe, setTimeframe] = useState('1d');
   const refreshTriggerRef = useRef(0); // Force refresh counter
+  const isFetchingRef = useRef(false); // Prevent concurrent fetches
   const [customRules, setCustomRules] = useState([]);
   const fallbackContractRef = useRef(null);
   const [yesPriceHistory, setYesPriceHistory] = useState([]);
@@ -507,14 +508,15 @@ const PolymarketStyleTrading = () => {
     }
   }, [marketId, API_BASE]);
 
-  const fetchPriceHistoryFromDb = useCallback(async (timeframeParam = timeframe) => {
+  const fetchPriceHistoryFromDb = useCallback(async (timeframeParam) => {
+    const actualTimeframe = timeframeParam || timeframe;
     if (!marketId || !API_BASE) {
       console.warn('Cannot fetch price history: missing marketId or API_BASE');
         return;
       }
 
     try {
-      const response = await fetch(`${API_BASE}/api/price-history?marketId=${marketId}&timeframe=${timeframeParam}`);
+      const response = await fetch(`${API_BASE}/api/price-history?marketId=${marketId}&timeframe=${actualTimeframe}`);
       
       if (!response.ok) {
         const errorText = await response.text();
@@ -528,14 +530,21 @@ const PolymarketStyleTrading = () => {
         setYesPriceHistory(data.data.yesPriceHistory || []);
         setNoPriceHistory(data.data.noPriceHistory || []);
         setPriceHistory(data.data.priceHistory || []);
-        console.log(`✅ Loaded ${data.data.count || 0} price snapshots for timeframe: ${timeframeParam}`);
+        console.log(`✅ Loaded ${data.data.count || 0} price snapshots for timeframe: ${actualTimeframe}`);
       }
     } catch (error) {
       console.error('Error fetching price history:', error);
     }
-  }, [marketId, API_BASE, timeframe]);
+  }, [marketId, API_BASE]);
 
   const fetchMarketData = useCallback(async () => {
+    // Prevent concurrent fetches
+    if (isFetchingRef.current) {
+      console.log('⏸️ Already fetching market data, skipping...');
+      return;
+    }
+    
+    isFetchingRef.current = true;
     try {
       setLoading(true);
 
@@ -585,7 +594,7 @@ const PolymarketStyleTrading = () => {
 
       // Fetch all data in parallel for better performance
       await Promise.all([
-        fetchPriceHistoryFromDb(),
+        fetchPriceHistoryFromDb(timeframe), // Pass timeframe explicitly
         fetchRecentTrades(),
         fetchOrderBook(),
         fetchLiquidity()
@@ -596,8 +605,9 @@ const PolymarketStyleTrading = () => {
       setCustomRules([]);
     } finally {
       setLoading(false);
+      isFetchingRef.current = false;
     }
-  }, [contracts?.predictionMarket, fetchLiquidity, fetchOrderBook, fetchPriceHistoryFromDb, fetchRecentTrades, fetchMarketDataDirect, getMarketData, getStoredRules, isConnected, marketId]);
+  }, [contracts?.predictionMarket, fetchLiquidity, fetchOrderBook, fetchPriceHistoryFromDb, fetchRecentTrades, fetchMarketDataDirect, getMarketData, getStoredRules, isConnected, marketId, timeframe]);
 
   const handleTimeframeChange = useCallback(async (range) => {
     setTimeframe(range);
@@ -610,15 +620,25 @@ const PolymarketStyleTrading = () => {
     await fetchMarketData();
   }, [fetchMarketData]);
 
+  // Store fetchMarketData in a ref to avoid dependency issues
+  const fetchMarketDataRef = useRef(fetchMarketData);
   useEffect(() => {
-    fetchMarketData();
+    fetchMarketDataRef.current = fetchMarketData;
+  }, [fetchMarketData]);
+
+  useEffect(() => {
+    if (!marketId) return;
+    
+    // Reset fetching flag when marketId changes
+    isFetchingRef.current = false;
+    fetchMarketDataRef.current();
     
     const refreshInterval = setInterval(() => {
-        fetchMarketData();
+        fetchMarketDataRef.current();
     }, 60000); // 60 seconds
     
     return () => clearInterval(refreshInterval);
-  }, [fetchMarketData]);
+  }, [marketId]); // Only depend on marketId to prevent infinite loops
 
   // Set up event listeners for real-time updates
   useEffect(() => {
@@ -734,11 +754,11 @@ const PolymarketStyleTrading = () => {
 
     // Fallback: refresh every 5 minutes (events handle immediate updates)
     const interval = setInterval(async () => {
-      await fetchPriceHistoryFromDb();
+      await fetchPriceHistoryFromDb(timeframe);
     }, 300000);
 
     return () => clearInterval(interval);
-  }, [contracts?.predictionMarket, fetchPriceHistoryFromDb, isConnected, marketId]);
+  }, [marketId, isConnected, contracts?.predictionMarket, timeframe]); // Remove fetchPriceHistoryFromDb to avoid loops
 
   const getTimeAgo = (date) => {
     const now = new Date();
