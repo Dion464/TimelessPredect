@@ -103,6 +103,33 @@ const parseRangeValue = (value = '') => {
   return { type: unitMap[unit] || 'day', count };
 };
 
+const densifySeries = (series = [], targetPoints = 240) => {
+  if (!series || series.length < 2) {
+    return series || [];
+  }
+
+  const totalSegments = series.length - 1;
+  const pointsPerSegment = Math.max(2, Math.floor(targetPoints / totalSegments));
+  const output = [];
+
+  for (let i = 0; i < totalSegments; i++) {
+    const [t1, v1] = series[i];
+    const [t2, v2] = series[i + 1];
+    output.push([t1, v1]);
+
+    const segmentLength = t2 - t1;
+    for (let j = 1; j < pointsPerSegment; j++) {
+      const ratio = j / pointsPerSegment;
+      const ts = t1 + segmentLength * ratio;
+      const value = v1 + (v2 - v1) * ratio;
+      output.push([ts, value]);
+    }
+  }
+
+  output.push(series[series.length - 1]);
+  return output;
+};
+
 const PolymarketChart = ({
   priceHistory = [],
   yesPriceHistory = [],
@@ -138,10 +165,16 @@ const PolymarketChart = ({
     return [];
   }, [aggregatedSeries, yesSeries, noSeries]);
 
-  const yesLineData = baseCurve.length ? baseCurve : yesSeries;
-  const noLineData = baseCurve.length
-    ? baseCurve.map(([ts, val]) => [ts, 1 - val]).filter(Boolean)
-    : noSeries;
+  const denseBase = useMemo(() => densifySeries(baseCurve, 240), [baseCurve]);
+
+  const yesLineData = denseBase.length ? denseBase : densifySeries(yesSeries, 120);
+  const noLineData =
+    denseBase.length > 0
+      ? denseBase.map(([ts, val]) => [ts, 1 - val]).filter(Boolean)
+      : densifySeries(
+          noSeries.map(([ts, val]) => [ts, val]),
+          120
+        );
 
   const hasData = yesLineData.length > 0 || noLineData.length > 0;
 
