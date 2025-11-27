@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import ReactECharts from 'echarts-for-react';
 import '../../pages/market/MarketDetailGlass.css';
 
@@ -173,6 +173,7 @@ const PolymarketChart = ({
   ranges = DEFAULT_RANGES,
   title = 'Dynamic Data & Time Axis'
 }) => {
+  const [selectedSide, setSelectedSide] = useState('yes'); // 'yes' or 'no'
   // Build YES and NO series independently - ensure they're always separate
   const yesSeries = useMemo(
     () => buildSeries(yesPriceHistory, currentYesPrice),
@@ -273,52 +274,48 @@ const PolymarketChart = ({
     const latestYes = yesData.length ? yesData[yesData.length - 1].actual : 0;
     const latestNo = noData.length ? noData[noData.length - 1].actual : 0;
 
-    const sortedSeries = [
-      yesData.length
-        ? {
-            key: 'YES',
-            color: accentYes,
-            data: yesData,
-            latest: latestYes
-          }
-        : null,
-      noData.length
-        ? {
-            key: 'NO',
-            color: accentNo,
-            data: noData,
-            latest: latestNo
-          }
-        : null
-    ]
-      .filter(Boolean)
-      .sort((a, b) => a.latest - b.latest); // Smaller value drawn first, largest on top
+    // Show only the selected side (YES or NO)
+    const activeSeries = selectedSide === 'yes' && yesData.length
+      ? {
+          key: 'YES',
+          color: accentYes,
+          data: yesData,
+          latest: latestYes
+        }
+      : noData.length
+      ? {
+          key: 'NO',
+          color: accentNo,
+          data: noData,
+          latest: latestNo
+        }
+      : null;
 
-    // Polymarket-style: area fills under lines, smooth curves, always separated
-    const series = sortedSeries.map((seriesItem, idx) => {
-      const isTopLine = idx === sortedSeries.length - 1; // Higher value line
-      
-      // Convert hex to rgba for area fill
-      const hexToRgba = (hex, alpha) => {
-        const r = parseInt(hex.slice(1, 3), 16);
-        const g = parseInt(hex.slice(3, 5), 16);
-        const b = parseInt(hex.slice(5, 7), 16);
-        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-      };
-      
-      return {
-        name: seriesItem.key,
+    if (!activeSeries) {
+      return null; // No data to show
+    }
+
+    // Convert hex to rgba for area fill
+    const hexToRgba = (hex, alpha) => {
+      const r = parseInt(hex.slice(1, 3), 16);
+      const g = parseInt(hex.slice(3, 5), 16);
+      const b = parseInt(hex.slice(5, 7), 16);
+      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    };
+
+    // Polymarket-style: area fills under line, smooth curves
+    const series = [
+      {
+        name: activeSeries.key,
         type: 'line',
         smooth: 0.6, // Smooth curves like Polymarket
         symbol: 'none',
         showSymbol: false,
         step: false,
         sampling: 'lttb', // Large-Than-Tiny-Buckets for better performance
-        zlevel: isTopLine ? 10 : 5,
-        z: isTopLine ? 100 : 50,
         lineStyle: {
           width: 2.5,
-          color: seriesItem.color,
+          color: activeSeries.color,
           type: 'solid'
         },
         // Polymarket-style area fills
@@ -330,9 +327,9 @@ const PolymarketChart = ({
             x2: 0,
             y2: 1,
             colorStops: [
-              { offset: 0, color: hexToRgba(seriesItem.color, 0.25) },
-              { offset: 0.5, color: hexToRgba(seriesItem.color, 0.15) },
-              { offset: 1, color: hexToRgba(seriesItem.color, 0.05) }
+              { offset: 0, color: hexToRgba(activeSeries.color, 0.25) },
+              { offset: 0.5, color: hexToRgba(activeSeries.color, 0.15) },
+              { offset: 1, color: hexToRgba(activeSeries.color, 0.05) }
             ]
           }
         },
@@ -341,15 +338,15 @@ const PolymarketChart = ({
           lineStyle: {
             width: 3.5,
             shadowBlur: 12,
-            shadowColor: seriesItem.color
+            shadowColor: activeSeries.color
           },
           areaStyle: {
             opacity: 0.4
           }
         },
-        data: seriesItem.data
-      };
-    });
+        data: activeSeries.data
+      }
+    ];
 
     return {
       backgroundColor: 'transparent',
@@ -393,25 +390,7 @@ const PolymarketChart = ({
         }
       },
       legend: {
-        data: ['YES', 'NO'],
-        left: '10%',
-        top: '8%',
-        textStyle: {
-          color: 'rgba(255, 255, 255, 0.8)',
-          fontSize: 12,
-          fontWeight: 'normal'
-        },
-        itemGap: 40,
-        itemWidth: 10,
-        itemHeight: 10,
-        formatter: function(name) {
-          const seriesItem = sortedSeries.find(s => s.key === name);
-          if (seriesItem) {
-            const val = seriesItem.latest;
-            return `${name} ${val.toFixed(1)}%`;
-          }
-          return name;
-        }
+        show: false // Hide legend since we have toggle buttons
       },
       xAxis: {
         type: 'time',
@@ -473,7 +452,7 @@ const PolymarketChart = ({
       },
       series
     };
-  }, [accentNo, accentYes, hasData, noLineData, yesLineData]);
+  }, [accentNo, accentYes, hasData, noLineData, yesLineData, selectedSide]);
 
   if (!hasData || !chartOptions) {
   return (
@@ -486,37 +465,70 @@ const PolymarketChart = ({
     );
   }
 
-  const renderRangeButtons = () => (
-    <div className="mb-4 flex items-center gap-2">
-      <span className="text-white/60 text-xs font-medium mr-1">Zoom</span>
-      {rangeButtons.map((btn, index) => {
-        const isActive = index === selectedRangeIndex;
-        return (
+  const renderControls = () => (
+    <div className="mb-4 flex items-center justify-between">
+      {/* YES/NO Toggle Buttons */}
+      <div className="flex items-center gap-2 bg-white/5 backdrop-blur-md rounded-full p-1 border border-white/10">
+              <button
+          onClick={() => setSelectedSide('yes')}
+          className={`px-4 py-1.5 rounded-full transition-all text-xs font-semibold ${
+            selectedSide === 'yes'
+              ? 'bg-[#FFE600] text-black'
+              : 'text-white/60 hover:text-white'
+          }`}
+          style={{
+            fontFamily: 'gilroy, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+          }}
+        >
+          YES
+              </button>
           <button
-            key={btn.text + btn.dataRangeValue}
-            onClick={() => onRangeChange?.(btn.dataRangeValue)}
-            className={`px-3 py-1.5 rounded-full transition-all text-xs font-medium ${
-              isActive
-                ? 'bg-white/15 text-white border border-white/20'
-                : 'bg-white/5 text-white/60 hover:bg-white/10 border border-transparent'
-            } backdrop-blur-md`}
-            style={{
-              fontFamily: 'gilroy, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-            }}
-          >
-            {btn.text}
+          onClick={() => setSelectedSide('no')}
+          className={`px-4 py-1.5 rounded-full transition-all text-xs font-semibold ${
+            selectedSide === 'no'
+              ? 'bg-[#7C3AED] text-white'
+              : 'text-white/60 hover:text-white'
+          }`}
+          style={{
+            fontFamily: 'gilroy, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+          }}
+        >
+          NO
           </button>
-        );
-      })}
-        </div>
+      </div>
+
+      {/* Zoom Buttons */}
+      <div className="flex items-center gap-2">
+        <span className="text-white/60 text-xs font-medium mr-1">Zoom</span>
+        {rangeButtons.map((btn, index) => {
+          const isActive = index === selectedRangeIndex;
+          return (
+            <button
+              key={btn.text + btn.dataRangeValue}
+              onClick={() => onRangeChange?.(btn.dataRangeValue)}
+              className={`px-3 py-1.5 rounded-full transition-all text-xs font-medium ${
+                isActive
+                  ? 'bg-white/15 text-white border border-white/20'
+                  : 'bg-white/5 text-white/60 hover:bg-white/10 border border-transparent'
+              } backdrop-blur-md`}
+              style={{
+                fontFamily: 'gilroy, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+              }}
+            >
+              {btn.text}
+            </button>
+          );
+        })}
+                  </div>
+                  </div>
   );
 
   return (
     <div className="glass-card w-full rounded-[24px] border border-white/20 backdrop-blur-xl p-6" style={{ background: 'rgba(12,12,12,0.55)' }}>
-      {renderRangeButtons()}
+      {renderControls()}
       <div className="overflow-hidden rounded-[16px]" style={{ height }}>
         <ReactECharts option={chartOptions} style={{ height, width: '100%' }} />
-      </div>
+        </div>
     </div>
   );
 };
