@@ -25,6 +25,79 @@ function serializeBigInt(obj) {
   return obj;
 }
 
+const timeframeAliasMap = {
+  '1h': '1h',
+  '60m': '1h',
+  '6h': '6h',
+  '1d': '24h',
+  '24h': '24h',
+  '7d': '7d',
+  '1w': '7d',
+  '30d': '30d',
+  '1m': '30d',
+  all: 'all'
+};
+
+const resolutionMsMap = {
+  '1h': 60 * 1000, // 1 minute
+  '6h': 3 * 60 * 1000, // 3 minutes
+  '24h': 5 * 60 * 1000, // 5 minutes
+  '7d': 15 * 60 * 1000, // 15 minutes
+  '30d': 60 * 60 * 1000, // 1 hour
+  all: null
+};
+
+const getResolutionMs = (timeframe = '24h') => {
+  const lower = typeof timeframe === 'string' ? timeframe.toLowerCase() : '24h';
+  const normalized = timeframeAliasMap[lower] || '24h';
+  return resolutionMsMap[normalized] ?? null;
+};
+
+const densifySnapshots = (entries = [], resolutionMs) => {
+  if (!resolutionMs || entries.length < 2) {
+    return entries;
+  }
+
+  const output = [];
+  for (let i = 0; i < entries.length - 1; i++) {
+    const current = entries[i];
+    const next = entries[i + 1];
+    output.push(current);
+
+    const currentTime = current.timestamp instanceof Date ? current.timestamp.getTime() : new Date(current.timestamp).getTime();
+    const nextTime = next.timestamp instanceof Date ? next.timestamp.getTime() : new Date(next.timestamp).getTime();
+    const timeDiff = nextTime - currentTime;
+
+    if (!Number.isFinite(timeDiff) || timeDiff <= resolutionMs) {
+      continue;
+    }
+
+    const steps = Math.floor(timeDiff / resolutionMs);
+    if (steps <= 1) {
+      continue;
+    }
+
+    for (let step = 1; step < steps; step++) {
+      const ratio = (resolutionMs * step) / timeDiff;
+      const interpolated = {
+        marketId: current.marketId,
+        yesPriceBps: Math.round(current.yesPriceBps + (next.yesPriceBps - current.yesPriceBps) * ratio),
+        noPriceBps: Math.round(current.noPriceBps + (next.noPriceBps - current.noPriceBps) * ratio),
+        blockNumber: current.blockNumber,
+        timestamp: new Date(currentTime + resolutionMs * step),
+        interpolated: true
+      };
+      output.push(interpolated);
+    }
+  }
+
+  if (entries.length) {
+    output.push(entries[entries.length - 1]);
+  }
+
+  return output;
+};
+
 module.exports = async (req, res) => {
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -98,19 +171,22 @@ module.exports = async (req, res) => {
       take: 10000 // Limit to prevent huge responses
     });
 
+    const resolutionMs = getResolutionMs(timeframe);
+    const enrichedSnapshots = densifySnapshots(snapshots, resolutionMs);
+
     // Format data for chart
-    const yesPriceHistory = snapshots.map(snapshot => ({
+    const yesPriceHistory = enrichedSnapshots.map(snapshot => ({
       price: snapshot.yesPriceBps / 10000, // Convert basis points to decimal (5000 -> 0.5)
       timestamp: snapshot.timestamp.toISOString()
     }));
 
-    const noPriceHistory = snapshots.map(snapshot => ({
+    const noPriceHistory = enrichedSnapshots.map(snapshot => ({
       price: snapshot.noPriceBps / 10000, // Convert basis points to decimal
       timestamp: snapshot.timestamp.toISOString()
     }));
 
     // Combined price history (for general charts)
-    const priceHistory = snapshots.map(snapshot => ({
+    const priceHistory = enrichedSnapshots.map(snapshot => ({
       price: snapshot.yesPriceBps / 10000,
       timestamp: snapshot.timestamp.toISOString()
     }));
@@ -121,7 +197,9 @@ module.exports = async (req, res) => {
         priceHistory,
         yesPriceHistory,
         noPriceHistory,
-        count: snapshots.length
+        count: enrichedSnapshots.length,
+        originalCount: snapshots.length,
+        resolutionMs
       }
     });
 
