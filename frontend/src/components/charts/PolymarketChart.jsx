@@ -399,10 +399,10 @@ const PolymarketChart = ({
       animation: true,
       animationDuration: 600,
       grid: {
-        left: '12%',
-        right: '12%',
-        top: '18%',
-        bottom: '18%',
+        left: '6%',
+        right: '8%',
+        top: '6%',
+        bottom: '8%',
         containLabel: true
       },
       tooltip: {
@@ -516,7 +516,7 @@ const PolymarketChart = ({
   }
 
   const renderControls = () => (
-    <div className="mb-4 flex items-center justify-between">
+    <div className="mb-3 flex items-center justify-between">
       {/* YES/NO Toggle Buttons */}
       <div className="flex items-center gap-2 bg-white/5 backdrop-blur-md rounded-full p-1 border border-white/10">
               <button
@@ -574,10 +574,10 @@ const PolymarketChart = ({
   );
 
   return (
-    <div className="glass-card w-full rounded-[24px] border border-white/20 backdrop-blur-xl p-6" style={{ background: 'rgba(12,12,12,0.55)' }}>
+    <div className="glass-card w-full rounded-[24px] border border-white/20 backdrop-blur-xl p-4" style={{ background: 'rgba(12,12,12,0.55)' }}>
       {renderControls()}
       <div className="overflow-hidden rounded-[16px]" style={{ height }}>
-        <ReactECharts option={chartOptions} style={{ height, width: '100%' }} />
+        <ReactECharts option={chartOptions} style={{ height: '100%', width: '100%' }} />
         </div>
     </div>
   );
