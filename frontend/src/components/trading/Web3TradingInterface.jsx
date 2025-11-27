@@ -150,22 +150,61 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
     ? { fontFamily: homePageFont, fontWeight: 600, fontSize: '28px', lineHeight: '32px', color: '#FFFFFF', letterSpacing: '-0.3px' }
     : { fontFamily: homePageFont, fontWeight: 400, fontSize: '14px', lineHeight: '20px', color: '#FFFFFF' };
 
+  // Function to fetch fresh prices from chain and update UI (ALWAYS gets current blockchain state)
+  const fetchFreshPrices = useCallback(async () => {
+    if (!contracts?.predictionMarket || !marketId) return null;
+
+    try {
+      const yesPrice = await contracts.predictionMarket.getCurrentPrice(marketId, true);
+      const noPrice = await contracts.predictionMarket.getCurrentPrice(marketId, false);
+      
+      const yesPriceBps = parseFloat(yesPrice.toString());
+      const noPriceBps = parseFloat(noPrice.toString());
+      const yesPriceCents = yesPriceBps / 100;
+      const noPriceCents = noPriceBps / 100;
+      
+      setMarketData(prev => {
+        // Always update, even if values are the same (to ensure freshness)
+        return { 
+          ...prev, 
+          yesPrice: yesPriceCents, 
+          noPrice: noPriceCents 
+        };
+      });
+      
+      console.log('💰 Fresh prices from chain:', { yesPriceCents, noPriceCents });
+      return { yesPriceCents, noPriceCents };
+    } catch (err) {
+      console.error('Failed to fetch fresh prices from chain:', err);
+      return null;
+    }
+  }, [contracts?.predictionMarket, marketId]);
+
   // Fetch market data and user position
   const fetchData = useCallback(async () => {
     if (!isConnected || !contracts.predictionMarket || !marketId) return;
 
     try {
-      const [marketInfo, userPos] = await Promise.all([
+      const [marketInfo, userPos, freshPrices] = await Promise.all([
         getMarketData(marketId),
         getUserPosition(marketId),
+        fetchFreshPrices(), // Always get fresh prices from chain
       ]);
+
+      // Merge fresh prices into marketInfo to ensure they're always current
+      if (freshPrices) {
+        marketInfo.yesPrice = freshPrices.yesPriceCents;
+        marketInfo.noPrice = freshPrices.noPriceCents;
+      }
 
       setMarketData(marketInfo);
       setPosition(userPos);
     } catch (err) {
       console.log('Blockchain data not available, using fallback:', err.message);
+      // Still try to fetch fresh prices even if other data fails
+      fetchFreshPrices().catch(() => {});
     }
-  }, [isConnected, contracts.predictionMarket, marketId, getMarketData, getUserPosition]);
+  }, [isConnected, contracts.predictionMarket, marketId, getMarketData, getUserPosition, fetchFreshPrices]);
 
   // Event-driven price updates (replaces 30s polling)
   useEffect(() => {
@@ -179,35 +218,14 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
       return;
     }
 
-    // Initial price fetch (only once on mount)
-    const fetchPrices = async () => {
-      try {
-        const yesPrice = await contract.getCurrentPrice(marketId, true);
-        const noPrice = await contract.getCurrentPrice(marketId, false);
-        
-        const yesPriceCents = parseFloat(yesPrice.toString()) / 100;
-        const noPriceCents = parseFloat(noPrice.toString()) / 100;
-        
-        setMarketData(prev => {
-          if (prev?.yesPrice === yesPriceCents && prev?.noPrice === noPriceCents) {
-            return prev;
-          }
-          return { ...prev, yesPrice: yesPriceCents, noPrice: noPriceCents };
-        });
-      } catch (err) {
-        // Silent fail - prices will update via events
-      }
-    };
-
     // Event handler - updates price instantly when trade happens
-    const handlePriceUpdate = (eventMarketId, _addr, isYes, _shares, _amount, newPrice) => {
+    const handlePriceUpdate = async (eventMarketId, _addr, isYes, _shares, _amount, newPrice) => {
       if (!eventMarketId.eq(normalizedMarketId)) return;
       
-      const priceCents = parseFloat(newPrice.toString()) / 100;
-      const yesPrice = isYes ? priceCents : (100 - priceCents);
-      const noPrice = isYes ? (100 - priceCents) : priceCents;
-      
-      setMarketData(prev => ({ ...prev, yesPrice, noPrice }));
+      // Always fetch fresh prices from chain after event (more reliable than using event price)
+      setTimeout(() => {
+        fetchFreshPrices();
+      }, 500);
     };
 
     // Subscribe to trade events (filtered by marketId for efficiency)
@@ -217,18 +235,20 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
     contract.on(purchaseFilter, handlePriceUpdate);
     contract.on(sellFilter, handlePriceUpdate);
 
-    // Initial fetch
-    fetchPrices();
+    // Initial fetch - always get fresh prices from chain
+    fetchFreshPrices();
 
-    // Fallback: refresh every 5 minutes as safety net
-    const fallbackInterval = setInterval(fetchPrices, 300000);
+    // Poll every 10 seconds to always have current prices
+    const pricePollInterval = setInterval(() => {
+      fetchFreshPrices();
+    }, 10000);
 
     return () => {
       contract.off(purchaseFilter, handlePriceUpdate);
       contract.off(sellFilter, handlePriceUpdate);
-      clearInterval(fallbackInterval);
+      clearInterval(pricePollInterval);
     };
-  }, [contracts.predictionMarket, marketId]);
+  }, [contracts.predictionMarket, marketId, fetchFreshPrices]);
 
   const normalizeDecimal = (value) => {
     if (value === null || value === undefined || value === '') {
@@ -530,51 +550,45 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
           txHash: receipt?.transactionHash || receipt?.hash
         });
 
-        // Immediately record new price after trade
+        setTradeAmount('');
+        
+        // Immediately fetch fresh prices from chain and update UI
         if (contracts?.predictionMarket && marketId) {
           try {
-            // Wait a moment for blockchain state to update
+            // Wait a moment for blockchain state to update after transaction
             await new Promise(resolve => setTimeout(resolve, 1500));
             
-            const yesPrice = await contracts.predictionMarket.getCurrentPrice(marketId, true);
-            const noPrice = await contracts.predictionMarket.getCurrentPrice(marketId, false);
-            const yesPriceBps = parseFloat(yesPrice.toString());
-            const noPriceBps = parseFloat(noPrice.toString());
+            // Fetch fresh prices from chain
+            const prices = await fetchFreshPrices();
             
-            console.log('📊 Recording price after buy:', { yesPriceBps, noPriceBps });
-            
-            // Immediately update the displayed prices in the UI FIRST (for instant feedback)
-            const yesPriceCents = yesPriceBps / 100;
-            const noPriceCents = noPriceBps / 100;
-            setMarketData(prev => ({ 
-              ...prev, 
-              yesPrice: yesPriceCents, 
-              noPrice: noPriceCents 
-            }));
-            console.log('🔄 Updated UI prices immediately:', { yesPriceCents, noPriceCents });
-            
-            // Record price snapshot to database
-            await fetch(`${API_BASE}/api/record-price`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-                marketId: marketId.toString(),
-                yesPriceBps: Math.round(yesPriceBps),
-                noPriceBps: Math.round(noPriceBps),
-                blockNumber: receipt?.blockNumber?.toString() || null
-          })
-        });
+            if (prices) {
+              const { yesPriceCents, noPriceCents } = prices;
+              const yesPriceBps = Math.round(yesPriceCents * 100);
+              const noPriceBps = Math.round(noPriceCents * 100);
+              
+              console.log('📊 Recording price after buy:', { yesPriceBps, noPriceBps });
+              
+              // Record price snapshot to database
+              await fetch(`${API_BASE}/api/record-price`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  marketId: marketId.toString(),
+                  yesPriceBps: yesPriceBps,
+                  noPriceBps: noPriceBps,
+                  blockNumber: receipt?.blockNumber?.toString() || null
+                })
+              });
 
-            console.log('✅ Price recorded to database');
+              console.log('✅ Price recorded to database');
+            }
           } catch (priceErr) {
             console.error('⚠️ Failed to record price after trade:', priceErr);
           }
         }
-
-        setTradeAmount('');
       }
       
-      // Update immediately - no delay
+      // Update data (this will also refresh prices via fetchFreshPrices in useEffect)
       fetchData();
       fetchOpenOrders();
       
@@ -737,51 +751,45 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
           txHash: receipt?.transactionHash || receipt?.hash
         });
 
-        // Immediately record new price after trade
+        setTradeAmount('');
+        
+        // Immediately fetch fresh prices from chain and update UI
         if (contracts?.predictionMarket && marketId) {
           try {
-            // Wait a moment for blockchain state to update
+            // Wait a moment for blockchain state to update after transaction
             await new Promise(resolve => setTimeout(resolve, 1500));
             
-            const yesPrice = await contracts.predictionMarket.getCurrentPrice(marketId, true);
-            const noPrice = await contracts.predictionMarket.getCurrentPrice(marketId, false);
-            const yesPriceBps = parseFloat(yesPrice.toString());
-            const noPriceBps = parseFloat(noPrice.toString());
+            // Fetch fresh prices from chain
+            const prices = await fetchFreshPrices();
             
-            console.log('📊 Recording price after sell:', { yesPriceBps, noPriceBps });
-            
-            // Immediately update the displayed prices in the UI FIRST (for instant feedback)
-            const yesPriceCents = yesPriceBps / 100;
-            const noPriceCents = noPriceBps / 100;
-            setMarketData(prev => ({ 
-              ...prev, 
-              yesPrice: yesPriceCents, 
-              noPrice: noPriceCents 
-            }));
-            console.log('🔄 Updated UI prices immediately:', { yesPriceCents, noPriceCents });
-            
-            // Record price snapshot to database
-            await fetch(`${API_BASE}/api/record-price`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                marketId: marketId.toString(),
-                yesPriceBps: Math.round(yesPriceBps),
-                noPriceBps: Math.round(noPriceBps),
-                blockNumber: receipt?.blockNumber?.toString() || null
-              })
-            });
-            
-            console.log('✅ Price recorded to database');
+            if (prices) {
+              const { yesPriceCents, noPriceCents } = prices;
+              const yesPriceBps = Math.round(yesPriceCents * 100);
+              const noPriceBps = Math.round(noPriceCents * 100);
+              
+              console.log('📊 Recording price after sell:', { yesPriceBps, noPriceBps });
+              
+              // Record price snapshot to database
+              await fetch(`${API_BASE}/api/record-price`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  marketId: marketId.toString(),
+                  yesPriceBps: yesPriceBps,
+                  noPriceBps: noPriceBps,
+                  blockNumber: receipt?.blockNumber?.toString() || null
+                })
+              });
+              
+              console.log('✅ Price recorded to database');
+            }
           } catch (priceErr) {
             console.error('⚠️ Failed to record price after trade:', priceErr);
           }
         }
-
-        setTradeAmount('');
       }
       
-      // Update immediately - no delay
+      // Update data (this will also refresh prices via fetchFreshPrices in useEffect)
       fetchData();
       fetchOpenOrders();
       
