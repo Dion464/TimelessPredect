@@ -129,7 +129,7 @@ const PolymarketChart = ({
 
   const aggregatedSeries = useMemo(() => sanitizeHistory(priceHistory), [priceHistory]);
 
-  const probabilityCurve = useMemo(() => {
+  const baseCurve = useMemo(() => {
     if (aggregatedSeries.length) return aggregatedSeries;
     if (yesSeries.length) return yesSeries;
     if (noSeries.length) {
@@ -138,10 +138,10 @@ const PolymarketChart = ({
     return [];
   }, [aggregatedSeries, yesSeries, noSeries]);
 
-  const yesLineData = yesSeries.length ? yesSeries : probabilityCurve;
-  const noLineData = noSeries.length
-    ? noSeries
-    : probabilityCurve.map(([ts, val]) => [ts, 1 - val]).filter(Boolean);
+  const yesLineData = baseCurve.length ? baseCurve : yesSeries;
+  const noLineData = baseCurve.length
+    ? baseCurve.map(([ts, val]) => [ts, 1 - val]).filter(Boolean)
+    : noSeries;
 
   const hasData = yesLineData.length > 0 || noLineData.length > 0;
 
