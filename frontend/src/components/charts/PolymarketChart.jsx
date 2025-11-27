@@ -1,6 +1,5 @@
 import React, { useMemo } from 'react';
-import Highcharts from 'highcharts/highstock';
-import HighchartsReact from 'highcharts-react-official';
+import ReactECharts from 'echarts-for-react';
 
 const DEFAULT_RANGES = [
   { label: '1H', value: '1h' },
@@ -128,12 +127,23 @@ const PolymarketChart = ({
     [noPriceHistory, currentNoPrice]
   );
 
-  const aggregatedSeries = useMemo(
-    () => sanitizeHistory(priceHistory),
-    [priceHistory]
-  );
+  const aggregatedSeries = useMemo(() => sanitizeHistory(priceHistory), [priceHistory]);
 
-  const hasData = yesSeries.length > 0 || noSeries.length > 0 || aggregatedSeries.length > 0;
+  const probabilityCurve = useMemo(() => {
+    if (aggregatedSeries.length) return aggregatedSeries;
+    if (yesSeries.length) return yesSeries;
+    if (noSeries.length) {
+      return noSeries.map(([ts, val]) => [ts, 1 - val]);
+    }
+    return [];
+  }, [aggregatedSeries, yesSeries, noSeries]);
+
+  const yesLineData = yesSeries.length ? yesSeries : probabilityCurve;
+  const noLineData = noSeries.length
+    ? noSeries
+    : probabilityCurve.map(([ts, val]) => [ts, 1 - val]).filter(Boolean);
+
+  const hasData = yesLineData.length > 0 || noLineData.length > 0;
 
   const rangeButtons = useMemo(() => {
     const sourceRanges = ranges && ranges.length ? ranges : DEFAULT_RANGES;
@@ -163,163 +173,114 @@ const PolymarketChart = ({
   const chartOptions = useMemo(() => {
     if (!hasData) return null;
 
-    const buttonConfigs = rangeButtons.map((btn) => ({
-      ...btn,
-      events: {
-        click() {
-          if (typeof onRangeChange === 'function' && btn.dataRangeValue) {
-            onRangeChange(btn.dataRangeValue);
-          }
-        }
-      }
-    }));
+    const yesData = yesLineData.map(([ts, value]) => [ts, Number(value || 0) * 100]);
+    const noData = noLineData.map(([ts, value]) => [ts, Number(value || 0) * 100]);
 
     return {
-      chart: {
-        backgroundColor,
-        height,
-        spacing: [16, 0, 0, 0]
-      },
-      credits: { enabled: false },
-      legend: {
-        enabled: true,
-        align: 'left',
-        verticalAlign: 'top',
-        itemStyle: { color: '#94a3b8', fontWeight: 600 },
-        itemDistance: 20
-      },
-      rangeSelector: {
-        selected: selectedRangeIndex,
-        buttonTheme: {
-          fill: 'rgba(255,255,255,0.04)',
-          stroke: 'transparent',
-          r: 6,
-          style: { color: '#91A6C9', fontWeight: 600 },
-          states: {
-            hover: { fill: 'rgba(255,255,255,0.08)' },
-            select: {
-              fill: 'rgba(59, 184, 255, 0.18)',
-              style: { color: '#3BB8FF' }
-            }
-          }
-        },
-        labelStyle: { color: '#7485a8', fontWeight: 500 },
-        inputEnabled: false,
-        buttons: buttonConfigs
-      },
-      navigator: { enabled: false },
-      scrollbar: { enabled: false },
-      xAxis: {
-        type: 'datetime',
-        lineColor: 'rgba(255,255,255,0.05)',
-        tickColor: 'rgba(255,255,255,0.05)',
-        gridLineColor: 'rgba(255,255,255,0.03)',
-        labels: {
-          style: { color: '#6f819f', fontSize: '11px', fontWeight: 500 }
-        }
-      },
-      yAxis: {
-        min: 0,
-        max: 1,
-        tickAmount: 5,
-        gridLineColor: 'rgba(255,255,255,0.04)',
-        title: { text: '' },
-        labels: {
-          style: { color: '#6f819f', fontSize: '11px', fontWeight: 500 },
-          formatter() {
-            return `${(this.value * 100).toFixed(0)}%`;
-          }
-        }
-      },
+      backgroundColor,
+      grid: { left: 40, right: 16, top: 32, bottom: 32 },
       tooltip: {
-        shared: true,
+        trigger: 'axis',
         backgroundColor: 'rgba(6,11,24,0.95)',
         borderColor: 'rgba(255,255,255,0.1)',
-        style: { color: '#f1f5f9', fontSize: '12px' },
-        formatter() {
-          const header = `<span style="font-size:11px;color:#94a3b8">${Highcharts.dateFormat(
-            '%b %e, %Y • %H:%M',
-            this.x
-          )}</span>`;
-          const points = (this.points || [])
-            .map(
-              (point) =>
-                `<span style="color:${point.color}">●</span> ${point.series.name}: <b>${(
-                  point.y * 100
-                ).toFixed(2)}%</b>`
-            )
-            .join('<br/>');
-          return `${header}<br/>${points}`;
-        }
+        textStyle: { color: '#f1f5f9', fontSize: 12 },
+        axisPointer: { type: 'line' },
+        valueFormatter: (val) => `${Number(val).toFixed(2)}%`
       },
-      plotOptions: {
-        series: {
-          dataGrouping: { enabled: true, approximation: 'average' },
-          marker: { enabled: false }
-        }
+      legend: {
+        data: ['YES', 'NO'],
+        left: 24,
+        top: 0,
+        textStyle: { color: '#94a3b8', fontWeight: 600 }
       },
+      xAxis: {
+        type: 'time',
+        boundaryGap: false,
+        axisLine: { lineStyle: { color: 'rgba(255,255,255,0.08)' } },
+        axisLabel: { color: '#6f819f', fontSize: 11, fontWeight: 500 },
+        splitLine: { show: true, lineStyle: { color: 'rgba(255,255,255,0.03)' } }
+      },
+      yAxis: {
+        type: 'value',
+        min: 0,
+        max: 100,
+        axisLabel: {
+          color: '#6f819f',
+          fontSize: 11,
+          formatter: (val) => `${val}%`
+        },
+        splitLine: { lineStyle: { color: 'rgba(255,255,255,0.04)' } }
+      },
+      animation: true,
       series: [
-        yesSeries.length
+        yesData.length
           ? {
-              type: 'line',
               name: 'YES',
-              data: yesSeries,
-              color: accentYes,
-              lineWidth: 3,
-              states: { hover: { lineWidth: 3.5 } },
-              shadow: {
-                color: Highcharts.color(accentYes).setOpacity(0.35).get('rgba'),
-                width: 6,
-                offsetX: 0,
-                offsetY: 0
-              }
+              type: 'line',
+              smooth: true,
+              showSymbol: false,
+              lineStyle: { color: accentYes, width: 3 },
+              areaStyle: {
+                opacity: 0.08,
+                color: accentYes
+              },
+              data: yesData
             }
           : null,
-        noSeries.length
+        noData.length
           ? {
-              type: 'line',
               name: 'NO',
-              data: noSeries,
-              color: accentNo,
-              lineWidth: 2,
-              dashStyle: 'ShortDash',
-              states: { hover: { lineWidth: 2.5 } }
+              type: 'line',
+              smooth: true,
+              showSymbol: false,
+              lineStyle: { color: accentNo, width: 2 },
+              areaStyle: {
+                opacity: 0.05,
+                color: accentNo
+              },
+              data: noData
             }
           : null
       ].filter(Boolean)
     };
-  }, [
-    accentNo,
-    accentYes,
-    backgroundColor,
-    hasData,
-    height,
-    onRangeChange,
-    noSeries,
-    rangeButtons,
-    selectedRangeIndex,
-    yesSeries
-  ]);
+  }, [accentNo, accentYes, backgroundColor, hasData, noLineData, yesLineData]);
 
   if (!hasData || !chartOptions) {
-    return (
+  return (
       <div
         className="flex items-center justify-center rounded-2xl border border-white/5 bg-[#08142a] text-sm text-slate-400"
         style={{ height }}
       >
         No price data available yet
-      </div>
+          </div>
     );
   }
 
+  const renderRangeButtons = () => (
+    <div className="mb-3 flex items-center gap-2 text-xs font-semibold text-[#6e7ea3]">
+      <span>Zoom</span>
+      {rangeButtons.map((btn, index) => {
+        const isActive = index === selectedRangeIndex;
+        return (
+          <button
+            key={btn.text + btn.dataRangeValue}
+            onClick={() => onRangeChange?.(btn.dataRangeValue)}
+            className={`rounded-full px-3 py-1 transition ${
+              isActive ? 'bg-[#172040] text-white' : 'bg-[#0d152c] text-[#7c8bb6]'
+            }`}
+          >
+            {btn.text}
+          </button>
+        );
+      })}
+        </div>
+  );
+
   return (
     <div className="w-full rounded-2xl border border-white/5 bg-[#050c1c] px-3 py-4 shadow-lg shadow-black/30">
+      {renderRangeButtons()}
       <div className="overflow-hidden rounded-xl border border-white/5 bg-[#07122c]">
-        <HighchartsReact
-          highcharts={Highcharts}
-          constructorType="stockChart"
-          options={chartOptions}
-        />
+        <ReactECharts option={chartOptions} style={{ height }} />
       </div>
     </div>
   );
