@@ -103,30 +103,44 @@ const parseRangeValue = (value = '') => {
   return { type: unitMap[unit] || 'day', count };
 };
 
-const densifySeries = (series = [], targetPoints = 240) => {
-  if (!series || series.length < 2) {
-    return series || [];
+const densifySeries = (series = [], targetPoints = 500) => {
+  if (!series || series.length === 0) {
+    return [];
   }
 
-  const totalSegments = series.length - 1;
-  const pointsPerSegment = Math.max(2, Math.floor(targetPoints / totalSegments));
-  const output = [];
+  if (series.length === 1) {
+    // If only one point, duplicate it to create a flat line
+    return [series[0], [Date.now(), series[0][1]]];
+  }
 
+  const output = [];
+  const totalSegments = series.length - 1;
+  
+  // Calculate how many points we need per segment to reach target
+  const pointsPerSegment = Math.max(10, Math.ceil(targetPoints / Math.max(1, totalSegments)));
+  
   for (let i = 0; i < totalSegments; i++) {
     const [t1, v1] = series[i];
     const [t2, v2] = series[i + 1];
+    
+    // Always include the first point
     output.push([t1, v1]);
 
+    // Add interpolated points between t1 and t2
     const segmentLength = t2 - t1;
+    const timeStep = segmentLength / pointsPerSegment;
+    
     for (let j = 1; j < pointsPerSegment; j++) {
       const ratio = j / pointsPerSegment;
-      const ts = t1 + segmentLength * ratio;
+      const ts = t1 + (segmentLength * ratio);
       const value = v1 + (v2 - v1) * ratio;
       output.push([ts, value]);
     }
   }
 
+  // Always include the last point
   output.push(series[series.length - 1]);
+  
   return output;
 };
 
@@ -144,6 +158,7 @@ const PolymarketChart = ({
   ranges = DEFAULT_RANGES,
   title = 'Dynamic Data & Time Axis'
 }) => {
+  // Build YES and NO series independently - ensure they're always separate
   const yesSeries = useMemo(
     () => buildSeries(yesPriceHistory, currentYesPrice),
     [yesPriceHistory, currentYesPrice]
@@ -154,27 +169,33 @@ const PolymarketChart = ({
     [noPriceHistory, currentNoPrice]
   );
 
+  // If we have aggregated price history, use it to build both YES and NO
+  // Otherwise, use the individual series
   const aggregatedSeries = useMemo(() => sanitizeHistory(priceHistory), [priceHistory]);
 
-  const baseCurve = useMemo(() => {
-    if (aggregatedSeries.length) return aggregatedSeries;
-    if (yesSeries.length) return yesSeries;
-    if (noSeries.length) {
-      return noSeries.map(([ts, val]) => [ts, 1 - val]);
+  // Build YES line data - prioritize yesPriceHistory, fallback to aggregated
+  const yesLineData = useMemo(() => {
+    if (yesSeries.length > 0) {
+      return densifySeries(yesSeries, 600);
+    }
+    if (aggregatedSeries.length > 0) {
+      return densifySeries(aggregatedSeries, 600);
     }
     return [];
-  }, [aggregatedSeries, yesSeries, noSeries]);
+  }, [yesSeries, aggregatedSeries]);
 
-  const denseBase = useMemo(() => densifySeries(baseCurve, 240), [baseCurve]);
-
-  const yesLineData = denseBase.length ? denseBase : densifySeries(yesSeries, 120);
-  const noLineData =
-    denseBase.length > 0
-      ? denseBase.map(([ts, val]) => [ts, 1 - val]).filter(Boolean)
-      : densifySeries(
-          noSeries.map(([ts, val]) => [ts, val]),
-          120
-        );
+  // Build NO line data - prioritize noPriceHistory, fallback to inverse of aggregated
+  const noLineData = useMemo(() => {
+    if (noSeries.length > 0) {
+      return densifySeries(noSeries, 600);
+    }
+    if (aggregatedSeries.length > 0) {
+      // NO = 1 - YES when we only have aggregated data
+      const invertedSeries = aggregatedSeries.map(([ts, val]) => [ts, 1 - val]);
+      return densifySeries(invertedSeries, 600);
+    }
+    return [];
+  }, [noSeries, aggregatedSeries]);
 
   const hasData = yesLineData.length > 0 || noLineData.length > 0;
 
@@ -206,74 +227,213 @@ const PolymarketChart = ({
   const chartOptions = useMemo(() => {
     if (!hasData) return null;
 
-    const yesData = yesLineData.map(([ts, value]) => [ts, Number(value || 0) * 100]);
-    const noData = noLineData.map(([ts, value]) => [ts, Number(value || 0) * 100]);
+    const formatSeriesData = (lineData) =>
+      lineData.map(([ts, value]) => {
+        const numericValue = Number(value || 0) * 100;
+        return {
+          value: [ts, Math.max(0, Math.min(100, numericValue))],
+          actual: Math.max(0, Math.min(100, numericValue))
+        };
+      });
+
+    const yesData = formatSeriesData(yesLineData);
+    const noData = formatSeriesData(noLineData);
+
+    // Calculate time range
+    const allTimestamps = [
+      ...yesData.map((point) => point.value[0]),
+      ...noData.map((point) => point.value[0])
+    ].filter(Number.isFinite);
+    const minTime = allTimestamps.length > 0 ? Math.min(...allTimestamps) : Date.now() - 86400000;
+    const maxTime = allTimestamps.length > 0 ? Math.max(...allTimestamps) : Date.now();
+
+    const latestYes = yesData.length ? yesData[yesData.length - 1].actual : 0;
+    const latestNo = noData.length ? noData[noData.length - 1].actual : 0;
+
+    const sortedSeries = [
+      yesData.length
+        ? {
+            key: 'YES',
+            color: accentYes,
+            data: yesData,
+            latest: latestYes
+          }
+        : null,
+      noData.length
+        ? {
+            key: 'NO',
+            color: accentNo,
+            data: noData,
+            latest: latestNo
+          }
+        : null
+    ]
+      .filter(Boolean)
+      .sort((a, b) => a.latest - b.latest); // Smaller value drawn first, largest on top
+
+    const series = sortedSeries.map((seriesItem, idx) => ({
+      name: seriesItem.key,
+      type: 'line',
+      smooth: 0.65,
+      symbol: 'none',
+      showSymbol: false,
+      sampling: 'lttb',
+      zlevel: idx,
+      z: idx + 1,
+      lineStyle: {
+        width: idx === sortedSeries.length - 1 ? 3 : 2,
+        color: seriesItem.color,
+        shadowColor: `${seriesItem.color}55`,
+        shadowBlur: 8
+      },
+      areaStyle: {
+        opacity: idx === sortedSeries.length - 1 ? 0.12 : 0.08,
+        color: {
+          type: 'linear',
+          x: 0,
+          y: 0,
+          x2: 0,
+          y2: 1,
+          colorStops: [
+            { offset: 0, color: `${seriesItem.color}33` },
+            { offset: 1, color: `${seriesItem.color}00` }
+          ]
+        }
+      },
+      emphasis: {
+        focus: 'series',
+        lineStyle: {
+          width: 3.5
+        }
+      },
+      endLabel: {
+        show: true,
+        formatter: (params) => `${seriesItem.key} ${params.value[1].toFixed(2)}%`,
+        color: seriesItem.color,
+        fontSize: 11,
+        padding: [0, 8],
+        backgroundColor: 'rgba(255, 255, 255, 0.8)',
+        borderColor: `${seriesItem.color}55`,
+        borderWidth: 1,
+        borderRadius: 6
+      },
+      data: seriesItem.data
+    }));
 
     return {
-      backgroundColor: '#f9faff',
+      backgroundColor: '#ffffff',
       animation: true,
-      animationDuration: 600,
-      grid: { left: 50, right: 24, top: 40, bottom: 50 },
+      animationDuration: 750,
+      grid: {
+        left: '10%',
+        right: '8%',
+        top: '15%',
+        bottom: '15%',
+        containLabel: false
+      },
       tooltip: {
         trigger: 'axis',
-        backgroundColor: 'rgba(15, 23, 42, 0.9)',
-        borderColor: 'rgba(148, 163, 184, 0.4)',
-        textStyle: { color: '#f8fafc', fontSize: 12 },
-        axisPointer: { type: 'line' },
-        valueFormatter: (val) => `${Number(val).toFixed(2)}%`
+        backgroundColor: 'rgba(0, 0, 0, 0.75)',
+        borderColor: 'rgba(255, 255, 255, 0.25)',
+        borderWidth: 1,
+        textStyle: {
+          color: '#fff',
+          fontSize: 12
+        },
+        axisPointer: {
+          type: 'cross',
+          lineStyle: {
+            color: '#999',
+            type: 'dashed'
+          },
+          crossStyle: {
+            color: '#999'
+          }
+        },
+        formatter: function(params) {
+          if (!params || params.length === 0) return '';
+          let result = `<div style="padding: 4px 0; font-weight: 600;">${params[0].axisValueLabel}</div>`;
+          params.forEach((item) => {
+            const value = Array.isArray(item.value) ? item.value[1] : item.value;
+            result += `<div style="display: flex; align-items: center; padding: 2px 0;">
+              <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: ${item.color}; margin-right: 6px;"></span>
+              <span style="color: ${item.color};">${item.seriesName}: ${Number(value).toFixed(2)}%</span>
+            </div>`;
+          });
+          return result;
+        }
       },
       legend: {
         data: ['YES', 'NO'],
         left: 'center',
-        top: 0,
-        textStyle: { color: '#475569', fontSize: 12, fontWeight: 600 }
+        top: '5%',
+        textStyle: {
+          color: '#333',
+          fontSize: 12,
+          fontWeight: 'normal'
+        },
+        itemGap: 30,
+        itemWidth: 25,
+        itemHeight: 14
       },
       xAxis: {
         type: 'time',
         boundaryGap: false,
-        axisLine: { show: true, lineStyle: { color: '#cbd5f5' } },
+        axisLine: {
+          show: true,
+          lineStyle: {
+            color: '#999',
+            width: 1
+          }
+        },
         axisLabel: {
           show: true,
-          color: '#94a3b8',
-          fontSize: 11
+          color: '#666',
+          fontSize: 11,
+          formatter: function(value) {
+            const date = new Date(value);
+            const hours = date.getHours().toString().padStart(2, '0');
+            const minutes = date.getMinutes().toString().padStart(2, '0');
+            return `${hours}:${minutes}`;
+          }
         },
-        splitLine: { show: false }
+        splitLine: {
+          show: true,
+          lineStyle: {
+            color: '#f0f0f0',
+            type: 'dashed'
+          }
+        },
+        min: minTime,
+        max: maxTime
       },
       yAxis: {
         type: 'value',
         min: 0,
         max: 100,
-        axisLine: { show: true, lineStyle: { color: '#cbd5f5' } },
+        interval: 20,
+        axisLine: {
+          show: true,
+          lineStyle: {
+            color: '#999',
+            width: 1
+          }
+        },
         axisLabel: {
           show: true,
-          color: '#94a3b8',
+          color: '#666',
           fontSize: 11,
           formatter: (val) => `${val}%`
         },
-        splitLine: { show: true, lineStyle: { color: '#e2e8f0' } }
+        splitLine: {
+          show: true,
+          lineStyle: {
+            color: '#f0f0f0',
+            type: 'dashed'
+          }
+        }
       },
-      series: [
-        yesData.length > 0
-          ? {
-              name: 'YES',
-              type: 'line',
-              smooth: true,
-              symbol: 'none',
-              lineStyle: { width: 2.5, color: accentYes },
-              data: yesData
-            }
-          : null,
-        noData.length > 0
-          ? {
-              name: 'NO',
-              type: 'line',
-              smooth: true,
-              symbol: 'none',
-              lineStyle: { width: 2.5, color: accentNo },
-              data: noData
-            }
-          : null
-      ].filter(Boolean)
+      series
     };
   }, [accentNo, accentYes, hasData, noLineData, yesLineData]);
 
@@ -289,16 +449,18 @@ const PolymarketChart = ({
   }
 
   const renderRangeButtons = () => (
-    <div className="mb-3 flex items-center gap-2 text-xs font-semibold text-[#6e7ea3]">
-      <span>Zoom</span>
+    <div className="mb-3 flex items-center gap-2 text-xs font-medium text-gray-600">
+      <span className="text-gray-700">Zoom</span>
       {rangeButtons.map((btn, index) => {
         const isActive = index === selectedRangeIndex;
         return (
           <button
             key={btn.text + btn.dataRangeValue}
             onClick={() => onRangeChange?.(btn.dataRangeValue)}
-            className={`rounded-full px-3 py-1 transition ${
-              isActive ? 'bg-[#172040] text-white' : 'bg-[#0d152c] text-[#7c8bb6]'
+            className={`px-3 py-1.5 rounded transition-colors text-xs font-medium ${
+              isActive
+                ? 'bg-blue-500 text-white'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
           >
             {btn.text}
@@ -309,12 +471,12 @@ const PolymarketChart = ({
   );
 
   return (
-    <div className="w-full rounded-3xl border border-[#e1e5f7] bg-[#f4f6ff] px-6 py-5 shadow-sm">
-      <div className="mb-3 text-center text-sm font-semibold text-[#475569] uppercase tracking-wide">
+    <div className="w-full rounded-lg border border-gray-200 bg-gray-50 px-6 py-5 shadow-sm">
+      <div className="mb-3 text-center text-sm font-semibold text-gray-700 uppercase tracking-wide">
         {title}
       </div>
       {renderRangeButtons()}
-      <div className="overflow-hidden rounded-2xl bg-white shadow-inner shadow-[#d9e0ff]">
+      <div className="overflow-hidden rounded-lg bg-white border border-gray-100">
         <ReactECharts option={chartOptions} style={{ height, width: '100%' }} />
         </div>
     </div>
