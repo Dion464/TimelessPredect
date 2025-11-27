@@ -110,11 +110,9 @@ const PolymarketChart = ({
   noPriceHistory = [],
   currentYesPrice = 0.5,
   currentNoPrice = 0.5,
-  headlineLabel = 'chance',
-  headlineValue,
-  changePercent = 0,
-  accentColor = '#3BB8FF',
-  backgroundColor = '#08142a',
+  accentYes = '#FFE600',
+  accentNo = '#7C3AED',
+  backgroundColor = '#081128',
   height = 320,
   selectedRange = 'all',
   onRangeChange = () => {},
@@ -183,7 +181,13 @@ const PolymarketChart = ({
         spacing: [16, 0, 0, 0]
       },
       credits: { enabled: false },
-      legend: { enabled: false },
+      legend: {
+        enabled: true,
+        align: 'left',
+        verticalAlign: 'top',
+        itemStyle: { color: '#94a3b8', fontWeight: 600 },
+        itemDistance: 20
+      },
       rangeSelector: {
         selected: selectedRangeIndex,
         buttonTheme: {
@@ -229,9 +233,9 @@ const PolymarketChart = ({
       },
       tooltip: {
         shared: true,
-        backgroundColor: 'rgba(7,12,26,0.95)',
-        borderColor: 'rgba(255,255,255,0.08)',
-        style: { color: '#f0f4ff', fontSize: '12px' },
+        backgroundColor: 'rgba(6,11,24,0.95)',
+        borderColor: 'rgba(255,255,255,0.1)',
+        style: { color: '#f1f5f9', fontSize: '12px' },
         formatter() {
           const header = `<span style="font-size:11px;color:#94a3b8">${Highcharts.dateFormat(
             '%b %e, %Y • %H:%M',
@@ -240,10 +244,12 @@ const PolymarketChart = ({
           const points = (this.points || [])
             .map(
               (point) =>
-                `${(point.y * 100).toFixed(2)}%`
+                `<span style="color:${point.color}">●</span> ${point.series.name}: <b>${(
+                  point.y * 100
+                ).toFixed(2)}%</b>`
             )
             .join('<br/>');
-          return `${header}<br/><span style="font-size:14px;font-weight:600">${points}</span>`;
+          return `${header}<br/>${points}`;
         }
       },
       plotOptions: {
@@ -255,52 +261,37 @@ const PolymarketChart = ({
       series: [
         yesSeries.length
           ? {
-              type: 'areaspline',
+              type: 'line',
               name: 'YES',
               data: yesSeries,
-              color: '#FFE600',
+              color: accentYes,
               lineWidth: 3,
-              fillColor: {
-                linearGradient: { x1: 0, y1: 0, x2: 0, y2: 1 },
-                stops: [
-                  [0, Highcharts.color('#FFE600').setOpacity(0.2).get('rgba')],
-                  [1, 'rgba(255,230,0,0)']
-                ]
+              states: { hover: { lineWidth: 3.5 } },
+              shadow: {
+                color: Highcharts.color(accentYes).setOpacity(0.35).get('rgba'),
+                width: 6,
+                offsetX: 0,
+                offsetY: 0
               }
             }
           : null,
         noSeries.length
           ? {
-              type: 'areaspline',
+              type: 'line',
               name: 'NO',
               data: noSeries,
-              color: '#7C3AED',
+              color: accentNo,
               lineWidth: 2,
-              fillColor: {
-                linearGradient: { x1: 0, y1: 0, x2: 0, y2: 1 },
-                stops: [
-                  [0, Highcharts.color('#7C3AED').setOpacity(0.15).get('rgba')],
-                  [1, 'rgba(124,58,237,0)']
-                ]
-              }
-            }
-          : null,
-        aggregatedSeries.length
-          ? {
-              type: 'line',
-              name: 'Aggregate',
-              data: aggregatedSeries,
-              color: Highcharts.color(accentColor).setOpacity(0.6).get('rgba'),
-              lineWidth: 1.5,
-              dashStyle: 'ShortDash'
+              dashStyle: 'ShortDash',
+              states: { hover: { lineWidth: 2.5 } }
             }
           : null
       ].filter(Boolean)
     };
   }, [
-    accentColor,
+    accentNo,
+    accentYes,
     backgroundColor,
-    aggregatedSeries,
     hasData,
     height,
     onRangeChange,
@@ -321,40 +312,15 @@ const PolymarketChart = ({
     );
   }
 
-  const fallbackSeries = yesSeries.length ? yesSeries : noSeries.length ? noSeries : aggregatedSeries;
-  const displayValue =
-    typeof headlineValue === 'number'
-      ? headlineValue
-      : (fallbackSeries[fallbackSeries.length - 1]?.[1] || 0) * 100;
-
-  const changeColor = changePercent >= 0 ? 'text-emerald-400' : 'text-rose-400';
-
   return (
-    <div className="w-full rounded-2xl border border-white/5 bg-[#050c1c] px-4 py-5 shadow-lg shadow-black/30">
-      <div className="mb-4 flex items-start justify-between">
-        <div>
-          <p className="text-[11px] uppercase tracking-[0.35em] text-[#5a6b8f]">{headlineLabel}</p>
-          <div className="mt-2 flex items-baseline gap-3">
-            <span className="text-4xl font-semibold text-white">
-              {Number(displayValue).toFixed(0)}%
-            </span>
-            <span className={`text-sm font-semibold ${changeColor}`}>
-              {changePercent >= 0 ? '+' : ''}
-              {changePercent.toFixed(0)}%
-            </span>
-          </div>
-        </div>
-        <div className="text-xs font-semibold uppercase tracking-widest text-[#5a6b8f]">
-          Polymarket
-        </div>
-      </div>
-      <div className="overflow-hidden rounded-xl border border-white/5">
+    <div className="w-full rounded-2xl border border-white/5 bg-[#050c1c] px-3 py-4 shadow-lg shadow-black/30">
+      <div className="overflow-hidden rounded-xl border border-white/5 bg-[#07122c]">
         <HighchartsReact
           highcharts={Highcharts}
           constructorType="stockChart"
           options={chartOptions}
         />
-        </div>
+      </div>
     </div>
   );
 };
