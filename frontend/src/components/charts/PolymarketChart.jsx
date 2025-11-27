@@ -118,13 +118,13 @@ const densifySeries = (series = [], targetPoints = 500) => {
 
   // Safety limit: never create more than 10000 points total
   const MAX_TOTAL_POINTS = 10000;
-  const MAX_POINTS_PER_SEGMENT = 50;
+  const MAX_POINTS_PER_SEGMENT = 60; // Increased for smoother curves
 
   if (series.length === 1) {
     // If only one point, create a simple horizontal segment
     const [ts, val] = series[0];
     const now = Date.now();
-    const segments = Math.min(20, MAX_POINTS_PER_SEGMENT); // Limit segments
+    const segments = Math.min(25, MAX_POINTS_PER_SEGMENT); // Limit segments
     const output = [];
     for (let i = 0; i <= segments; i++) {
       const ratio = i / segments;
@@ -140,7 +140,7 @@ const densifySeries = (series = [], targetPoints = 500) => {
   // Calculate points per segment with safety limits
   let pointsPerSegment = Math.ceil(targetPoints / Math.max(1, totalSegments));
   pointsPerSegment = Math.min(pointsPerSegment, MAX_POINTS_PER_SEGMENT);
-  pointsPerSegment = Math.max(pointsPerSegment, 5); // Minimum 5 points per segment
+  pointsPerSegment = Math.max(pointsPerSegment, 8); // Increased minimum for smoother curves
   
   // Safety check: if this would exceed MAX_TOTAL_POINTS, reduce points per segment
   if (totalSegments * pointsPerSegment > MAX_TOTAL_POINTS) {
@@ -236,26 +236,26 @@ const PolymarketChart = ({
     let noData = [];
 
     // If we have separate YES and NO series, use them independently
-    // Reduced target points to prevent stack overflow (500 max per series = 1000 total max)
+    // Increased target points for smoother curves (but still safe)
     if (yesSeries.length > 0 && noSeries.length > 0) {
-      yesData = densifySeries(yesSeries, 300);
-      noData = densifySeries(noSeries, 300);
+      yesData = densifySeries(yesSeries, 400);
+      noData = densifySeries(noSeries, 400);
     }
     // If we only have aggregated data, derive both from it
     else if (aggregatedSeries.length > 0) {
-      yesData = densifySeries(aggregatedSeries, 300);
+      yesData = densifySeries(aggregatedSeries, 400);
       noData = densifySeries(
         aggregatedSeries.map(([ts, val]) => [ts, 1 - val]),
-        300
+        400
       );
     }
     // Fallback: use individual series if available
     else {
       if (yesSeries.length > 0) {
-        yesData = densifySeries(yesSeries, 300);
+        yesData = densifySeries(yesSeries, 400);
       }
       if (noSeries.length > 0) {
-        noData = densifySeries(noSeries, 300);
+        noData = densifySeries(noSeries, 400);
       }
     }
 
@@ -349,15 +349,20 @@ const PolymarketChart = ({
       {
         name: activeSeries.key,
         type: 'line',
-        smooth: true, // Ultra-smooth curves with bezier interpolation
+        smooth: 0.6, // Higher smooth value (0-1) for more pronounced, curvy lines
+        smoothMonotone: 'x', // Ensure smooth curves that follow the data direction naturally
         symbol: 'none',
         showSymbol: false,
         step: false,
         sampling: false, // Disable sampling to use all densified points
+        connectNulls: false,
         lineStyle: {
-          width: 2.5,
+          width: 3, // Slightly thicker line for better visibility
           color: activeSeries.color,
-          type: 'solid'
+          type: 'solid',
+          shadowBlur: 8,
+          shadowColor: activeSeries.color,
+          shadowOffsetY: 2
         },
         // Polymarket-style area fills
         areaStyle: {
@@ -368,21 +373,21 @@ const PolymarketChart = ({
             x2: 0,
             y2: 1,
             colorStops: [
-              { offset: 0, color: hexToRgba(activeSeries.color, 0.25) },
-              { offset: 0.5, color: hexToRgba(activeSeries.color, 0.15) },
-              { offset: 1, color: hexToRgba(activeSeries.color, 0.05) }
+              { offset: 0, color: hexToRgba(activeSeries.color, 0.2) },
+              { offset: 0.5, color: hexToRgba(activeSeries.color, 0.12) },
+              { offset: 1, color: hexToRgba(activeSeries.color, 0.04) }
             ]
           }
         },
         emphasis: {
           focus: 'series',
           lineStyle: {
-            width: 3.5,
-            shadowBlur: 12,
+            width: 4,
+            shadowBlur: 15,
             shadowColor: activeSeries.color
           },
           areaStyle: {
-            opacity: 0.4
+            opacity: 0.5
           }
         },
         data: activeSeries.data
@@ -394,11 +399,11 @@ const PolymarketChart = ({
       animation: true,
       animationDuration: 600,
       grid: {
-        left: '10%',
-        right: '10%',
-        top: '20%',
-        bottom: '15%',
-        containLabel: false
+        left: '12%',
+        right: '12%',
+        top: '18%',
+        bottom: '18%',
+        containLabel: true
       },
       tooltip: {
         trigger: 'axis',
@@ -447,6 +452,7 @@ const PolymarketChart = ({
           show: true,
           color: 'rgba(255, 255, 255, 0.6)',
           fontSize: 11,
+          margin: 10, // Add margin for better spacing
           formatter: function(value) {
             const date = new Date(value);
             const month = date.toLocaleString('default', { month: 'short' });
@@ -459,6 +465,7 @@ const PolymarketChart = ({
         splitLine: {
           show: false
         },
+        boundaryGap: ['5%', '5%'], // Add padding at left and right for breathing room
         min: minTime,
         max: maxTime
       },
@@ -480,6 +487,7 @@ const PolymarketChart = ({
           show: true,
           color: 'rgba(255, 255, 255, 0.6)',
           fontSize: 11,
+          margin: 12, // Add margin for better spacing
           formatter: (val) => `${val}%`
         },
         splitLine: {
@@ -489,7 +497,8 @@ const PolymarketChart = ({
             type: 'solid',
             width: 1
           }
-        }
+        },
+        boundaryGap: ['5%', '5%'] // Add padding at top and bottom for breathing room
       },
       series
     };
