@@ -134,11 +134,16 @@ export const Web3Provider = ({ children }) => {
         throw new Error(`Invalid prediction market ABI: ${abiError.message}`);
       }
 
-      if (!predictionMarketInterface.functions['getMarket(uint256)']) {
-        throw new Error('Prediction market ABI is missing required getMarket(uint256) function');
+      const hasFunction = (signature) =>
+        Boolean(
+          predictionMarketInterface.functions[signature] ||
+          predictionMarketInterface.functions[`${signature} payable`]
+        );
 
+      if (!hasFunction('getMarket(uint256)')) {
+        throw new Error('Prediction market ABI is missing required getMarket(uint256) function');
       }
-      if (!predictionMarketInterface.functions['buyShares(uint256,bool) payable']) {
+      if (!hasFunction('buyShares(uint256,bool)')) {
         throw new Error('Prediction market ABI is missing required buyShares(uint256,bool) function');
       }
 
