@@ -128,8 +128,7 @@ const HomeWormStyle = () => {
 
       const activeMarketsData = marketsData.filter(m => m && m.active && !m.resolved);
       setMarkets(activeMarketsData);
-      
-      // Set top 3 as trending
+            // Set top 3 as trending
       const sorted = [...activeMarketsData].sort((a, b) => b.volume - a.volume);
       setTrendingMarkets(sorted.slice(0, 3));
       
@@ -310,9 +309,9 @@ const HomeWormStyle = () => {
                         <h3 
                           style={{
                             fontFamily: '"Clash Grotesk Variable", "Clash Grotesk", system-ui, sans-serif',
-                            fontWeight: 600,
-                            fontSize: '16px',
-                            lineHeight: '1.43em',
+                            fontWeight: 600, // Semibold
+                            fontSize: '16.09px',
+                            lineHeight: '22.98px',
                             color: '#F2F2F2',
                             margin: 0,
                             display: '-webkit-box',
@@ -330,8 +329,8 @@ const HomeWormStyle = () => {
                         style={{
                           fontFamily: '"Clash Grotesk Variable", "Clash Grotesk", system-ui, sans-serif',
                           fontWeight: 400,
-                          fontSize: '14px',
-                          lineHeight: '1.33em',
+                          fontSize: '13.79px',
+                          lineHeight: '18.38px',
                           color: '#899CB2',
                           flexShrink: 0,
                           whiteSpace: 'nowrap'
@@ -348,9 +347,9 @@ const HomeWormStyle = () => {
                         <span 
                           style={{
                             fontFamily: '"Clash Grotesk Variable", "Clash Grotesk", system-ui, sans-serif',
-                            fontWeight: 500,
-                            fontSize: '18px',
-                            lineHeight: '1.5em',
+                            fontWeight: 500, // Medium
+                            fontSize: '18.38px',
+                            lineHeight: '27.58px',
                             color: '#F2F2F2'
                           }}
                         >
@@ -360,8 +359,8 @@ const HomeWormStyle = () => {
                           style={{
                             fontFamily: '"Clash Grotesk Variable", "Clash Grotesk", system-ui, sans-serif',
                             fontWeight: 500,
-                            fontSize: '13px',
-                            lineHeight: '1.5em',
+                            fontSize: '13.83px',
+                            lineHeight: '27.58px',
                             color: '#899CB2'
                           }}
                         >
@@ -423,8 +422,8 @@ const HomeWormStyle = () => {
                         <span 
                           style={{
                             fontFamily: '"Clash Grotesk Variable", "Clash Grotesk", system-ui, sans-serif',
-                            fontWeight: 600,
-                            fontSize: '16px',
+                            fontWeight: 600, // Semibold
+                            fontSize: '16.09px',
                             color: '#43C773'
                           }}
                         >
@@ -461,8 +460,8 @@ const HomeWormStyle = () => {
                         <span 
                           style={{
                             fontFamily: '"Clash Grotesk Variable", "Clash Grotesk", system-ui, sans-serif',
-                            fontWeight: 600,
-                            fontSize: '16px',
+                            fontWeight: 600, // Semibold
+                            fontSize: '16.09px',
                             color: '#E13737'
                           }}
                         >

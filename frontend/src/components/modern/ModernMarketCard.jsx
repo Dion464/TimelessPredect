@@ -136,9 +136,9 @@ const ModernMarketCard = ({ market, showBuyButtons = false, onBuy }) => {
             <h3 
               style={{
                 fontFamily: '"Clash Grotesk Variable", "Clash Grotesk", system-ui, sans-serif',
-                fontWeight: 600,
-                fontSize: '16px',
-                lineHeight: '1.43em',
+                fontWeight: 600, // Semibold
+                fontSize: '16.09px',
+                lineHeight: '22.98px',
                 color: '#F2F2F2',
                 margin: 0,
                 display: '-webkit-box',
@@ -156,8 +156,8 @@ const ModernMarketCard = ({ market, showBuyButtons = false, onBuy }) => {
             style={{
               fontFamily: '"Clash Grotesk Variable", "Clash Grotesk", system-ui, sans-serif',
               fontWeight: 400,
-              fontSize: '14px',
-              lineHeight: '1.33em',
+              fontSize: '13.79px',
+              lineHeight: '18.38px',
               color: '#899CB2',
               flexShrink: 0,
               whiteSpace: 'nowrap'
@@ -174,9 +174,9 @@ const ModernMarketCard = ({ market, showBuyButtons = false, onBuy }) => {
             <span 
               style={{
                 fontFamily: '"Clash Grotesk Variable", "Clash Grotesk", system-ui, sans-serif',
-                fontWeight: 500,
-                fontSize: '18px',
-                lineHeight: '1.5em',
+                fontWeight: 500, // Medium
+                fontSize: '18.38px',
+                lineHeight: '27.58px',
                 color: '#F2F2F2'
               }}
             >
@@ -186,8 +186,8 @@ const ModernMarketCard = ({ market, showBuyButtons = false, onBuy }) => {
               style={{
                 fontFamily: '"Clash Grotesk Variable", "Clash Grotesk", system-ui, sans-serif',
                 fontWeight: 500,
-                fontSize: '13px',
-                lineHeight: '1.5em',
+                fontSize: '13.83px',
+                lineHeight: '27.58px',
                 color: '#899CB2'
               }}
             >
@@ -253,9 +253,9 @@ const ModernMarketCard = ({ market, showBuyButtons = false, onBuy }) => {
             <span 
               style={{
                 fontFamily: '"Clash Grotesk Variable", "Clash Grotesk", system-ui, sans-serif',
-                fontWeight: 600,
-                fontSize: '16px',
-                lineHeight: '1.43em',
+                fontWeight: 600, // Semibold
+                fontSize: '16.09px',
+                lineHeight: '22.98px',
                 color: '#43C773',
                 textShadow: '0 1px 2px rgba(0,0,0,0.2)'
               }}
@@ -296,9 +296,9 @@ const ModernMarketCard = ({ market, showBuyButtons = false, onBuy }) => {
             <span 
               style={{
                 fontFamily: '"Clash Grotesk Variable", "Clash Grotesk", system-ui, sans-serif',
-                fontWeight: 600,
-                fontSize: '16px',
-                lineHeight: '1.43em',
+                fontWeight: 600, // Semibold
+                fontSize: '16.09px',
+                lineHeight: '22.98px',
                 color: '#E13737',
                 textShadow: '0 1px 2px rgba(0,0,0,0.2)'
               }}
