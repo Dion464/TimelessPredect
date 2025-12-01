@@ -95,7 +95,7 @@ const ModernMarketCard = ({ market, showBuyButtons = false, onBuy }) => {
       className="glass-card box-shadow cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-[0_0_30px_rgba(247,208,34,0.15)]"
       style={{
         width: '100%',
-        minHeight: '220px',
+        minHeight: '235px',
         // Lighter, clearer glass background
         background: 'linear-gradient(135deg, rgba(18,18,18,0.68), rgba(40,40,40,0.52))',
         backdropFilter: 'blur(24px)',
@@ -106,7 +106,7 @@ const ModernMarketCard = ({ market, showBuyButtons = false, onBuy }) => {
         overflow: 'hidden'
       }}
     >
-      <div style={{ padding: '20px 18px', height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ padding: '22px 20px', height: '100%', display: 'flex', flexDirection: 'column' }}>
         
         {/* Top Section: Icon + Title + Volume */}
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: '9px', marginBottom: '20px' }}>
@@ -139,8 +139,8 @@ const ModernMarketCard = ({ market, showBuyButtons = false, onBuy }) => {
               style={{
                 fontFamily: '"Clash Grotesk", "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                 fontWeight: 600, 
-                fontSize: '18px',
-                lineHeight: '24px',
+                fontSize: '19px',
+                lineHeight: '26px',
                 color: '#F2F2F2',
                 margin: 0,
                 display: '-webkit-box',
@@ -158,8 +158,8 @@ const ModernMarketCard = ({ market, showBuyButtons = false, onBuy }) => {
             style={{
               fontFamily: '"Clash Grotesk", "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
               fontWeight: 400,
-              fontSize: '13.79px',
-              lineHeight: '18.38px',
+              fontSize: '14.2px',
+              lineHeight: '19.5px',
               color: '#899CB2',
               flexShrink: 0,
               whiteSpace: 'nowrap'
@@ -177,8 +177,8 @@ const ModernMarketCard = ({ market, showBuyButtons = false, onBuy }) => {
               style={{
                 fontFamily: '"Clash Grotesk", "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                 fontWeight: 500, // Medium
-                fontSize: '18.38px',
-                lineHeight: '27.58px',
+                fontSize: '19.5px',
+                lineHeight: '28.5px',
                 color: '#F2F2F2'
               }}
             >
@@ -188,8 +188,8 @@ const ModernMarketCard = ({ market, showBuyButtons = false, onBuy }) => {
               style={{
                 fontFamily: '"Clash Grotesk", "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                 fontWeight: 500,
-                fontSize: '13.83px',
-                lineHeight: '27.58px',
+                fontSize: '14px',
+                lineHeight: '28.5px',
                 color: '#899CB2'
               }}
             >
@@ -229,7 +229,7 @@ const ModernMarketCard = ({ market, showBuyButtons = false, onBuy }) => {
             onClick={(e) => handleBuy('yes', e)}
             style={{
               flex: 1,
-              height: '48px',
+              height: '50px',
               background: 'rgba(67, 199, 115, 0.15)',
               backdropFilter: 'blur(8px)',
               WebkitBackdropFilter: 'blur(8px)',
@@ -256,8 +256,8 @@ const ModernMarketCard = ({ market, showBuyButtons = false, onBuy }) => {
               style={{
                 fontFamily: '"Clash Grotesk", "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                 fontWeight: 600, // Semibold
-                fontSize: '16.09px',
-                lineHeight: '22.98px',
+                fontSize: '17px',
+                lineHeight: '24px',
                 color: '#43C773',
                 textShadow: '0 1px 2px rgba(0,0,0,0.2)'
               }}
@@ -272,7 +272,7 @@ const ModernMarketCard = ({ market, showBuyButtons = false, onBuy }) => {
             onClick={(e) => handleBuy('no', e)}
             style={{
               flex: 1,
-              height: '48px',
+              height: '50px',
               background: 'rgba(225, 55, 55, 0.15)',
               backdropFilter: 'blur(8px)',
               WebkitBackdropFilter: 'blur(8px)',
@@ -299,8 +299,8 @@ const ModernMarketCard = ({ market, showBuyButtons = false, onBuy }) => {
               style={{
                 fontFamily: '"Clash Grotesk", "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                 fontWeight: 600, // Semibold
-                fontSize: '16.09px',
-                lineHeight: '22.98px',
+                fontSize: '17px',
+                lineHeight: '24px',
                 color: '#E13737',
                 textShadow: '0 1px 2px rgba(0,0,0,0.2)'
               }}

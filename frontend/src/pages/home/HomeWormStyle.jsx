@@ -324,8 +324,8 @@ const HomeWormStyle = () => {
                           style={{
                             fontFamily: '"Clash Grotesk", "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                             fontWeight: 600, // Semibold
-                            fontSize: '18px',
-                            lineHeight: '24px',
+                            fontSize: '19px',
+                            lineHeight: '26px',
                             color: '#F2F2F2',
                             margin: 0,
                             display: '-webkit-box',
