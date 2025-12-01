@@ -139,8 +139,8 @@ const ModernMarketCard = ({ market, showBuyButtons = false, onBuy }) => {
               style={{
                 fontFamily: '"Clash Grotesk", "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                 fontWeight: 600, 
-                fontSize: '16.09px',
-                lineHeight: '22.98px',
+                fontSize: '18px',
+                lineHeight: '24px',
                 color: '#F2F2F2',
                 margin: 0,
                 display: '-webkit-box',
