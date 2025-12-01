@@ -111,6 +111,38 @@ const easeInOutCubic = (t) => {
     : 1 - Math.pow(-2 * t + 2, 3) / 2;  // Ease out (cubic deceleration)
 };
 
+// Extra smoothing over values to avoid perfectly vertical jumps
+// Simple forward + backward exponential smoothing over the densified series
+const smoothSeries = (series = [], passes = 2, alpha = 0.4) => {
+  if (!Array.isArray(series) || series.length < 3) return series;
+
+  let smoothed = series.map(([ts, v]) => [ts, v]);
+
+  for (let p = 0; p < passes; p++) {
+    const forward = [];
+    let prevVal = smoothed[0][1];
+    for (let i = 0; i < smoothed.length; i++) {
+      const [ts, v] = smoothed[i];
+      const next = prevVal + (v - prevVal) * alpha;
+      forward.push([ts, next]);
+      prevVal = next;
+    }
+
+    const backward = [];
+    prevVal = forward[forward.length - 1][1];
+    for (let i = forward.length - 1; i >= 0; i--) {
+      const [ts, v] = forward[i];
+      const next = prevVal + (v - prevVal) * alpha;
+      backward.push([ts, next]);
+      prevVal = next;
+    }
+
+    smoothed = backward.reverse();
+  }
+
+  return smoothed;
+};
+
 const densifySeries = (series = [], targetPoints = 500) => {
   if (!series || series.length === 0) {
     return [];
@@ -232,19 +264,19 @@ const PolymarketChart = ({
   // Build YES and NO line data with synchronized timestamps
   // This ensures lines are always aligned and never overlap
   const { yesLineData, noLineData } = useMemo(() => {
-    let yesData = [];
-    let noData = [];
+    let yesDataRaw = [];
+    let noDataRaw = [];
 
     // If we have separate YES and NO series, use them independently
     // Increased target points for smoother curves (but still safe)
     if (yesSeries.length > 0 && noSeries.length > 0) {
-      yesData = densifySeries(yesSeries, 400);
-      noData = densifySeries(noSeries, 400);
+      yesDataRaw = densifySeries(yesSeries, 400);
+      noDataRaw = densifySeries(noSeries, 400);
     }
     // If we only have aggregated data, derive both from it
     else if (aggregatedSeries.length > 0) {
-      yesData = densifySeries(aggregatedSeries, 400);
-      noData = densifySeries(
+      yesDataRaw = densifySeries(aggregatedSeries, 400);
+      noDataRaw = densifySeries(
         aggregatedSeries.map(([ts, val]) => [ts, 1 - val]),
         400
       );
@@ -252,12 +284,16 @@ const PolymarketChart = ({
     // Fallback: use individual series if available
     else {
       if (yesSeries.length > 0) {
-        yesData = densifySeries(yesSeries, 400);
+        yesDataRaw = densifySeries(yesSeries, 400);
       }
       if (noSeries.length > 0) {
-        noData = densifySeries(noSeries, 400);
+        noDataRaw = densifySeries(noSeries, 400);
       }
     }
+
+    // Apply additional smoothing so transitions are rounded, not perfectly vertical
+    const yesData = smoothSeries(yesDataRaw, 2, 0.45);
+    const noData = smoothSeries(noDataRaw, 2, 0.45);
 
     return { yesLineData: yesData, noLineData: noData };
   }, [yesSeries, noSeries, aggregatedSeries]);
@@ -294,10 +330,12 @@ const PolymarketChart = ({
 
     const formatSeriesData = (lineData) =>
       lineData.map(([ts, value]) => {
-        const numericValue = Number(value || 0) * 100;
+        // Convert to percentage and keep some space from 0% and 100% for readability
+        const rawPercent = Number(value || 0) * 100;
+        const numericValue = Math.max(5, Math.min(95, rawPercent)); // clamp to [5, 95]
         return {
-          value: [ts, Math.max(0, Math.min(100, numericValue))],
-          actual: Math.max(0, Math.min(100, numericValue))
+          value: [ts, numericValue],
+          actual: numericValue
         };
       });
 
