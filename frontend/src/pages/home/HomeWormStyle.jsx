@@ -7,6 +7,7 @@ import WormStyleNavbar from '../../components/modern/WormStyleNavbar';
 import MarketCountdown from '../../components/common/MarketCountdown';
 import ModernMarketCard from '../../components/modern/ModernMarketCard';
 import { CONTRACT_ADDRESS, CONTRACT_ABI, RPC_URL } from '../../contracts/eth-config';
+import '../market/MarketDetailGlass.css';
 
 const HomeWormStyle = () => {
   const history = useHistory();
@@ -256,6 +257,19 @@ const HomeWormStyle = () => {
         {!searchQuery.trim() && (
           <div className="mb-12">
             <div className="flex items-center justify-between mb-6">
+              <h2
+                style={{
+                  fontFamily: '"Clash Grotesk", "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                  fontWeight: 600,
+                  fontSize: '14px',
+                  letterSpacing: '0.12em',
+                  textTransform: 'uppercase',
+                  color: '#F2F2F2',
+                  opacity: 0.9,
+                }}
+              >
+                Trending markets
+              </h2>
             </div>
             
             {trendingMarkets.length > 0 && (
@@ -264,20 +278,20 @@ const HomeWormStyle = () => {
                 <div
                   key={market.id}
                   onClick={() => history.push(`/markets/${market.id}`)}
-                  className="rounded-[12px] overflow-hidden cursor-pointer transition-all duration-300 ease-out group relative border hover:scale-[1.02]"
+                  className="glass-card background box-shadow rounded-[14px] overflow-hidden cursor-pointer transition-all duration-300 ease-out group relative hover:scale-[1.02]"
                   style={{
-                    background: 'rgba(30, 30, 30, 0.6)',
-                    backdropFilter: 'blur(20px)',
-                    WebkitBackdropFilter: 'blur(20px)',
-                    border: '1px solid rgba(255, 255, 255, 0.08)',
-                    boxShadow: '0 4px 24px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+                    // Use glass-card outline for border; keep interior mostly transparent with blur
+                    background: 'transparent',
+                    backdropFilter: 'blur(26px)',
+                    WebkitBackdropFilter: 'blur(26px)',
+                    borderRadius: '14px',
                     minHeight: '220px'
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.boxShadow = '0 0 30px rgba(247, 208, 34, 0.15), 0 4px 24px rgba(0, 0, 0, 0.2)';
+                    e.currentTarget.style.boxShadow = '0 0 0 1px rgba(255,255,255,0.2), 0 26px 60px rgba(0,0,0,0.75), inset 0 1px 0 rgba(255,255,255,0.18)';
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.boxShadow = '0 4px 24px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.05)';
+                    e.currentTarget.style.boxShadow = '';
                   }}
                 >
                   <div style={{ padding: '18px 16px', height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -308,7 +322,7 @@ const HomeWormStyle = () => {
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <h3 
                           style={{
-                            fontFamily: '"Clash Grotesk Variable", "Clash Grotesk", system-ui, sans-serif',
+                            fontFamily: '"Clash Grotesk", "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                             fontWeight: 600, // Semibold
                             fontSize: '16.09px',
                             lineHeight: '22.98px',
@@ -327,7 +341,7 @@ const HomeWormStyle = () => {
                       {/* Volume */}
                       <div 
                         style={{
-                          fontFamily: '"Clash Grotesk Variable", "Clash Grotesk", system-ui, sans-serif',
+                          fontFamily: '"Clash Grotesk", "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                           fontWeight: 400,
                           fontSize: '13.79px',
                           lineHeight: '18.38px',
@@ -346,7 +360,7 @@ const HomeWormStyle = () => {
                       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'flex-end', marginBottom: '6px', gap: '6px' }}>
                         <span 
                           style={{
-                            fontFamily: '"Clash Grotesk Variable", "Clash Grotesk", system-ui, sans-serif',
+                            fontFamily: '"Clash Grotesk", "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                             fontWeight: 500, // Medium
                             fontSize: '18.38px',
                             lineHeight: '27.58px',
@@ -357,7 +371,7 @@ const HomeWormStyle = () => {
                         </span>
                         <span 
                           style={{
-                            fontFamily: '"Clash Grotesk Variable", "Clash Grotesk", system-ui, sans-serif',
+                            fontFamily: '"Clash Grotesk", "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                             fontWeight: 500,
                             fontSize: '13.83px',
                             lineHeight: '27.58px',
@@ -421,7 +435,7 @@ const HomeWormStyle = () => {
                       >
                         <span 
                           style={{
-                            fontFamily: '"Clash Grotesk Variable", "Clash Grotesk", system-ui, sans-serif',
+                            fontFamily: '"Clash Grotesk", "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                             fontWeight: 600, // Semibold
                             fontSize: '16.09px',
                             color: '#43C773'
@@ -459,7 +473,7 @@ const HomeWormStyle = () => {
                       >
                         <span 
                           style={{
-                            fontFamily: '"Clash Grotesk Variable", "Clash Grotesk", system-ui, sans-serif',
+                            fontFamily: '"Clash Grotesk", "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                             fontWeight: 600, // Semibold
                             fontSize: '16.09px',
                             color: '#E13737'

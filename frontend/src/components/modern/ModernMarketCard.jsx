@@ -1,5 +1,6 @@
 import React from 'react';
 import { useHistory } from 'react-router-dom';
+import '../../pages/market/MarketDetailGlass.css';
 
 // Helper function to format volume
 const formatVolumeDisplay = (volume) => {
@@ -91,16 +92,17 @@ const ModernMarketCard = ({ market, showBuyButtons = false, onBuy }) => {
   return (
     <div 
       onClick={handleCardClick}
-      className="cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-[0_0_30px_rgba(247,208,34,0.15)]"
+      className="glass-card box-shadow cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-[0_0_30px_rgba(247,208,34,0.15)]"
       style={{
         width: '100%',
         minHeight: '220px',
-        background: 'rgba(30, 30, 30, 0.6)',
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
-        borderRadius: '12px',
-        border: '1px solid rgba(255, 255, 255, 0.08)',
-        boxShadow: '0 4px 24px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+        // Lighter, clearer glass background
+        background: 'linear-gradient(135deg, rgba(18,18,18,0.68), rgba(40,40,40,0.52))',
+        backdropFilter: 'blur(24px)',
+        WebkitBackdropFilter: 'blur(24px)',
+        borderRadius: '14px',
+        border: '1px solid rgba(255, 255, 255, 0.2)',
+        boxShadow: '0 0 0 1px rgba(255, 255, 255, 0.06), 0 18px 45px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.14)',
         overflow: 'hidden'
       }}
     >
@@ -112,7 +114,7 @@ const ModernMarketCard = ({ market, showBuyButtons = false, onBuy }) => {
           <div 
             style={{
               width: '48px',
-              height: '48px',
+              height: '54px',
               borderRadius: '8px',
               overflow: 'hidden',
               flexShrink: 0,
@@ -135,8 +137,8 @@ const ModernMarketCard = ({ market, showBuyButtons = false, onBuy }) => {
           <div style={{ flex: 1, minWidth: 0 }}>
             <h3 
               style={{
-                fontFamily: '"Clash Grotesk Variable", "Clash Grotesk", system-ui, sans-serif',
-                fontWeight: 600, // Semibold
+                fontFamily: '"Clash Grotesk", "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                fontWeight: 600, 
                 fontSize: '16.09px',
                 lineHeight: '22.98px',
                 color: '#F2F2F2',
@@ -154,7 +156,7 @@ const ModernMarketCard = ({ market, showBuyButtons = false, onBuy }) => {
           {/* Volume */}
           <div 
             style={{
-              fontFamily: '"Clash Grotesk Variable", "Clash Grotesk", system-ui, sans-serif',
+              fontFamily: '"Clash Grotesk", "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
               fontWeight: 400,
               fontSize: '13.79px',
               lineHeight: '18.38px',
@@ -173,7 +175,7 @@ const ModernMarketCard = ({ market, showBuyButtons = false, onBuy }) => {
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'flex-end', marginBottom: '6px', gap: '6px' }}>
             <span 
               style={{
-                fontFamily: '"Clash Grotesk Variable", "Clash Grotesk", system-ui, sans-serif',
+                fontFamily: '"Clash Grotesk", "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                 fontWeight: 500, // Medium
                 fontSize: '18.38px',
                 lineHeight: '27.58px',
@@ -184,7 +186,7 @@ const ModernMarketCard = ({ market, showBuyButtons = false, onBuy }) => {
             </span>
             <span 
               style={{
-                fontFamily: '"Clash Grotesk Variable", "Clash Grotesk", system-ui, sans-serif',
+                fontFamily: '"Clash Grotesk", "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                 fontWeight: 500,
                 fontSize: '13.83px',
                 lineHeight: '27.58px',
@@ -252,7 +254,7 @@ const ModernMarketCard = ({ market, showBuyButtons = false, onBuy }) => {
           >
             <span 
               style={{
-                fontFamily: '"Clash Grotesk Variable", "Clash Grotesk", system-ui, sans-serif',
+                fontFamily: '"Clash Grotesk", "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                 fontWeight: 600, // Semibold
                 fontSize: '16.09px',
                 lineHeight: '22.98px',
@@ -295,7 +297,7 @@ const ModernMarketCard = ({ market, showBuyButtons = false, onBuy }) => {
           >
             <span 
               style={{
-                fontFamily: '"Clash Grotesk Variable", "Clash Grotesk", system-ui, sans-serif',
+                fontFamily: '"Clash Grotesk", "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                 fontWeight: 600, // Semibold
                 fontSize: '16.09px',
                 lineHeight: '22.98px',
