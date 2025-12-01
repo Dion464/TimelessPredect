@@ -294,7 +294,7 @@ const HomeWormStyle = () => {
                     e.currentTarget.style.boxShadow = '';
                   }}
                 >
-                  <div style={{ padding: '18px 16px', height: '100%', display: 'flex', flexDirection: 'column' }}>
+                  <div style={{ padding: '20px 18px', height: '100%', display: 'flex', flexDirection: 'column' }}>
                     {/* Top Section: Icon + Title + Volume */}
                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', marginBottom: '20px' }}>
                       {/* Market Icon */}
