@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useHistory } from 'react-router-dom';
 import { useWeb3 } from '../../hooks/useWeb3';
 import { ethers } from 'ethers';
+import ModernMarketCard from '../../components/modern/ModernMarketCard';
 
 // Helper function to format volume
 const formatVolumeDisplay = (volume) => {
@@ -456,7 +457,7 @@ function Home() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredMarkets.map((market, index) => (
-              <MarketCard key={market.id || index} market={market} />
+              <ModernMarketCard key={market.id || index} market={market} showBuyButtons={true} />
             ))}
           </div>
         )}

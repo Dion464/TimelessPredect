@@ -5,6 +5,7 @@ import { getCurrencySymbol } from '../../utils/currency';
 import { ethers } from 'ethers';
 import WormStyleNavbar from '../../components/modern/WormStyleNavbar';
 import MarketCountdown from '../../components/common/MarketCountdown';
+import ModernMarketCard from '../../components/modern/ModernMarketCard';
 import { CONTRACT_ADDRESS, CONTRACT_ABI, RPC_URL } from '../../contracts/eth-config';
 
 const HomeWormStyle = () => {
@@ -128,9 +129,9 @@ const HomeWormStyle = () => {
       const activeMarketsData = marketsData.filter(m => m && m.active && !m.resolved);
       setMarkets(activeMarketsData);
       
-      // Set top 4 as trending
+      // Set top 3 as trending
       const sorted = [...activeMarketsData].sort((a, b) => b.volume - a.volume);
-      setTrendingMarkets(sorted.slice(0, 4));
+      setTrendingMarkets(sorted.slice(0, 3));
       
     } catch (error) {
       console.error('Error fetching markets:', error);
@@ -259,67 +260,215 @@ const HomeWormStyle = () => {
             </div>
             
             {trendingMarkets.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
               {trendingMarkets.map((market) => (
                 <div
                   key={market.id}
                   onClick={() => history.push(`/markets/${market.id}`)}
-                  className="rounded-[24px] overflow-hidden cursor-pointer transition-all duration-300 ease-out group aspect-square relative border border-transparent shadow-[0_0_0_0_rgba(0,0,0,0)] hover:shadow-[0_0_45px_0_rgba(248,247,106,0.45)] hover:border-[#ffffff00] hover:scale-[1.02] hover:opacity-95"
+                  className="rounded-[12px] overflow-hidden cursor-pointer transition-all duration-300 ease-out group relative border hover:scale-[1.02]"
                   style={{
-                    backgroundImage: `url(${getMarketImage(market)})`,
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center'
+                    background: 'rgba(30, 30, 30, 0.6)',
+                    backdropFilter: 'blur(20px)',
+                    WebkitBackdropFilter: 'blur(20px)',
+                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                    boxShadow: '0 4px 24px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+                    minHeight: '220px'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.boxShadow = '0 0 30px rgba(247, 208, 34, 0.15), 0 4px 24px rgba(0, 0, 0, 0.2)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.boxShadow = '0 4px 24px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.05)';
                   }}
                 >
-                  {/* Gradient overlay - matching Figma */}
-                  <div 
-                    className="absolute inset-0"
-                    style={{
-                      background: 'linear-gradient(135deg, rgba(23, 23, 23, 1) 0%, rgba(23, 23, 23, 0) 100%)'
-                    }}
-                  />
-                  
-                  <div className="relative h-full flex flex-col">
-                    {/* Top badges - matching Figma specs */}
-                    <div 
-                      className="absolute flex items-center justify-between"
-                      style={{
-                        top: '24px',
-                        left: '24px',
-                        right: '24px',
-                        height: '44px',
-                        border: '2px solid rgba(255, 255, 255, 0.12)',
-                        borderRadius: '9999px',
-                        backdropFilter: 'blur(16px)',
-                        padding: '10px'
-                      }}
-                    >
-                      <span className="text-white font-space-grotesk font-medium" style={{ fontSize: '14.4px', lineHeight: '1.667em' }}>
-                        @{market.creator.slice(2, 8)}
-                      </span>
-                      {market.volume > 1 && (
-                        <span className="text-white font-space-grotesk font-normal text-right" style={{ fontSize: '14.1px', lineHeight: '1.418em' }}>
-                          {market.volume.toFixed(2)} Vol.
-                        </span>
-                      )}
+                  <div style={{ padding: '18px 16px', height: '100%', display: 'flex', flexDirection: 'column' }}>
+                    {/* Top Section: Icon + Title + Volume */}
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', marginBottom: '20px' }}>
+                      {/* Market Icon */}
+                      <div 
+                        style={{
+                          width: '48px',
+                          height: '48px',
+                          borderRadius: '8px',
+                          overflow: 'hidden',
+                          flexShrink: 0,
+                          background: 'rgba(255, 255, 255, 0.05)',
+                          border: '1px solid rgba(255, 255, 255, 0.1)',
+                          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)'
+                        }}
+                      >
+                        <img
+                          src={getMarketImage(market)}
+                          alt={market.question || 'Market'}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          onError={(e) => { e.target.style.display = 'none'; }}
+                        />
+                      </div>
+                      
+                      {/* Title */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <h3 
+                          style={{
+                            fontFamily: '"Clash Grotesk Variable", "Clash Grotesk", system-ui, sans-serif',
+                            fontWeight: 600,
+                            fontSize: '16px',
+                            lineHeight: '1.43em',
+                            color: '#F2F2F2',
+                            margin: 0,
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical',
+                            overflow: 'hidden'
+                          }}
+                        >
+                          {market.question}
+                        </h3>
+                      </div>
+                      
+                      {/* Volume */}
+                      <div 
+                        style={{
+                          fontFamily: '"Clash Grotesk Variable", "Clash Grotesk", system-ui, sans-serif',
+                          fontWeight: 400,
+                          fontSize: '14px',
+                          lineHeight: '1.33em',
+                          color: '#899CB2',
+                          flexShrink: 0,
+                          whiteSpace: 'nowrap'
+                        }}
+                      >
+                        ${market.volume >= 1000 ? `${(market.volume / 1000).toFixed(1)}k` : market.volume.toFixed(2)} Vol.
+                      </div>
                     </div>
                     
-                    {/* Bottom content - matching Figma specs */}
-                    <div className="absolute" style={{ bottom: '24px', left: '24px', right: '24px' }}>
-                      {/* Percentage */}
-                      <div className="flex items-baseline mb-2">
-                        <span className="font-space-grotesk font-medium text-[#FAF8FE]" style={{ fontSize: '67.5px', lineHeight: '1.067em' }}>
-                          {market.yesPrice}
+                    {/* Middle Section: Progress Bar with Percentage */}
+                    <div style={{ marginBottom: '14px' }}>
+                      {/* Percentage and Label */}
+                      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'flex-end', marginBottom: '6px', gap: '6px' }}>
+                        <span 
+                          style={{
+                            fontFamily: '"Clash Grotesk Variable", "Clash Grotesk", system-ui, sans-serif',
+                            fontWeight: 500,
+                            fontSize: '18px',
+                            lineHeight: '1.5em',
+                            color: '#F2F2F2'
+                          }}
+                        >
+                          {market.yesPrice}%
                         </span>
-                        <span className="font-space-grotesk font-medium text-[#FAF8FE]" style={{ fontSize: '36px', lineHeight: '1em' }}>
-                          %
+                        <span 
+                          style={{
+                            fontFamily: '"Clash Grotesk Variable", "Clash Grotesk", system-ui, sans-serif',
+                            fontWeight: 500,
+                            fontSize: '13px',
+                            lineHeight: '1.5em',
+                            color: '#899CB2'
+                          }}
+                        >
+                          chance
                         </span>
                       </div>
                       
-                      {/* Question text */}
-                      <p className="text-[#FAF8FE] font-space-grotesk font-normal line-clamp-2" style={{ fontSize: '18.9px', lineHeight: '1.323em' }}>
-                        {market.question}
-                      </p>
+                      {/* Progress Bar */}
+                      <div 
+                        style={{
+                          width: '100%',
+                          height: '6px',
+                          background: 'rgba(55, 55, 55, 0.6)',
+                          borderRadius: '3px',
+                          overflow: 'hidden',
+                          boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.2)'
+                        }}
+                      >
+                        <div 
+                          style={{
+                            width: `${market.yesPrice}%`,
+                            height: '100%',
+                            background: 'linear-gradient(90deg, #F7D022 0%, #FFE566 100%)',
+                            borderRadius: '3px',
+                            boxShadow: '0 0 8px rgba(247, 208, 34, 0.4)'
+                          }}
+                        />
+                      </div>
+                    </div>
+                    
+                    {/* Bottom Section: Yes/No Buttons */}
+                    <div style={{ display: 'flex', gap: '10px', marginTop: 'auto' }}>
+                      {/* Yes Button */}
+                      <button
+                        onClick={(e) => { e.stopPropagation(); history.push(`/markets/${market.id}`); }}
+                        style={{
+                          flex: 1,
+                          height: '48px',
+                          background: 'rgba(67, 199, 115, 0.15)',
+                          backdropFilter: 'blur(8px)',
+                          WebkitBackdropFilter: 'blur(8px)',
+                          borderRadius: '8px',
+                          border: '1px solid rgba(67, 199, 115, 0.2)',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          transition: 'all 0.2s ease'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = 'rgba(67, 199, 115, 0.25)';
+                          e.currentTarget.style.borderColor = 'rgba(67, 199, 115, 0.4)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = 'rgba(67, 199, 115, 0.15)';
+                          e.currentTarget.style.borderColor = 'rgba(67, 199, 115, 0.2)';
+                        }}
+                      >
+                        <span 
+                          style={{
+                            fontFamily: '"Clash Grotesk Variable", "Clash Grotesk", system-ui, sans-serif',
+                            fontWeight: 600,
+                            fontSize: '16px',
+                            color: '#43C773'
+                          }}
+                        >
+                          Yes
+                        </span>
+                      </button>
+                      
+                      {/* No Button */}
+                      <button
+                        onClick={(e) => { e.stopPropagation(); history.push(`/markets/${market.id}`); }}
+                        style={{
+                          flex: 1,
+                          height: '48px',
+                          background: 'rgba(225, 55, 55, 0.15)',
+                          backdropFilter: 'blur(8px)',
+                          WebkitBackdropFilter: 'blur(8px)',
+                          borderRadius: '8px',
+                          border: '1px solid rgba(225, 55, 55, 0.2)',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          transition: 'all 0.2s ease'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = 'rgba(225, 55, 55, 0.25)';
+                          e.currentTarget.style.borderColor = 'rgba(225, 55, 55, 0.4)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = 'rgba(225, 55, 55, 0.15)';
+                          e.currentTarget.style.borderColor = 'rgba(225, 55, 55, 0.2)';
+                        }}
+                      >
+                        <span 
+                          style={{
+                            fontFamily: '"Clash Grotesk Variable", "Clash Grotesk", system-ui, sans-serif',
+                            fontWeight: 600,
+                            fontSize: '16px',
+                            color: '#E13737'
+                          }}
+                        >
+                          No
+                        </span>
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -399,77 +548,18 @@ const HomeWormStyle = () => {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {sortedMarkets.map((market) => (
-              <div
+              <ModernMarketCard
                 key={market.id}
-                onClick={() => history.push(`/markets/${market.id}`)}
-                className="rounded-[24px] overflow-hidden cursor-pointer transition-all duration-300 ease-out aspect-square relative border border-transparent shadow-[0_0_0_0_rgba(0,0,0,0)] hover:shadow-[0_0_45px_0_rgba(248,247,106,0.45)] hover:border-[#f5ff80] hover:scale-[1.02] hover:opacity-95"
-                style={{
-                  backgroundImage: `url(${getMarketImage(market)})`,
-                  backgroundSize: 'cover',
-                  backgroundPosition: 'center'
+                market={{
+                  ...market,
+                  questionTitle: market.question || market.questionTitle,
+                  totalVolume: market.volume || market.totalVolume
                 }}
-              >
-                {/* Gradient overlay - matching Figma */}
-                <div 
-                  className="absolute inset-0"
-                  style={{
-                    background: 'linear-gradient(135deg, rgba(23, 23, 23, 1) 0%, rgba(23, 23, 23, 0) 100%)'
-                  }}
-                />
-                
-                <div className="relative h-full flex flex-col">
-                  {/* Top badges - matching Figma specs */}
-                  <div 
-                    className="absolute flex items-center justify-between"
-                    style={{
-                      top: '24px',
-                      left: '24px',
-                      right: '24px',
-                      height: '44px',
-                      border: '2px solid rgba(255, 255, 255, 0.12)',
-                      borderRadius: '9999px',
-                      backdropFilter: 'blur(16px)',
-                      padding: '10px'
-                    }}
-                  >
-                    <span className="text-white font-space-grotesk font-medium" style={{ fontSize: '14.4px', lineHeight: '1.667em' }}>
-                      @{market.creator.slice(2, 8)}
-                    </span>
-                    {market.volume > 1 && (
-                      <span className="text-white font-space-grotesk font-normal text-right" style={{ fontSize: '14.1px', lineHeight: '1.418em' }}>
-                        {market.volume.toFixed(2)} Vol.
-                      </span>
-                    )}
-                  </div>
-                  
-                  {/* Countdown timer badge */}
-                  <div className="absolute" style={{ top: '80px', right: '24px' }}>
-                    <MarketCountdown 
-                      endTime={market.endTime} 
-                      variant="card"
-                      showLabel={false}
-                    />
-                  </div>
-                  
-                  {/* Bottom content - matching Figma specs */}
-                  <div className="absolute" style={{ bottom: '24px', left: '24px', right: '24px' }}>
-                    {/* Percentage */}
-                    <div className="flex items-baseline mb-2">
-                      <span className="font-space-grotesk font-medium text-[#FAF8FE]" style={{ fontSize: '67.5px', lineHeight: '1.067em' }}>
-                        {market.yesPrice}
-                      </span>
-                      <span className="font-space-grotesk font-medium text-[#FAF8FE]" style={{ fontSize: '36px', lineHeight: '1em' }}>
-                        %
-                      </span>
-                    </div>
-                    
-                    {/* Question text */}
-                    <p className="text-[#FAF8FE] font-space-grotesk font-normal line-clamp-2" style={{ fontSize: '18.9px', lineHeight: '1.323em' }}>
-                      {market.question}
-                    </p>
-                  </div>
-                </div>
-              </div>
+                showBuyButtons={true}
+                onBuy={(marketId, side) => {
+                  history.push(`/markets/${marketId}`);
+                }}
+              />
             ))}
           </div>
         )}

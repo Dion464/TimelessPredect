@@ -1,22 +1,24 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useHistory } from 'react-router-dom';
-import { centsToTCENT } from '../../utils/priceFormatter';
 
 // Helper function to format volume
 const formatVolumeDisplay = (volume) => {
-  if (!volume || volume === 0) return '0.00';
+  if (!volume || volume === 0) return '$0';
   // If volume is extremely large (likely Wei that wasn't converted), convert it
   if (volume > 1e12) {
     const ethValue = volume / 1e18;
-    return `${ethValue.toFixed(2)} ETH`;
+    if (ethValue >= 1e6) return `$${(ethValue / 1e6).toFixed(1)}m`;
+    if (ethValue >= 1e3) return `$${(ethValue / 1e3).toFixed(1)}k`;
+    return `$${ethValue.toFixed(2)}`;
   }
-  // Format with 2 decimal places for readability
-  return volume.toFixed(2);
+  // Format with appropriate suffix
+  if (volume >= 1e6) return `$${(volume / 1e6).toFixed(1)}m`;
+  if (volume >= 1e3) return `$${(volume / 1e3).toFixed(1)}k`;
+  return `$${volume.toFixed(2)}`;
 };
 
 const ModernMarketCard = ({ market, showBuyButtons = false, onBuy }) => {
   const history = useHistory();
-  const [hoveredSide, setHoveredSide] = useState(null);
   
   // Use actual prices from market if available (from blockchain), otherwise calculate from probability
   let yesPrice, noPrice;
@@ -34,7 +36,6 @@ const ModernMarketCard = ({ market, showBuyButtons = false, onBuy }) => {
   const handleCardClick = (e) => {
     // Don't navigate if clicking on buy buttons
     if (e.target.closest('.buy-button')) return;
-    console.log('Card clicked, navigating to market:', market.id);
     history.push(`/markets/${market.id}`);
   };
 
@@ -45,36 +46,7 @@ const ModernMarketCard = ({ market, showBuyButtons = false, onBuy }) => {
     }
   };
 
-  const formatTimeRemaining = (resolutionDate) => {
-    if (!resolutionDate) return 'No end date';
-    const now = new Date();
-    const end = new Date(resolutionDate);
-    const diff = end - now;
-    
-    if (diff <= 0) return 'Ended';
-    
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-    
-    if (days > 30) return `${Math.floor(days / 30)}mo`;
-    if (days > 0) return `${days}d`;
-    if (hours > 0) return `${hours}h`;
-    return 'Soon';
-  };
-
-  const getCategoryColor = (category) => {
-    const colors = {
-      'Technology': 'bg-blue-500',
-      'Sports': 'bg-green-500', 
-      'Politics': 'bg-red-500',
-      'Entertainment': 'bg-purple-500',
-      'Economics': 'bg-yellow-500',
-      'Science': 'bg-indigo-500'
-    };
-    return colors[category] || 'bg-gray-500';
-  };
-
-  // Generate image URL based on category and market ID (Polymarket-style)
+  // Generate image URL based on category and market ID
   const getMarketImage = () => {
     const marketId = market.id || '0';
     
@@ -108,110 +80,232 @@ const ModernMarketCard = ({ market, showBuyButtons = false, onBuy }) => {
     };
     
     const keywords = categoryKeywords[category] || categoryKeywords['General'];
-    // Use a deterministic seed based on market ID for consistent images
     const seed = parseInt(marketId) % 1000;
     
     return `https://source.unsplash.com/400x200/?${keywords}&sig=${seed}`;
   };
 
+  // Calculate progress bar width (YES percentage)
+  const progressWidth = `${yesPrice}%`;
+
   return (
     <div 
       onClick={handleCardClick}
-      className="bg-white rounded-xl border border-gray-200 hover:border-gray-300 transition-all duration-200 cursor-pointer overflow-hidden shadow-sm hover:shadow-md"
+      className="cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-[0_0_30px_rgba(247,208,34,0.15)]"
+      style={{
+        width: '100%',
+        minHeight: '220px',
+        background: 'rgba(30, 30, 30, 0.6)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+        borderRadius: '12px',
+        border: '1px solid rgba(255, 255, 255, 0.08)',
+        boxShadow: '0 4px 24px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+        overflow: 'hidden'
+      }}
     >
-      {/* Market Image */}
-      <div className="relative w-full h-40 bg-gradient-to-br from-gray-100 to-gray-200 overflow-hidden">
-        <img
-          src={getMarketImage()}
-          alt={market.questionTitle || 'Market'}
-          className="w-full h-full object-cover"
-          onError={(e) => {
-            // Fallback to gradient if image fails to load
-            e.target.style.display = 'none';
-            e.target.parentElement.className = 'relative w-full h-40 bg-gradient-to-br from-blue-100 via-purple-100 to-pink-100';
-          }}
-        />
-        <div className="absolute top-2 left-2">
-          <span className={`px-2 py-1 rounded-full text-xs font-medium text-white shadow-sm ${getCategoryColor(market.category)}`}>
-            {market.category || 'General'}
-          </span>
+      <div style={{ padding: '18px 16px', height: '100%', display: 'flex', flexDirection: 'column' }}>
+        
+        {/* Top Section: Icon + Title + Volume */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '9px', marginBottom: '20px' }}>
+          {/* Market Icon */}
+          <div 
+            style={{
+              width: '48px',
+              height: '48px',
+              borderRadius: '8px',
+              overflow: 'hidden',
+              flexShrink: 0,
+              background: 'rgba(255, 255, 255, 0.05)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)'
+            }}
+          >
+            <img
+              src={getMarketImage()}
+              alt={market.questionTitle || 'Market'}
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              onError={(e) => {
+                e.target.style.display = 'none';
+              }}
+            />
+          </div>
+          
+          {/* Title and Volume */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h3 
+              style={{
+                fontFamily: '"Clash Grotesk Variable", "Clash Grotesk", system-ui, sans-serif',
+                fontWeight: 600,
+                fontSize: '16px',
+                lineHeight: '1.43em',
+                color: '#F2F2F2',
+                margin: 0,
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden'
+              }}
+            >
+              {market.questionTitle || market.question}
+            </h3>
+          </div>
+          
+          {/* Volume */}
+          <div 
+            style={{
+              fontFamily: '"Clash Grotesk Variable", "Clash Grotesk", system-ui, sans-serif',
+              fontWeight: 400,
+              fontSize: '14px',
+              lineHeight: '1.33em',
+              color: '#899CB2',
+              flexShrink: 0,
+              whiteSpace: 'nowrap'
+            }}
+          >
+            {formatVolumeDisplay(market.totalVolume || market.volume)} Vol.
+          </div>
         </div>
-        <div className="absolute top-2 right-2">
-          <span className="px-2 py-1 rounded-full text-xs font-medium text-white bg-black bg-opacity-50 backdrop-blur-sm">
-            {formatTimeRemaining(market.resolutionDateTime)}
-          </span>
+        
+        {/* Middle Section: Progress Bar with Percentage */}
+        <div style={{ marginBottom: '14px' }}>
+          {/* Percentage and Label */}
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'flex-end', marginBottom: '6px', gap: '6px' }}>
+            <span 
+              style={{
+                fontFamily: '"Clash Grotesk Variable", "Clash Grotesk", system-ui, sans-serif',
+                fontWeight: 500,
+                fontSize: '18px',
+                lineHeight: '1.5em',
+                color: '#F2F2F2'
+              }}
+            >
+              {yesPrice}%
+            </span>
+            <span 
+              style={{
+                fontFamily: '"Clash Grotesk Variable", "Clash Grotesk", system-ui, sans-serif',
+                fontWeight: 500,
+                fontSize: '13px',
+                lineHeight: '1.5em',
+                color: '#899CB2'
+              }}
+            >
+              chance
+            </span>
+          </div>
+          
+          {/* Progress Bar */}
+          <div 
+            style={{
+              width: '100%',
+              height: '6px',
+              background: 'rgba(55, 55, 55, 0.6)',
+              borderRadius: '3px',
+              overflow: 'hidden',
+              boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.2)'
+            }}
+          >
+            <div 
+              style={{
+                width: progressWidth,
+                height: '100%',
+                background: 'linear-gradient(90deg, #F7D022 0%, #FFE566 100%)',
+                borderRadius: '3px',
+                transition: 'width 0.3s ease',
+                boxShadow: '0 0 8px rgba(247, 208, 34, 0.4)'
+              }}
+            />
+          </div>
         </div>
-      </div>
-
-      {/* Header */}
-      <div className="p-4 pb-3">
-        <h3 className="text-gray-900 font-medium text-sm leading-tight mb-3 line-clamp-2">
-          {market.questionTitle}
-        </h3>
-      </div>
-
-      {/* Betting Interface */}
-      <div className="px-4 pb-4">
-        <div className="grid grid-cols-2 gap-2">
+        
+        {/* Bottom Section: Yes/No Buttons */}
+        <div style={{ display: 'flex', gap: '10px', marginTop: 'auto' }}>
           {/* Yes Button */}
           <button
-            className={`buy-button relative p-3 rounded-lg border-2 transition-all duration-200 ${
-              hoveredSide === 'yes' 
-                ? 'border-green-500 bg-green-50' 
-                : 'border-green-200 hover:border-green-300 hover:bg-green-50'
-            }`}
-            onMouseEnter={() => setHoveredSide('yes')}
-            onMouseLeave={() => setHoveredSide(null)}
+            className="buy-button"
             onClick={(e) => handleBuy('yes', e)}
-            disabled={!showBuyButtons}
+            style={{
+              flex: 1,
+              height: '48px',
+              background: 'rgba(67, 199, 115, 0.15)',
+              backdropFilter: 'blur(8px)',
+              WebkitBackdropFilter: 'blur(8px)',
+              borderRadius: '8px',
+              border: '1px solid rgba(67, 199, 115, 0.2)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.2s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(67, 199, 115, 0.25)';
+              e.currentTarget.style.borderColor = 'rgba(67, 199, 115, 0.4)';
+              e.currentTarget.style.transform = 'translateY(-1px)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(67, 199, 115, 0.15)';
+              e.currentTarget.style.borderColor = 'rgba(67, 199, 115, 0.2)';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}
           >
-            <div className="text-center">
-              <div className="text-xs text-gray-600 mb-1">
-                {market.yesLabel || 'Yes'}
-              </div>
-              <div className="text-lg font-bold text-green-600">
-                {centsToTCENT(yesPrice)} TCENT
-              </div>
-              {showBuyButtons && (
-                <div className="text-xs text-green-600 mt-1">
-                  Buy
-                </div>
-              )}
-            </div>
+            <span 
+              style={{
+                fontFamily: '"Clash Grotesk Variable", "Clash Grotesk", system-ui, sans-serif',
+                fontWeight: 600,
+                fontSize: '16px',
+                lineHeight: '1.43em',
+                color: '#43C773',
+                textShadow: '0 1px 2px rgba(0,0,0,0.2)'
+              }}
+            >
+              Yes
+            </span>
           </button>
-
+          
           {/* No Button */}
           <button
-            className={`buy-button relative p-3 rounded-lg border-2 transition-all duration-200 ${
-              hoveredSide === 'no' 
-                ? 'border-red-500 bg-red-50' 
-                : 'border-red-200 hover:border-red-300 hover:bg-red-50'
-            }`}
-            onMouseEnter={() => setHoveredSide('no')}
-            onMouseLeave={() => setHoveredSide(null)}
+            className="buy-button"
             onClick={(e) => handleBuy('no', e)}
-            disabled={!showBuyButtons}
+            style={{
+              flex: 1,
+              height: '48px',
+              background: 'rgba(225, 55, 55, 0.15)',
+              backdropFilter: 'blur(8px)',
+              WebkitBackdropFilter: 'blur(8px)',
+              borderRadius: '8px',
+              border: '1px solid rgba(225, 55, 55, 0.2)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.2s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(225, 55, 55, 0.25)';
+              e.currentTarget.style.borderColor = 'rgba(225, 55, 55, 0.4)';
+              e.currentTarget.style.transform = 'translateY(-1px)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(225, 55, 55, 0.15)';
+              e.currentTarget.style.borderColor = 'rgba(225, 55, 55, 0.2)';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}
           >
-            <div className="text-center">
-              <div className="text-xs text-gray-600 mb-1">
-                {market.noLabel || 'No'}
-              </div>
-              <div className="text-lg font-bold text-red-600">
-                {centsToTCENT(noPrice)} TCENT
-              </div>
-              {showBuyButtons && (
-                <div className="text-xs text-red-600 mt-1">
-                  Buy
-                </div>
-              )}
-            </div>
+            <span 
+              style={{
+                fontFamily: '"Clash Grotesk Variable", "Clash Grotesk", system-ui, sans-serif',
+                fontWeight: 600,
+                fontSize: '16px',
+                lineHeight: '1.43em',
+                color: '#E13737',
+                textShadow: '0 1px 2px rgba(0,0,0,0.2)'
+              }}
+            >
+              No
+            </span>
           </button>
-        </div>
-
-        {/* Volume Info */}
-        <div className="flex items-center justify-between mt-3 text-xs text-gray-500">
-          <span>${formatVolumeDisplay(market.totalVolume)} vol</span>
-          <span>{market.totalBets || 0} traders</span>
         </div>
       </div>
     </div>
@@ -219,4 +313,3 @@ const ModernMarketCard = ({ market, showBuyButtons = false, onBuy }) => {
 };
 
 export default ModernMarketCard;
-
