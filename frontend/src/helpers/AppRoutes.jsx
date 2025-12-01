@@ -4,6 +4,7 @@ import Markets from '../pages/markets/Markets';
 import About from '../pages/about/About';
 import Stats from '../pages/stats/Stats';
 import HomeWormStyle from '../pages/home/HomeWormStyle';
+import Activity from '../pages/activity/Activity';
 import PolymarketStyleTrading from '../pages/market/PolymarketStyleTrading';
 import User from '../pages/user/User';
 import CreateMarket from '../pages/create/CreateMarket';
@@ -59,6 +60,7 @@ const AppRoutes = () => {
       <Route exact path='/user/:address' component={User} />
       
       <Route exact path='/stats' component={Stats} />
+      <Route exact path='/activity' component={Activity} />
 
       {/* Public Market Creation */}
       <Route exact path='/create' component={CreateMarket} />
