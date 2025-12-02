@@ -10,9 +10,30 @@ const ActivityRow = ({ item }) => {
       {/* Market thumbnail */}
       <div className="flex items-center gap-4 flex-1 px-4 py-3">
         <div className="relative w-12 h-12 rounded-md overflow-hidden flex-shrink-0">
-          <div
-            className={`absolute inset-0 bg-gradient-to-br ${item.avatarGradient}`}
-          />
+          {item.marketImageUrl ? (
+            <>
+              <img
+                src={item.marketImageUrl}
+                alt={item.marketTitle}
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  // Fallback to gradient if image fails to load
+                  e.target.style.display = 'none';
+                  if (e.target.nextSibling) {
+                    e.target.nextSibling.style.display = 'block';
+                  }
+                }}
+              />
+              <div
+                className={`absolute inset-0 bg-gradient-to-br ${item.avatarGradient}`}
+                style={{ display: 'none' }}
+              />
+            </>
+          ) : (
+            <div
+              className={`absolute inset-0 bg-gradient-to-br ${item.avatarGradient}`}
+            />
+          )}
         </div>
         <div className="min-w-0">
           <p

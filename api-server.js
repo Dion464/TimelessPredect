@@ -15,6 +15,10 @@ import { executeOrderViaAMM } from './api/execute-amm-order.js';
 const pendingMarketsHandler = require('./api/pending-markets/index.js');
 const pendingMarketByIdHandler = require('./api/pending-markets/[id].js');
 
+// Import activity handlers
+const activityHandler = require('./api/activity/index.js');
+const createActivityHandler = require('./api/activity/create.js');
+
 const app = express();
 const PORT = process.env.PORT || 8080;
 
@@ -141,6 +145,29 @@ app.get('/api/pending-markets/:id', async (req, res) => {
     await pendingMarketByIdHandler(vercelReq, res);
   } catch (error) {
     console.error('Error in pending-market handler:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Activity routes
+app.get('/api/activity', async (req, res) => {
+  try {
+    const vercelReq = createVercelRequest(req);
+    vercelReq.query = req.query;
+    await activityHandler(vercelReq, res);
+  } catch (error) {
+    console.error('Error in activity handler:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/activity/create', async (req, res) => {
+  try {
+    const vercelReq = createVercelRequest(req);
+    vercelReq.body = req.body;
+    await createActivityHandler(vercelReq, res);
+  } catch (error) {
+    console.error('Error in create activity handler:', error);
     res.status(500).json({ error: error.message });
   }
 });

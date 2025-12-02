@@ -73,10 +73,18 @@ module.exports = async function handler(req, res) {
 
       const timestampLabel = meta.timestampLabel || 'now';
 
+      // Use Incentiv block explorer (check both env var formats)
+      const explorerBase = process.env.BLOCK_EXPLORER_URL || 
+                          process.env.VITE_BLOCK_EXPLORER_URL || 
+                          'https://explorer-testnet.incentiv.io';
+      const cleanExplorerBase = explorerBase.trim().replace(/\/$/, '');
+      const txUrl = meta.txUrl || (ev.txHash ? `${cleanExplorerBase}/tx/${ev.txHash}` : '#');
+
       return {
         id: Number(ev.id),
         marketTitle:
           ev.market?.question || meta.marketTitle || `Market #${ev.marketId}`,
+        marketImageUrl: ev.market?.imageUrl || null,
         avatarGradient,
         user: (ev.userAddress || '').slice(0, 8) || 'Unknown',
         action,
@@ -88,7 +96,7 @@ module.exports = async function handler(req, res) {
         priceCents: priceCents ?? 50,
         notionalUsd: notionalUsd ?? 1,
         timestampLabel,
-        txUrl: meta.txUrl || (ev.txHash ? `https://basescan.org/tx/${ev.txHash}` : '#'),
+        txUrl,
       };
     });
 
