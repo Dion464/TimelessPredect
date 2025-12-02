@@ -1,34 +1,5 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import WormStyleNavbar from '../../components/modern/WormStyleNavbar';
-
-const MOCK_ACTIVITY = [
-  {
-    id: 1,
-    marketTitle: 'Will Sporting CP win on 2025-11-26?',
-    avatarGradient: '../../../public/image1.svg',
-    user: 'SLoInv',
-    action: 'bought',
-    side: 'Yes',
-    sideColor: '#FFE600',
-    priceCents: 64,
-    notionalUsd: 1.5,
-    timestampLabel: 'now',
-    txUrl: '#',
-  },
-  {
-    id: 2,
-    marketTitle: 'Bitcoin Up or Down - November 26, 9:00AM-9:15AM ET',
-    avatarGradient: '../../../public/image2.svg',
-    user: 'gabagool22',
-    action: 'bought',
-    side: 'Down',
-    sideColor: '#E13737',
-    priceCents: 75,
-    notionalUsd: 7.5,
-    timestampLabel: 'now',
-    txUrl: '#',
-  },
-];
 
 const ActivityRow = ({ item }) => {
   return (
@@ -108,6 +79,30 @@ const ActivityRow = ({ item }) => {
 };
 
 const Activity = () => {
+  const [activity, setActivity] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchActivity = async () => {
+      try {
+        const base =
+          window.__ENV?.API_BASE_URL ||
+          import.meta.env.VITE_API_BASE_URL ||
+          '';
+        const res = await fetch(`${base}/api/activity?limit=50`);
+        if (!res.ok) throw new Error('Failed to load activity');
+        const data = await res.json();
+        setActivity(data.activity || []);
+      } catch (err) {
+        console.error('Failed to fetch activity', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchActivity();
+  }, []);
+
   return (
     <div className="min-h-screen bg-[#050505]">
       <WormStyleNavbar />
@@ -156,9 +151,20 @@ const Activity = () => {
 
           {/* Activity list – full-width rows with subtle dividers, no outer card */}
           <div className="rounded-[18px] bg-[#050505] shadow-[0_22px_60px_rgba(0,0,0,0.75)]">
-            {MOCK_ACTIVITY.map((item) => (
-              <ActivityRow key={item.id} item={item} />
-            ))}
+            {loading && (
+              <div className="px-4 py-6 text-sm text-[#BABABA]">
+                Loading recent activity...
+              </div>
+            )}
+            {!loading && activity.length === 0 && (
+              <div className="px-4 py-6 text-sm text-[#BABABA]">
+                No recent activity yet. Trade a market to see it here.
+              </div>
+            )}
+            {!loading &&
+              activity.map((item) => (
+                <ActivityRow key={item.id} item={item} />
+              ))}
           </div>
         </div>
       </div>
