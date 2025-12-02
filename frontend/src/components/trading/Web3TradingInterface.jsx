@@ -581,6 +581,33 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
               });
 
               console.log('✅ Price recorded to database');
+
+              // Create activity event for the buy
+              const priceBps = tradeSide === 'yes' ? yesPriceBps : noPriceBps;
+              const costWei = ethers.utils.parseUnits(normalizedAmount, 18).toString();
+              const sharesWei = costWei; // Approximate - AMM calculates actual shares
+              
+              try {
+                await fetch(`${API_BASE}/api/activity/create`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    type: 'TRADE',
+                    marketId: marketId.toString(),
+                    userAddress: account,
+                    isYes: tradeSide === 'yes',
+                    sharesWei: sharesWei,
+                    priceBps: priceBps,
+                    costWei: costWei,
+                    txHash: receipt?.transactionHash || receipt?.hash || null,
+                    blockNumber: receipt?.blockNumber?.toString() || null,
+                    blockTime: receipt?.blockNumber ? new Date().toISOString() : new Date().toISOString(),
+                  })
+                });
+                console.log('✅ Activity event created for buy');
+              } catch (activityErr) {
+                console.error('⚠️ Failed to create activity event:', activityErr);
+              }
             }
           } catch (priceErr) {
             console.error('⚠️ Failed to record price after trade:', priceErr);
@@ -780,8 +807,35 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
                   blockNumber: receipt?.blockNumber?.toString() || null
                 })
               });
-              
+
               console.log('✅ Price recorded to database');
+
+              // Create activity event for the sell
+              const priceBps = tradeSide === 'yes' ? yesPriceBps : noPriceBps;
+              const sharesWei = ethers.utils.parseUnits(tradeAmount, 18).toString();
+              const costWei = sharesWei; // Approximate - AMM calculates actual payout
+              
+              try {
+                await fetch(`${API_BASE}/api/activity/create`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    type: 'TRADE',
+                    marketId: marketId.toString(),
+                    userAddress: account,
+                    isYes: tradeSide === 'yes',
+                    sharesWei: sharesWei,
+                    priceBps: priceBps,
+                    costWei: costWei,
+                    txHash: receipt?.transactionHash || receipt?.hash || null,
+                    blockNumber: receipt?.blockNumber?.toString() || null,
+                    blockTime: receipt?.blockNumber ? new Date().toISOString() : new Date().toISOString(),
+                  })
+                });
+                console.log('✅ Activity event created for sell');
+              } catch (activityErr) {
+                console.error('⚠️ Failed to create activity event:', activityErr);
+              }
             }
           } catch (priceErr) {
             console.error('⚠️ Failed to record price after trade:', priceErr);
