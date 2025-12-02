@@ -375,7 +375,7 @@ const WormStyleNavbar = () => {
 
           {/* Right: actions */}
           <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-            <img src="/public/iicon.svg" alt="How it works" className="w-4 h-4" />
+            <img src="/iicon.svg" alt="How it works" className="w-4 h-4" />
 
             <button
               className="hidden md:inline-block text-[14px] font-medium text-[#FFE600] hover:text-[#FFE600] transition-colors"
