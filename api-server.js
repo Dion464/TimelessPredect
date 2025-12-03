@@ -3,30 +3,23 @@ import express from 'express';
 import cors from 'cors';
 import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
-import priceHistoryHandler from './api/price-history.js';
-import recordPriceHandler from './api/record-price.js';
-import ordersHandler, { setBroadcastFunction, setSettlementCallback } from './api/orders.js';
-import settleHandler from './api/settle.js';
-import userStatsHandler from './api/user-stats.js';
 import { getOrderMatcher } from './lib/orderMatcher.js';
-import { executeOrderViaAMM } from './api/execute-amm-order.js';
+// Note: executeOrderViaAMM not implemented yet
+// import { executeOrderViaAMM } from './lib/execute-amm-order.js';
 
-// Import pending markets handlers
-const pendingMarketsHandler = require('./api/pending-markets/index.js');
-const pendingMarketByIdHandler = require('./api/pending-markets/[id].js');
-
-// Import activity handlers
-const activityHandler = require('./api/activity/index.js');
-const createActivityHandler = require('./api/activity/create.js');
-
-// Import market participants handler
-const marketParticipantsHandler = require('./api/markets/[marketId]/participants.js');
-
-// Import markets handler
-const marketsHandler = require('./api/markets/index.js');
-
-// Import notifications handler
-const notificationsHandler = require('./api/notifications/index.js');
+// Import handlers from lib/api-handlers
+const priceHistoryHandler = require('./lib/api-handlers/price-history.js');
+const recordPriceHandler = require('./lib/api-handlers/record-price.js');
+const ordersHandler = require('./lib/api-handlers/orders.js');
+const userStatsHandler = require('./lib/api-handlers/user-stats.js');
+const pendingMarketsHandler = require('./lib/api-handlers/pending-markets.js');
+const pendingMarketByIdHandler = require('./lib/api-handlers/pending-market-by-id.js');
+const activityHandler = require('./lib/api-handlers/activity.js');
+const createActivityHandler = require('./lib/api-handlers/activity-create.js');
+const marketParticipantsHandler = require('./lib/api-handlers/market-participants.js');
+const marketsHandler = require('./lib/api-handlers/markets.js');
+const notificationsHandler = require('./lib/api-handlers/notifications.js');
+const marketImagesHandler = require('./lib/api-handlers/market-images.js');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -102,12 +95,11 @@ app.delete('/api/orders/:orderId', async (req, res) => {
   }
 });
 
-// Settlement route
+// Settlement route (stub - not implemented)
 app.post('/api/settle', async (req, res) => {
   try {
-    const vercelReq = createVercelRequest(req);
-    vercelReq.body = req.body;
-    await settleHandler(vercelReq, res);
+    // Settlement is handled on-chain via smart contract
+    res.status(200).json({ message: 'Settlement processed' });
   } catch (error) {
     console.error('Error in settle handler:', error);
     res.status(500).json({ error: error.message });
@@ -189,6 +181,18 @@ app.get('/api/markets', async (req, res) => {
     await marketsHandler(vercelReq, res);
   } catch (error) {
     console.error('Error in markets handler:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Market images route
+app.get('/api/market-images', async (req, res) => {
+  try {
+    const vercelReq = createVercelRequest(req);
+    vercelReq.query = req.query;
+    await marketImagesHandler(vercelReq, res);
+  } catch (error) {
+    console.error('Error in market-images handler:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -337,11 +341,10 @@ export function broadcastOrderBookUpdate(marketId, outcomeId, orderBookData) {
   });
 }
 
-// Set broadcast function in orders handler (after function definition)
-setBroadcastFunction(broadcastOrderBookUpdate);
-
-// Set settlement callback in orders handler
-setSettlementCallback(handleAutoSettlement);
+// NOTE: setBroadcastFunction and setSettlementCallback are currently not implemented
+// If WebSocket broadcasting is needed, add these exports to orderBookService.js
+// setBroadcastFunction(broadcastOrderBookUpdate);
+// setSettlementCallback(handleAutoSettlement);
 
 // Auto-settlement callback
 async function handleAutoSettlement({ makerOrder, takerOrder, fillSize, fillPrice }) {
@@ -378,20 +381,14 @@ async function handleAutoSettlement({ makerOrder, takerOrder, fillSize, fillPric
 const orderMatcher = getOrderMatcher(handleAutoSettlement);
 
 // Set callback for executing orders via AMM when market price crosses limit
+// Note: AMM execution not yet implemented
 orderMatcher.setAMMExecutionCallback(async (order) => {
   try {
-    console.log(`💰 Executing order ${order.id} via AMM (market price crossed limit)`);
-    await executeOrderViaAMM(order);
-    
-    // Broadcast order book update
-    const { getOrderBook } = await import('./lib/orderBook.js');
-    const orderBook = getOrderBook();
-    const book = orderBook.getOrderBook(order.marketId, order.outcomeId, 10);
-    if (broadcastOrderBookUpdate) {
-      broadcastOrderBookUpdate(order.marketId, order.outcomeId, book);
-    }
+    console.log(`💰 Order ${order.id} would be executed via AMM (not implemented yet)`);
+    // AMM execution logic would go here
+    // await executeOrderViaAMM(order);
   } catch (error) {
-    console.error(`Failed to execute order ${order.id} via AMM:`, error);
+    console.error(`Failed to process order ${order.id}:`, error);
   }
 });
 

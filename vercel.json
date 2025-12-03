@@ -5,24 +5,8 @@
   "installCommand": "npm install && npx prisma generate --schema=./prisma/schema.prisma && cd frontend && npm install",
   "routes": [
     {
-      "src": "/api/pending-markets/([0-9]+)",
-      "dest": "/api/pending-markets/[id].js?id=$1"
-    },
-    {
-      "src": "/api/markets/([0-9]+)/participants",
-      "dest": "/api/markets/[marketId]/participants.js?marketId=$1"
-    },
-    {
-      "src": "/api/activity/create",
-      "dest": "/api/activity/create.js"
-    },
-    {
-      "src": "/api/markets$",
-      "dest": "/api/markets/index.js"
-    },
-    {
       "src": "/api/(.*)",
-      "dest": "/api/$1"
+      "dest": "/api/index.js"
     },
     {
       "handle": "filesystem"
@@ -33,10 +17,10 @@
     }
   ],
   "functions": {
-    "api/**/*.js": {
+    "api/index.js": {
       "memory": 1024,
-      "maxDuration": 10
+      "maxDuration": 10,
+      "includeFiles": "lib/**/*.js"
     }
   }
 }
-
