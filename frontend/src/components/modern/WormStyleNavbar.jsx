@@ -19,6 +19,7 @@ const WormStyleNavbar = () => {
   const [notifications, setNotifications] = useState([]);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [loadingNotifications, setLoadingNotifications] = useState(false);
+  const [claimedMarkets, setClaimedMarkets] = useState(new Set());
 
   const handleCreateClick = () => {
     history.push('/create');
@@ -302,6 +303,8 @@ const WormStyleNavbar = () => {
   const handleClaim = async (marketId) => {
     try {
       await claimWinnings(marketId);
+      // Mark this market as claimed
+      setClaimedMarkets(prev => new Set([...prev, marketId]));
       showGlassToast({ title: 'Winnings claimed successfully! 🎉', icon: '✅' });
       loadNotifications();
     } catch (err) {
@@ -473,15 +476,21 @@ const WormStyleNavbar = () => {
                               )}
                             </div>
                             {notif.claimable && notif.marketId && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleClaim(notif.marketId);
-                                }}
-                                className="w-full text-sm sm:text-xs font-semibold text-black bg-[#FFE600] hover:bg-[#FFD700] active:bg-[#FFC700] rounded-full py-2.5 sm:py-2 touch-manipulation transition-colors"
-                              >
-                                Claim {((notif.shares || 0) > 0 ? notif.shares.toFixed(2) : '0.00')} TCENT
-                              </button>
+                              claimedMarkets.has(notif.marketId) ? (
+                                <div className="w-full text-sm sm:text-xs font-semibold text-[#22C55E] bg-[#22C55E]/10 border border-[#22C55E]/30 rounded-full py-2.5 sm:py-2 text-center">
+                                  ✓ Claimed
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleClaim(notif.marketId);
+                                  }}
+                                  className="w-full text-sm sm:text-xs font-semibold text-black bg-[#FFE600] hover:bg-[#FFD700] active:bg-[#FFC700] rounded-full py-2.5 sm:py-2 touch-manipulation transition-colors"
+                                >
+                                  Claim {((notif.shares || 0) > 0 ? notif.shares.toFixed(2) : '0.00')} TCENT
+                                </button>
+                              )
                             )}
                           </div>
                         ))}

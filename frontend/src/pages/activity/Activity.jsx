@@ -113,8 +113,15 @@ const Activity = () => {
   const [activity, setActivity] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
-  const [sortBy, setSortBy] = useState('recent');
+  const [dropdownOpen, setDropdownOpen] = useState(false);
   const history = useHistory();
+
+  const filterOptions = [
+    { key: 'all', label: 'All' },
+    { key: 'trades', label: 'Trades' },
+    { key: 'resolved', label: 'Resolved' },
+    { key: 'created', label: 'Created' },
+  ];
 
   const handleActivityClick = (item) => {
     if (item.marketId) {
@@ -122,22 +129,14 @@ const Activity = () => {
     }
   };
 
-  // Filter and sort activity
-  const filteredActivity = activity
-    .filter((item) => {
-      if (filter === 'all') return true;
-      if (filter === 'trades') return item.eventType === 'ORDER_FILLED' || item.eventType === 'ORDER_PLACED';
-      if (filter === 'resolved') return item.eventType === 'MARKET_RESOLVED';
-      if (filter === 'created') return item.eventType === 'MARKET_CREATED';
-      return true;
-    })
-    .sort((a, b) => {
-      if (sortBy === 'amount') {
-        return (b.shares || 0) - (a.shares || 0);
-      }
-      // Default: recent (already sorted by API)
-      return 0;
-    });
+  // Filter activity
+  const filteredActivity = activity.filter((item) => {
+    if (filter === 'all') return true;
+    if (filter === 'trades') return item.eventType === 'ORDER_FILLED' || item.eventType === 'ORDER_PLACED';
+    if (filter === 'resolved') return item.eventType === 'MARKET_RESOLVED';
+    if (filter === 'created') return item.eventType === 'MARKET_CREATED';
+    return true;
+  });
 
   useEffect(() => {
     const fetchActivity = async () => {
@@ -190,57 +189,58 @@ const Activity = () => {
               </p>
             </div>
 
-            {/* Filter dropdowns */}
+            {/* Filter dropdown */}
             <div 
-              className="flex items-center gap-4"
+              className="relative"
               style={{
                 fontFamily:
                   '"Clash Grotesk", "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
               }}
             >
-              {/* Event Type Filter */}
-              <div className="relative">
-                <select
-                  value={filter}
-                  onChange={(e) => setFilter(e.target.value)}
-                  className="appearance-none bg-transparent border-2 border-[#FFE600] text-[#FFE600] rounded-full px-6 py-3 pr-12 text-base font-medium cursor-pointer hover:bg-[#FFE600]/10 transition-colors focus:outline-none focus:ring-2 focus:ring-[#FFE600]/30"
-                  style={{ minWidth: '120px' }}
-                >
-                  <option value="all" className="bg-[#0E0E0E] text-[#FFE600]">All</option>
-                  <option value="trades" className="bg-[#0E0E0E] text-[#FFE600]">Trades</option>
-                  <option value="resolved" className="bg-[#0E0E0E] text-[#FFE600]">Resolved</option>
-                  <option value="created" className="bg-[#0E0E0E] text-[#FFE600]">Created</option>
-                </select>
+              <button
+                onClick={() => setDropdownOpen(!dropdownOpen)}
+                className="flex items-center gap-3 bg-transparent border-2 border-[#FFE600] text-[#FFE600] rounded-full px-6 py-3 text-base font-medium cursor-pointer hover:bg-[#FFE600]/10 transition-all focus:outline-none"
+                style={{ minWidth: '140px' }}
+              >
+                <span>{filterOptions.find(o => o.key === filter)?.label || 'All'}</span>
                 <svg 
-                  className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#FFE600] pointer-events-none"
+                  className={`w-4 h-4 transition-transform duration-200 ${dropdownOpen ? 'rotate-180' : ''}`}
                   fill="none" 
                   stroke="currentColor" 
                   viewBox="0 0 24 24"
                 >
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
                 </svg>
-              </div>
-
-              {/* Amount Sort Filter */}
-              <div className="relative">
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
-                  className="appearance-none bg-transparent border-2 border-[#FFE600] text-[#FFE600] rounded-full px-6 py-3 pr-12 text-base font-medium cursor-pointer hover:bg-[#FFE600]/10 transition-colors focus:outline-none focus:ring-2 focus:ring-[#FFE600]/30"
-                  style={{ minWidth: '140px' }}
-                >
-                  <option value="recent" className="bg-[#0E0E0E] text-[#FFE600]">Recent</option>
-                  <option value="amount" className="bg-[#0E0E0E] text-[#FFE600]">Amount</option>
-                </select>
-                <svg 
-                  className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#FFE600] pointer-events-none"
-                  fill="none" 
-                  stroke="currentColor" 
-                  viewBox="0 0 24 24"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                </svg>
-              </div>
+              </button>
+              
+              {/* Dropdown menu */}
+              {dropdownOpen && (
+                <>
+                  {/* Backdrop to close dropdown */}
+                  <div 
+                    className="fixed inset-0 z-40" 
+                    onClick={() => setDropdownOpen(false)}
+                  />
+                  <div className="absolute right-0 mt-2 w-48 bg-[#1A1A1A] border border-[#FFE600]/30 rounded-2xl shadow-xl z-50 overflow-hidden">
+                    {filterOptions.map(({ key, label }) => (
+                      <button
+                        key={key}
+                        onClick={() => {
+                          setFilter(key);
+                          setDropdownOpen(false);
+                        }}
+                        className={`w-full px-5 py-3 text-left text-sm font-medium transition-colors ${
+                          filter === key
+                            ? 'bg-[#FFE600]/20 text-[#FFE600]'
+                            : 'text-white hover:bg-white/5'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
           </div>
 
