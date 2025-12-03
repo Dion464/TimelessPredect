@@ -57,10 +57,16 @@ const ActivityRow = ({ item }) => {
       >
         <span className="text-[#F2F2F2] font-semibold">{item.user}</span>
         <span>{item.action}</span>
-        <span style={{ color: item.sideColor, fontWeight: 600 }}>{item.side}</span>
-        <span>at</span>
-        <span>{item.priceCents}¢</span>
-        <span>(${item.notionalUsd.toFixed(2)})</span>
+        {item.side && (
+          <span style={{ color: item.sideColor, fontWeight: 600 }}>{item.side}</span>
+        )}
+        {item.priceCents !== null && item.shares !== null && (
+          <>
+            <span>at</span>
+            <span>{item.priceCents}¢</span>
+            <span>({typeof item.shares === 'number' ? item.shares.toFixed(4) : '0'} tCent)</span>
+          </>
+        )}
       </div>
 
       {/* Time + link */}

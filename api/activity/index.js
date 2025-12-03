@@ -43,12 +43,68 @@ module.exports = async function handler(req, res) {
     });
 
     const mapped = events.map((ev) => {
+      const meta = ev.metadata || {};
+
+      // Use Incentiv block explorer (check both env var formats)
+      const explorerBase = process.env.BLOCK_EXPLORER_URL || 
+                          process.env.VITE_BLOCK_EXPLORER_URL || 
+                          'https://explorer-testnet.incentiv.io';
+      const cleanExplorerBase = explorerBase.trim().replace(/\/$/, '');
+      const txUrl = meta.txUrl || (ev.txHash ? `${cleanExplorerBase}/tx/${ev.txHash}` : '#');
+
+      const avatarGradient =
+        meta.avatarGradient ||
+        (ev.market?.category === 'crypto'
+          ? 'from-[#FF9900] to-[#FF5E00]'
+          : 'from-[#3B82F6] to-[#06B6D4]');
+
+      const timestampLabel = meta.timestampLabel || 'now';
+
+      // Handle different event types
+      if (ev.eventType === 'MARKET_RESOLVED') {
+        const outcome = meta.outcome || 'Unknown';
+        return {
+          id: Number(ev.id),
+          eventType: 'MARKET_RESOLVED',
+          marketTitle:
+            ev.market?.question || meta.marketTitle || `Market #${ev.marketId}`,
+          marketImageUrl: ev.market?.imageUrl || null,
+          avatarGradient,
+          user: 'Market Resolved',
+          action: '/',
+          side: outcome,
+          sideColor: outcome === 'Yes' ? '#FFE600' : outcome === 'No' ? '#E13737' : '#BABABA',
+          priceCents: null,
+          shares: null,
+          timestampLabel,
+          txUrl,
+        };
+      }
+
+      if (ev.eventType === 'MARKET_CREATED') {
+        return {
+          id: Number(ev.id),
+          eventType: 'MARKET_CREATED',
+          marketTitle:
+            ev.market?.question || meta.marketTitle || `Market #${ev.marketId}`,
+          marketImageUrl: ev.market?.imageUrl || null,
+          avatarGradient,
+          user: (ev.userAddress || '').slice(0, 8) || 'Unknown',
+          action: 'created market',
+          side: null,
+          sideColor: null,
+          priceCents: null,
+          shares: null,
+          timestampLabel,
+          txUrl,
+        };
+      }
+
+      // Default: trade events (ORDER_PLACED, ORDER_FILLED, POSITION_UPDATED, etc.)
       const isBuyLike =
         ev.eventType === 'ORDER_PLACED' ||
         ev.eventType === 'ORDER_FILLED' ||
         ev.eventType === 'POSITION_UPDATED';
-
-      const meta = ev.metadata || {};
 
       const side = meta.side || (isBuyLike ? 'Yes' : 'No');
       const action = meta.action || (isBuyLike ? 'bought' : 'sold');
@@ -60,28 +116,17 @@ module.exports = async function handler(req, res) {
           ? Math.round(meta.priceBps / 100)
           : null;
 
-      const notionalUsd =
-        typeof meta.notionalUsd === 'number'
+      // Get shares amount (prefer shares, fall back to notionalUsd for backwards compat)
+      const shares =
+        typeof meta.shares === 'number'
+          ? meta.shares
+          : typeof meta.notionalUsd === 'number'
           ? meta.notionalUsd
           : null;
 
-      const avatarGradient =
-        meta.avatarGradient ||
-        (ev.market?.category === 'crypto'
-          ? 'from-[#FF9900] to-[#FF5E00]'
-          : 'from-[#3B82F6] to-[#06B6D4]');
-
-      const timestampLabel = meta.timestampLabel || 'now';
-
-      // Use Incentiv block explorer (check both env var formats)
-      const explorerBase = process.env.BLOCK_EXPLORER_URL || 
-                          process.env.VITE_BLOCK_EXPLORER_URL || 
-                          'https://explorer-testnet.incentiv.io';
-      const cleanExplorerBase = explorerBase.trim().replace(/\/$/, '');
-      const txUrl = meta.txUrl || (ev.txHash ? `${cleanExplorerBase}/tx/${ev.txHash}` : '#');
-
       return {
         id: Number(ev.id),
+        eventType: ev.eventType,
         marketTitle:
           ev.market?.question || meta.marketTitle || `Market #${ev.marketId}`,
         marketImageUrl: ev.market?.imageUrl || null,
@@ -94,7 +139,7 @@ module.exports = async function handler(req, res) {
             ? '#FFE600'
             : '#E13737',
         priceCents: priceCents ?? 50,
-        notionalUsd: notionalUsd ?? 1,
+        shares: shares ?? 0, // Shares in tCent
         timestampLabel,
         txUrl,
       };

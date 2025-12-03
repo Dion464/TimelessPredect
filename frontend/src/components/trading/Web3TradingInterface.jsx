@@ -596,6 +596,7 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
                     marketId: marketId.toString(),
                     userAddress: account,
                     isYes: tradeSide === 'yes',
+                    isBuy: true, // This is a buy transaction
                     sharesWei: sharesWei,
                     priceBps: priceBps,
                     costWei: costWei,
@@ -824,6 +825,7 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
                     marketId: marketId.toString(),
                     userAddress: account,
                     isYes: tradeSide === 'yes',
+                    isBuy: false, // This is a sell transaction
                     sharesWei: sharesWei,
                     priceBps: priceBps,
                     costWei: costWei,

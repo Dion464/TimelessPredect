@@ -44,6 +44,7 @@ module.exports = async function handler(req, res) {
           marketId,
           userAddress,
           isYes,
+          isBuy,
           sharesWei,
           priceBps,
           costWei,
@@ -67,6 +68,7 @@ module.exports = async function handler(req, res) {
           marketId,
           userAddress,
           isYes: Boolean(isYes),
+          isBuy: isBuy !== undefined ? Boolean(isBuy) : true, // Default to buy for backwards compat
           sharesWei,
           priceBps: parseInt(priceBps, 10),
           costWei,
