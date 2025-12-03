@@ -63,8 +63,8 @@ const ActivityRow = ({ item }) => {
         {item.priceCents !== null && item.shares !== null && (
           <>
             <span>at</span>
-            <span>{item.priceCents}¢</span>
-            <span>({typeof item.shares === 'number' ? item.shares.toFixed(4) : '0'} tCent)</span>
+            <span>{centsToTCENT(item.priceCents)} TCENT</span>
+            <span>({typeof item.shares === 'number' ? item.shares.toFixed(4) : '0'} TCENT)</span>
           </>
         )}
       </div>
