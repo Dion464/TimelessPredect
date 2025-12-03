@@ -112,6 +112,7 @@ const ActivityRow = ({ item, onClick }) => {
 const Activity = () => {
   const [activity, setActivity] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState('all');
   const history = useHistory();
 
   const handleActivityClick = (item) => {
@@ -119,6 +120,15 @@ const Activity = () => {
       history.push(`/markets/${item.marketId}`);
     }
   };
+
+  // Filter activity based on selected filter
+  const filteredActivity = activity.filter((item) => {
+    if (filter === 'all') return true;
+    if (filter === 'trades') return item.eventType === 'ORDER_FILLED' || item.eventType === 'ORDER_PLACED';
+    if (filter === 'resolved') return item.eventType === 'MARKET_RESOLVED';
+    if (filter === 'created') return item.eventType === 'MARKET_CREATED';
+    return true;
+  });
 
   useEffect(() => {
     const fetchActivity = async () => {
@@ -148,10 +158,10 @@ const Activity = () => {
       <div className="pt-24 pb-24 px-4">
         <div className="max-w-5xl mx-auto">
           {/* Header */}
-          <div className="mb-8 flex items-start justify-between gap-6">
+          <div className="mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
             <div>
               <h1
-                className="text-[48px] font-bold  text-white mb-2"
+                className="text-[36px] sm:text-[48px] font-bold text-white mb-2"
                style={{
                 fontFamily:
                   '"Clash Grotesk", "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
@@ -160,7 +170,7 @@ const Activity = () => {
                 Polydegen Activity
               </h1>
               <p
-                className=" text-[14px] text-[#BABABA] max-w-xl"
+                className="text-[14px] text-[#BABABA] max-w-xl"
                 style={{
                   fontFamily:
                     '"Clash Grotesk", "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
@@ -171,19 +181,32 @@ const Activity = () => {
               </p>
             </div>
 
-            {/* Filter pills (visual only for now) */}
-            <div className="hidden sm:flex items-center gap-3 text-xs"
+            {/* Filter pills */}
+            <div 
+              className="flex items-center gap-2 flex-wrap"
               style={{
                 fontFamily:
                   '"Clash Grotesk", "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
               }}
             >
-              <button className="px-4 py-1.5 rounded-full bg-[#FFE600] text-black font-semibold shadow-[0_0_0_1px_rgba(0,0,0,0.6)]">
-                All
-              </button>
-              <button className="px-4 py-1.5 rounded-full border border-[#FFE600] text-[#FFE600] hover:bg-[#FFE600]/10 transition-colors">
-                Amount
-              </button>
+              {[
+                { key: 'all', label: 'All' },
+                { key: 'trades', label: 'Trades' },
+                { key: 'resolved', label: 'Resolved' },
+                { key: 'created', label: 'Created' },
+              ].map(({ key, label }) => (
+                <button
+                  key={key}
+                  onClick={() => setFilter(key)}
+                  className={`px-5 py-2 rounded-full text-sm font-semibold transition-all duration-200 ${
+                    filter === key
+                      ? 'bg-[#FFE600] text-black shadow-[0_0_12px_rgba(255,230,0,0.3)]'
+                      : 'border border-[#FFE600]/60 text-[#FFE600] hover:bg-[#FFE600]/10 hover:border-[#FFE600]'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
           </div>
 
@@ -194,13 +217,16 @@ const Activity = () => {
                 Loading recent activity...
               </div>
             )}
-            {!loading && activity.length === 0 && (
+            {!loading && filteredActivity.length === 0 && (
               <div className="px-4 py-6 text-sm text-[#BABABA]">
-                No recent activity yet. Trade a market to see it here.
+                {activity.length === 0 
+                  ? 'No recent activity yet. Trade a market to see it here.'
+                  : `No ${filter === 'all' ? '' : filter} activity found.`
+                }
               </div>
             )}
             {!loading &&
-              activity.map((item) => (
+              filteredActivity.map((item) => (
                 <ActivityRow 
                   key={item.id} 
                   item={item} 
