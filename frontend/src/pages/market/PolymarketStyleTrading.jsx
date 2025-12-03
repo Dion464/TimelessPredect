@@ -571,6 +571,8 @@ const PolymarketStyleTrading = () => {
         endTime: safeToNumber(marketData.endTime),
         creatorUsername: marketData.creator,
         isResolved: marketData.resolved,
+        resolved: marketData.resolved,
+        outcome: safeToNumber(marketData.outcome),
         totalVolume: formatEtherNumber(marketData.totalVolume),
         yesPrice: Number(marketData.yesPrice ?? 50),
         noPrice: Number(marketData.noPrice ?? 50),

@@ -870,6 +870,25 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
   const noPrice = marketData?.noPrice || market?.noPrice || 50;
   const currentPrice = tradeSide === 'yes' ? yesPrice : noPrice;
 
+  // Check if market is resolved
+  const isResolved = market?.resolved || marketData?.resolved;
+  const outcome = market?.outcome || marketData?.outcome;
+
+  // Show resolved state
+  if (isResolved) {
+    const resolvedImage = outcome === 1 ? '/yesresolved.svg' : '/no.svg';
+    return (
+      <div className="glass-card rounded-[12px] sm:rounded-[16px] backdrop-blur-[32px] relative w-full overflow-hidden" style={{ background: 'transparent' }}>
+        <img 
+          src={resolvedImage} 
+          alt={outcome === 1 ? 'Yes - Market Resolved' : 'No - Market Resolved'}
+          className="w-full h-auto"
+          style={{ display: 'block' }}
+        />
+      </div>
+    );
+  }
+
   if (!isConnected) {
     return (
       <div className="glass-card rounded-[12px] sm:rounded-[16px] backdrop-blur-[32px] relative w-full px-3 sm:px-4" style={{ background: 'transparent', minHeight: '200px', paddingTop: '17px', paddingBottom: '17px' }}>
