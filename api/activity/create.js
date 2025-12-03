@@ -51,6 +51,7 @@ module.exports = async function handler(req, res) {
           txHash,
           blockNumber,
           blockTime,
+          marketQuestion, // Market question from frontend
         } = data;
 
         if (!marketId || !userAddress || isYes === undefined || !sharesWei || !priceBps || !costWei) {
@@ -59,10 +60,16 @@ module.exports = async function handler(req, res) {
           });
         }
 
-        // Get market info
-        const market = await prisma.market.findUnique({
+        // Get market info from DB
+        let market = await prisma.market.findUnique({
           where: { marketId: BigInt(marketId) },
         }).catch(() => null);
+
+        // If market question is passed from frontend and DB doesn't have it, use the passed value
+        if (marketQuestion && (!market || !market.question)) {
+          market = market || {};
+          market.question = marketQuestion;
+        }
 
         activityEvent = await createTradeActivity({
           marketId,
