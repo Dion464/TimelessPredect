@@ -4,18 +4,43 @@ import '../../pages/market/MarketDetailGlass.css';
 
 // Helper function to format volume
 const formatVolumeDisplay = (volume) => {
-  if (!volume || volume === 0) return '$0';
+  if (!volume || volume === 0) return '0';
   // If volume is extremely large (likely Wei that wasn't converted), convert it
   if (volume > 1e12) {
     const ethValue = volume / 1e18;
-    if (ethValue >= 1e6) return `$${(ethValue / 1e6).toFixed(1)}m`;
-    if (ethValue >= 1e3) return `$${(ethValue / 1e3).toFixed(1)}k`;
-    return `$${ethValue.toFixed(2)}`;
+    if (ethValue >= 1e6) return `${(ethValue / 1e6).toFixed(1)}m`;
+    if (ethValue >= 1e3) return `${(ethValue / 1e3).toFixed(1)}k`;
+    return `${ethValue.toFixed(2)}`;
   }
   // Format with appropriate suffix
-  if (volume >= 1e6) return `$${(volume / 1e6).toFixed(1)}m`;
-  if (volume >= 1e3) return `$${(volume / 1e3).toFixed(1)}k`;
-  return `$${volume.toFixed(2)}`;
+  if (volume >= 1e6) return `${(volume / 1e6).toFixed(1)}m`;
+  if (volume >= 1e3) return `${(volume / 1e3).toFixed(1)}k`;
+  return `${volume.toFixed(2)}`;
+};
+
+// Helper function to get time remaining
+const getTimeRemaining = (endTime, resolutionDateTime) => {
+  // Try to use endTime (unix timestamp) first, then resolutionDateTime (ISO string)
+  let endDate;
+  if (endTime) {
+    endDate = new Date(Number(endTime) * 1000);
+  } else if (resolutionDateTime) {
+    endDate = new Date(resolutionDateTime);
+  } else {
+    return null;
+  }
+  
+  const now = new Date();
+  const diff = endDate - now;
+  
+  if (diff <= 0) return 'Ended';
+  
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  
+  if (days > 0) return `ends in ${days} day${days > 1 ? 's' : ''}`;
+  if (hours > 0) return `ends in ${hours}h`;
+  return 'ends soon';
 };
 
 const ModernMarketCard = ({ market, showBuyButtons = false, onBuy }) => {
@@ -108,7 +133,7 @@ const ModernMarketCard = ({ market, showBuyButtons = false, onBuy }) => {
     >
       <div style={{ padding: '22px 20px', height: '100%', display: 'flex', flexDirection: 'column' }}>
         
-        {/* Top Section: Icon + Title + Volume */}
+        {/* Top Section: Icon + Title + End Time */}
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: '9px', marginBottom: '20px' }}>
           {/* Market Icon */}
           <div 
@@ -133,7 +158,7 @@ const ModernMarketCard = ({ market, showBuyButtons = false, onBuy }) => {
             />
           </div>
           
-          {/* Title and Volume */}
+          {/* Title */}
           <div style={{ flex: 1, minWidth: 0 }}>
             <h3 
               style={{
@@ -153,48 +178,66 @@ const ModernMarketCard = ({ market, showBuyButtons = false, onBuy }) => {
             </h3>
           </div>
           
-          {/* Volume */}
-          <div 
-            style={{
-              fontFamily: '"Clash Grotesk", "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-              fontWeight: 400,
-              fontSize: '14.2px',
-              lineHeight: '19.5px',
-              color: '#899CB2',
-              flexShrink: 0,
-              whiteSpace: 'nowrap'
-            }}
-          >
-            {formatVolumeDisplay(market.totalVolume || market.volume)} Vol.
-          </div>
-        </div>
-        
-        {/* Middle Section: Progress Bar with Percentage */}
-        <div style={{ marginBottom: '14px' }}>
-          {/* Percentage and Label */}
-          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'flex-end', marginBottom: '6px', gap: '6px' }}>
-            <span 
+          {/* End Time */}
+          {getTimeRemaining(market.endTime, market.resolutionDateTime) && (
+            <div 
               style={{
                 fontFamily: '"Clash Grotesk", "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                fontWeight: 500, // Medium
-                fontSize: '19.5px',
-                lineHeight: '28.5px',
+                fontWeight: 400,
+                fontSize: '14px',
+                lineHeight: '19px',
+                color: '#F2F2F2',
+                flexShrink: 0,
+                whiteSpace: 'nowrap'
+              }}
+            >
+              {getTimeRemaining(market.endTime, market.resolutionDateTime)}
+            </div>
+          )}
+        </div>
+        
+        {/* Middle Section: Volume + Progress Bar with Percentage */}
+        <div style={{ marginBottom: '14px' }}>
+          {/* Volume and Percentage row */}
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: '6px' }}>
+            {/* Volume on left */}
+            <div 
+              style={{
+                fontFamily: '"Clash Grotesk", "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                fontWeight: 400,
+                fontSize: '14px',
+                lineHeight: '19px',
                 color: '#F2F2F2'
               }}
             >
-              {yesPrice}%
-            </span>
-            <span 
-              style={{
-                fontFamily: '"Clash Grotesk", "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                fontWeight: 500,
-                fontSize: '14px',
-                lineHeight: '28.5px',
-                color: '#899CB2'
-              }}
-            >
-              chance
-            </span>
+              {formatVolumeDisplay(market.totalVolume || market.volume)} Vol.
+            </div>
+            
+            {/* Percentage and Label on right */}
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+              <span 
+                style={{
+                  fontFamily: '"Clash Grotesk", "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                  fontWeight: 500,
+                  fontSize: '19.5px',
+                  lineHeight: '28.5px',
+                  color: '#F2F2F2'
+                }}
+              >
+                {yesPrice}%
+              </span>
+              <span 
+                style={{
+                  fontFamily: '"Clash Grotesk", "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                  fontWeight: 500,
+                  fontSize: '14px',
+                  lineHeight: '28.5px',
+                  color: '#899CB2'
+                }}
+              >
+                chance
+              </span>
+            </div>
           </div>
           
           {/* Progress Bar */}

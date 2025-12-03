@@ -170,6 +170,33 @@ const HomeWormStyle = () => {
     }
   });
 
+  // Helper function to get time remaining
+  const getTimeRemaining = (endTime, resolutionTime) => {
+    let endDate;
+    if (endTime) {
+      // endTime could be a Date object or ISO string
+      endDate = endTime instanceof Date ? endTime : new Date(endTime);
+    } else if (resolutionTime) {
+      endDate = new Date(resolutionTime);
+    } else {
+      return null;
+    }
+    
+    const now = new Date();
+    const diff = endDate - now;
+    
+    if (diff <= 0) return 'Ended';
+    
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const months = Math.floor(days / 30);
+    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    
+    if (months > 0) return `ends in ${months} month${months > 1 ? 's' : ''}`;
+    if (days > 0) return `ends in ${days} day${days > 1 ? 's' : ''}`;
+    if (hours > 0) return `ends in ${hours}h`;
+    return 'ends soon';
+  };
+
   const getMarketImage = (market) => {
     if (market.imageUrl) {
       return market.imageUrl;
@@ -295,7 +322,7 @@ const HomeWormStyle = () => {
                   }}
                 >
                   <div style={{ padding: '20px 18px', height: '100%', display: 'flex', flexDirection: 'column' }}>
-                    {/* Top Section: Icon + Title + Volume */}
+                    {/* Top Section: Icon + Title + End Time */}
                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', marginBottom: '20px' }}>
                       {/* Market Icon */}
                       <div 
@@ -318,12 +345,12 @@ const HomeWormStyle = () => {
                         />
                       </div>
                       
-                      {/* Title */}
+                      {/* Title and ID */}
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <h3 
                           style={{
                             fontFamily: '"Clash Grotesk", "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                            fontWeight: 600, // Semibold
+                            fontWeight: 600,
                             fontSize: '19px',
                             lineHeight: '26px',
                             color: '#F2F2F2',
@@ -336,50 +363,80 @@ const HomeWormStyle = () => {
                         >
                           {market.question}
                         </h3>
-                      </div>
-                      
-                      {/* Volume */}
-                      <div 
-                        style={{
-                          fontFamily: '"Clash Grotesk", "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                          fontWeight: 400,
-                          fontSize: '13.79px',
-                          lineHeight: '18.38px',
-                          color: '#899CB2',
-                          flexShrink: 0,
-                          whiteSpace: 'nowrap'
-                        }}
-                      >
-                        ${market.volume >= 1000 ? `${(market.volume / 1000).toFixed(1)}k` : market.volume.toFixed(2)} Vol.
-                      </div>
-                    </div>
-                    
-                    {/* Middle Section: Progress Bar with Percentage */}
-                    <div style={{ marginBottom: '14px' }}>
-                      {/* Percentage and Label */}
-                      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'flex-end', marginBottom: '6px', gap: '6px' }}>
-                        <span 
+                        <span
                           style={{
                             fontFamily: '"Clash Grotesk", "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                            fontWeight: 500, // Medium
-                            fontSize: '18.38px',
-                            lineHeight: '27.58px',
+                            fontWeight: 400,
+                            fontSize: '12px',
+                            color: '#899CB2',
+                            marginTop: '4px',
+                            display: 'inline-block'
+                          }}
+                        >
+                        
+                        </span>
+                      </div>
+                      
+                      {/* End Time */}
+                      {getTimeRemaining(market.endTime, market.resolutionTime) && (
+                        <div 
+                          style={{
+                            fontFamily: '"Clash Grotesk", "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                            fontWeight: 400,
+                            fontSize: '14px',
+                            lineHeight: '19px',
+                            color: '#F2F2F2',
+                            flexShrink: 0,
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          {getTimeRemaining(market.endTime, market.resolutionTime)}
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Middle Section: Volume + Progress Bar with Percentage */}
+                    <div style={{ marginBottom: '14px' }}>
+                      {/* Volume and Percentage row */}
+                      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: '6px' }}>
+                        {/* Volume on left */}
+                        <div 
+                          style={{
+                            fontFamily: '"Clash Grotesk", "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                            fontWeight: 400,
+                            fontSize: '14px',
+                            lineHeight: '19px',
                             color: '#F2F2F2'
                           }}
                         >
-                          {market.yesPrice}%
-                        </span>
-                        <span 
-                          style={{
-                            fontFamily: '"Clash Grotesk", "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                            fontWeight: 500,
-                            fontSize: '13.83px',
-                            lineHeight: '27.58px',
-                            color: '#899CB2'
-                          }}
-                        >
-                          chance
-                        </span>
+                          {market.volume >= 1000000 ? `${(market.volume / 1000000).toFixed(1)}m` : market.volume >= 1000 ? `${(market.volume / 1000).toFixed(1)}k` : market.volume.toFixed(2)} Vol.
+                        </div>
+                        
+                        {/* Percentage and Label on right */}
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+                          <span 
+                            style={{
+                              fontFamily: '"Clash Grotesk", "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                              fontWeight: 500,
+                              fontSize: '18.38px',
+                              lineHeight: '27.58px',
+                              color: '#F2F2F2'
+                            }}
+                          >
+                            {market.yesPrice}%
+                          </span>
+                          <span 
+                            style={{
+                              fontFamily: '"Clash Grotesk", "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                              fontWeight: 500,
+                              fontSize: '13.83px',
+                              lineHeight: '27.58px',
+                              color: '#899CB2'
+                            }}
+                          >
+                            chance
+                          </span>
+                        </div>
                       </div>
                       
                       {/* Progress Bar */}
@@ -566,7 +623,8 @@ const HomeWormStyle = () => {
                 market={{
                   ...market,
                   questionTitle: market.question || market.questionTitle,
-                  totalVolume: market.volume || market.totalVolume
+                  totalVolume: market.volume || market.totalVolume,
+                  resolutionDateTime: market.resolutionTime || market.endTime
                 }}
                 showBuyButtons={true}
                 onBuy={(marketId, side) => {
