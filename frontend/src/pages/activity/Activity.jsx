@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import WormStyleNavbar from '../../components/modern/WormStyleNavbar';
+import { centsToTCENT } from '../../utils/priceFormatter';
 
 const ActivityRow = ({ item }) => {
   return (
