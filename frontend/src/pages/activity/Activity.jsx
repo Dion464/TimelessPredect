@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react';
+import { useHistory } from 'react-router-dom';
 import WormStyleNavbar from '../../components/modern/WormStyleNavbar';
 import { centsToTCENT } from '../../utils/priceFormatter';
 
-const ActivityRow = ({ item }) => {
+const ActivityRow = ({ item, onClick }) => {
   return (
     <div
-      className="flex items-center border-b border-[#272727]"
+      className="flex items-center border-b border-[#272727] cursor-pointer hover:bg-white/5 transition-colors"
       style={{ minHeight: '72px' }}
+      onClick={onClick}
     >
       {/* Market thumbnail */}
       <div className="flex items-center gap-4 flex-1 px-4 py-3">
@@ -85,6 +87,7 @@ const ActivityRow = ({ item }) => {
           href={item.txUrl}
           target="_blank"
           rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
           className="w-5 h-5 rounded-full border border-white/16 flex items-center justify-center hover:border-white/40 transition-colors"
         >
           <svg
@@ -109,6 +112,13 @@ const ActivityRow = ({ item }) => {
 const Activity = () => {
   const [activity, setActivity] = useState([]);
   const [loading, setLoading] = useState(true);
+  const history = useHistory();
+
+  const handleActivityClick = (item) => {
+    if (item.marketId) {
+      history.push(`/markets/${item.marketId}`);
+    }
+  };
 
   useEffect(() => {
     const fetchActivity = async () => {
@@ -191,7 +201,11 @@ const Activity = () => {
             )}
             {!loading &&
               activity.map((item) => (
-                <ActivityRow key={item.id} item={item} />
+                <ActivityRow 
+                  key={item.id} 
+                  item={item} 
+                  onClick={() => handleActivityClick(item)}
+                />
               ))}
           </div>
         </div>

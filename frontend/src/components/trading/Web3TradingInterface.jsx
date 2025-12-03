@@ -603,7 +603,7 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
                     txHash: receipt?.transactionHash || receipt?.hash || null,
                     blockNumber: receipt?.blockNumber?.toString() || null,
                     blockTime: receipt?.blockNumber ? new Date().toISOString() : new Date().toISOString(),
-                    marketQuestion: market?.question || null, // Pass the market question
+                    marketQuestion: market?.questionTitle || market?.question || null, // Pass the market question
                   })
                 });
                 console.log('✅ Activity event created for buy');
@@ -833,7 +833,7 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
                     txHash: receipt?.transactionHash || receipt?.hash || null,
                     blockNumber: receipt?.blockNumber?.toString() || null,
                     blockTime: receipt?.blockNumber ? new Date().toISOString() : new Date().toISOString(),
-                    marketQuestion: market?.question || null, // Pass the market question
+                    marketQuestion: market?.questionTitle || market?.question || null, // Pass the market question
                   })
                 });
                 console.log('✅ Activity event created for sell');
