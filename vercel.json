@@ -17,6 +17,10 @@
       "dest": "/api/activity/create.js"
     },
     {
+      "src": "/api/markets$",
+      "dest": "/api/markets/index.js"
+    },
+    {
       "src": "/api/(.*)",
       "dest": "/api/$1"
     },

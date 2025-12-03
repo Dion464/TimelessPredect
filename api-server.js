@@ -22,6 +22,9 @@ const createActivityHandler = require('./api/activity/create.js');
 // Import market participants handler
 const marketParticipantsHandler = require('./api/markets/[marketId]/participants.js');
 
+// Import markets handler
+const marketsHandler = require('./api/markets/index.js');
+
 // Import notifications handler
 const notificationsHandler = require('./api/notifications/index.js');
 
@@ -174,6 +177,18 @@ app.post('/api/activity/create', async (req, res) => {
     await createActivityHandler(vercelReq, res);
   } catch (error) {
     console.error('Error in create activity handler:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Markets list route
+app.get('/api/markets', async (req, res) => {
+  try {
+    const vercelReq = createVercelRequest(req);
+    vercelReq.query = req.query;
+    await marketsHandler(vercelReq, res);
+  } catch (error) {
+    console.error('Error in markets handler:', error);
     res.status(500).json({ error: error.message });
   }
 });
