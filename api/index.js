@@ -26,17 +26,21 @@ module.exports = async (req, res) => {
     return res.status(200).end();
   }
 
-  // Parse the URL path
-  const url = new URL(req.url, `http://${req.headers.host}`);
+  // Parse the URL path and query params
+  const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   const path = url.pathname;
   
-  // Copy query params to req.query if not already there
-  if (!req.query) {
-    req.query = {};
-    url.searchParams.forEach((value, key) => {
+  // Always ensure req.query is populated from URL search params
+  // Vercel may or may not set this depending on the route
+  req.query = req.query || {};
+  url.searchParams.forEach((value, key) => {
+    // Don't overwrite existing query params from Vercel
+    if (req.query[key] === undefined) {
       req.query[key] = value;
-    });
-  }
+    }
+  });
+  
+  console.log(`[API] ${req.method} ${path}`, { query: req.query });
 
   try {
     // Route based on path
@@ -99,8 +103,13 @@ module.exports = async (req, res) => {
       return await recordPriceHandler(req, res);
     }
 
-    // User stats
-    if (path === '/api/user-stats') {
+    // User stats (with optional address parameter)
+    const userStatsMatch = path.match(/^\/api\/user-stats(?:\/(.+))?$/);
+    if (userStatsMatch) {
+      if (userStatsMatch[1]) {
+        req.params = req.params || {};
+        req.params.address = userStatsMatch[1];
+      }
       return await userStatsHandler(req, res);
     }
 
