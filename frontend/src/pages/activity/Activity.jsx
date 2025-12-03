@@ -113,6 +113,7 @@ const Activity = () => {
   const [activity, setActivity] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
+  const [sortBy, setSortBy] = useState('recent');
   const history = useHistory();
 
   const handleActivityClick = (item) => {
@@ -121,14 +122,22 @@ const Activity = () => {
     }
   };
 
-  // Filter activity based on selected filter
-  const filteredActivity = activity.filter((item) => {
-    if (filter === 'all') return true;
-    if (filter === 'trades') return item.eventType === 'ORDER_FILLED' || item.eventType === 'ORDER_PLACED';
-    if (filter === 'resolved') return item.eventType === 'MARKET_RESOLVED';
-    if (filter === 'created') return item.eventType === 'MARKET_CREATED';
-    return true;
-  });
+  // Filter and sort activity
+  const filteredActivity = activity
+    .filter((item) => {
+      if (filter === 'all') return true;
+      if (filter === 'trades') return item.eventType === 'ORDER_FILLED' || item.eventType === 'ORDER_PLACED';
+      if (filter === 'resolved') return item.eventType === 'MARKET_RESOLVED';
+      if (filter === 'created') return item.eventType === 'MARKET_CREATED';
+      return true;
+    })
+    .sort((a, b) => {
+      if (sortBy === 'amount') {
+        return (b.shares || 0) - (a.shares || 0);
+      }
+      // Default: recent (already sorted by API)
+      return 0;
+    });
 
   useEffect(() => {
     const fetchActivity = async () => {
@@ -181,32 +190,57 @@ const Activity = () => {
               </p>
             </div>
 
-            {/* Filter pills */}
+            {/* Filter dropdowns */}
             <div 
-              className="flex items-center gap-2 flex-wrap"
+              className="flex items-center gap-4"
               style={{
                 fontFamily:
                   '"Clash Grotesk", "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
               }}
             >
-              {[
-                { key: 'all', label: 'All' },
-                { key: 'trades', label: 'Trades' },
-                { key: 'resolved', label: 'Resolved' },
-                { key: 'created', label: 'Created' },
-              ].map(({ key, label }) => (
-                <button
-                  key={key}
-                  onClick={() => setFilter(key)}
-                  className={`px-5 py-2 rounded-full text-sm font-semibold transition-all duration-200 ${
-                    filter === key
-                      ? 'bg-[#FFE600] text-black shadow-[0_0_12px_rgba(255,230,0,0.3)]'
-                      : 'border border-[#FFE600]/60 text-[#FFE600] hover:bg-[#FFE600]/10 hover:border-[#FFE600]'
-                  }`}
+              {/* Event Type Filter */}
+              <div className="relative">
+                <select
+                  value={filter}
+                  onChange={(e) => setFilter(e.target.value)}
+                  className="appearance-none bg-transparent border-2 border-[#FFE600] text-[#FFE600] rounded-full px-6 py-3 pr-12 text-base font-medium cursor-pointer hover:bg-[#FFE600]/10 transition-colors focus:outline-none focus:ring-2 focus:ring-[#FFE600]/30"
+                  style={{ minWidth: '120px' }}
                 >
-                  {label}
-                </button>
-              ))}
+                  <option value="all" className="bg-[#0E0E0E] text-[#FFE600]">All</option>
+                  <option value="trades" className="bg-[#0E0E0E] text-[#FFE600]">Trades</option>
+                  <option value="resolved" className="bg-[#0E0E0E] text-[#FFE600]">Resolved</option>
+                  <option value="created" className="bg-[#0E0E0E] text-[#FFE600]">Created</option>
+                </select>
+                <svg 
+                  className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#FFE600] pointer-events-none"
+                  fill="none" 
+                  stroke="currentColor" 
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+
+              {/* Amount Sort Filter */}
+              <div className="relative">
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="appearance-none bg-transparent border-2 border-[#FFE600] text-[#FFE600] rounded-full px-6 py-3 pr-12 text-base font-medium cursor-pointer hover:bg-[#FFE600]/10 transition-colors focus:outline-none focus:ring-2 focus:ring-[#FFE600]/30"
+                  style={{ minWidth: '140px' }}
+                >
+                  <option value="recent" className="bg-[#0E0E0E] text-[#FFE600]">Recent</option>
+                  <option value="amount" className="bg-[#0E0E0E] text-[#FFE600]">Amount</option>
+                </select>
+                <svg 
+                  className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#FFE600] pointer-events-none"
+                  fill="none" 
+                  stroke="currentColor" 
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
             </div>
           </div>
 
