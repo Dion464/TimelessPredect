@@ -624,6 +624,7 @@ const HomeWormStyle = () => {
                   ...market,
                   questionTitle: market.question || market.questionTitle,
                   totalVolume: market.volume || market.totalVolume,
+                  endTime: market.endTime,
                   resolutionDateTime: market.resolutionTime || market.endTime
                 }}
                 showBuyButtons={true}

@@ -164,6 +164,7 @@ model Notification {
   marketId        BigInt?          @map("market_id")
   pendingMarketId BigInt?          @map("pending_market_id")
   read            Boolean          @default(false) @map("read")
+  claimed         Boolean          @default(false) @map("claimed")
   createdAt       DateTime         @default(now()) @map("created_at")
   updatedAt       DateTime         @updatedAt @map("updated_at")
 

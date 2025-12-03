@@ -20,6 +20,7 @@ const WormStyleNavbar = () => {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [loadingNotifications, setLoadingNotifications] = useState(false);
   const [claimedMarkets, setClaimedMarkets] = useState(new Set());
+  const [claimingMarket, setClaimingMarket] = useState(null);
 
   const handleCreateClick = () => {
     history.push('/create');
@@ -149,6 +150,15 @@ const WormStyleNavbar = () => {
         if (dbResponse.ok) {
           const dbData = await dbResponse.json();
           if (dbData.success && dbData.notifications) {
+            // Build claimed markets set from database
+            const claimedFromDb = new Set();
+            dbData.notifications.forEach(n => {
+              if (n.claimed && n.marketId) {
+                claimedFromDb.add(Number(n.marketId));
+              }
+            });
+            setClaimedMarkets(prev => new Set([...prev, ...claimedFromDb]));
+
             const dbNotifs = dbData.notifications
               .filter(n => !n.read)
               .map((n) => {
@@ -181,7 +191,8 @@ const WormStyleNavbar = () => {
                   message: n.message,
                   question: n.message.split('"')[1] || n.title,
                   status: n.type === 'MARKET_RESOLVED' ? (n.message.includes('won') ? 'won' : 'lost') : n.type === 'MARKET_APPROVED' ? 'approved' : n.type === 'MARKET_REJECTED' ? 'rejected' : 'info',
-                  claimable: n.type === 'MARKET_RESOLVED' && n.message.includes('won'),
+                  claimable: n.type === 'MARKET_RESOLVED' && n.message.includes('won') && !n.claimed,
+                  claimed: n.claimed || false,
                   shares: shares,
                   marketId: n.marketId ? Number(n.marketId) : null,
                   pendingMarketId: n.pendingMarketId ? Number(n.pendingMarketId) : null,
@@ -268,7 +279,14 @@ const WormStyleNavbar = () => {
     }
   }, [notificationsOpen]);
 
-  const notificationCount = notifications.length;
+  // Count only unclaimed notifications for the badge
+  const notificationCount = notifications.filter(n => {
+    // If it's a claimable notification and already claimed, don't count it
+    if (n.claimable && n.marketId && (claimedMarkets.has(n.marketId) || n.claimed)) {
+      return false;
+    }
+    return true;
+  }).length;
 
   const statusStyles = useMemo(() => ({
     won: 'text-green-300',
@@ -301,15 +319,38 @@ const WormStyleNavbar = () => {
   }, [isConnected, account, resolveApiBase, loadNotifications]);
 
   const handleClaim = async (marketId) => {
+    if (claimingMarket === marketId) return; // Prevent double-click
+    
     try {
+      setClaimingMarket(marketId);
       await claimWinnings(marketId);
-      // Mark this market as claimed
+      
+      // Mark this market as claimed locally
       setClaimedMarkets(prev => new Set([...prev, marketId]));
+      
+      // Save claimed state to database
+      try {
+        const apiBaseUrl = resolveApiBase();
+        await fetch(`${apiBaseUrl}/api/notifications`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            recipient: account.toLowerCase(),
+            markClaimed: true,
+            marketId: marketId
+          })
+        });
+      } catch (dbErr) {
+        console.error('Failed to save claimed state to database:', dbErr);
+      }
+      
       showGlassToast({ title: 'Winnings claimed successfully! 🎉', icon: '✅' });
       loadNotifications();
     } catch (err) {
       console.error('Failed to claim winnings', err);
       showGlassToast({ title: err?.message || 'Failed to claim winnings', icon: '❌' });
+    } finally {
+      setClaimingMarket(null);
     }
   };
 
@@ -476,7 +517,7 @@ const WormStyleNavbar = () => {
                               )}
                             </div>
                             {notif.claimable && notif.marketId && (
-                              claimedMarkets.has(notif.marketId) ? (
+                              claimedMarkets.has(notif.marketId) || notif.claimed ? (
                                 <div className="w-full text-sm sm:text-xs font-semibold text-[#22C55E] bg-[#22C55E]/10 border border-[#22C55E]/30 rounded-full py-2.5 sm:py-2 text-center">
                                   ✓ Claimed
                                 </div>
@@ -486,9 +527,10 @@ const WormStyleNavbar = () => {
                                     e.stopPropagation();
                                     handleClaim(notif.marketId);
                                   }}
-                                  className="w-full text-sm sm:text-xs font-semibold text-black bg-[#FFE600] hover:bg-[#FFD700] active:bg-[#FFC700] rounded-full py-2.5 sm:py-2 touch-manipulation transition-colors"
+                                  disabled={claimingMarket === notif.marketId}
+                                  className="w-full text-sm sm:text-xs font-semibold text-black bg-[#FFE600] hover:bg-[#FFD700] active:bg-[#FFC700] rounded-full py-2.5 sm:py-2 touch-manipulation transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                                 >
-                                  Claim {((notif.shares || 0) > 0 ? notif.shares.toFixed(2) : '0.00')} TCENT
+                                  {claimingMarket === notif.marketId ? 'Claiming...' : `Claim ${((notif.shares || 0) > 0 ? notif.shares.toFixed(2) : '0.00')} TCENT`}
                                 </button>
                               )
                             )}

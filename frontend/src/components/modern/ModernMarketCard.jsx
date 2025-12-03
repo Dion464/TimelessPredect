@@ -20,10 +20,15 @@ const formatVolumeDisplay = (volume) => {
 
 // Helper function to get time remaining
 const getTimeRemaining = (endTime, resolutionDateTime) => {
-  // Try to use endTime (unix timestamp) first, then resolutionDateTime (ISO string)
+  // Try to use endTime first, then resolutionDateTime
   let endDate;
   if (endTime) {
-    endDate = new Date(Number(endTime) * 1000);
+    // Handle both ISO string and unix timestamp
+    if (typeof endTime === 'string') {
+      endDate = new Date(endTime);
+    } else {
+      endDate = new Date(Number(endTime) * 1000);
+    }
   } else if (resolutionDateTime) {
     endDate = new Date(resolutionDateTime);
   } else {
@@ -36,8 +41,10 @@ const getTimeRemaining = (endTime, resolutionDateTime) => {
   if (diff <= 0) return 'Ended';
   
   const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  const months = Math.floor(days / 30);
   const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
   
+  if (months > 0) return `ends in ${months} month${months > 1 ? 's' : ''}`;
   if (days > 0) return `ends in ${days} day${days > 1 ? 's' : ''}`;
   if (hours > 0) return `ends in ${hours}h`;
   return 'ends soon';
