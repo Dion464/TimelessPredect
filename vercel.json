@@ -6,7 +6,15 @@
   "routes": [
     {
       "src": "/api/pending-markets/([0-9]+)",
-      "dest": "/api/pending-markets/index.js"
+      "dest": "/api/pending-markets/[id].js?id=$1"
+    },
+    {
+      "src": "/api/markets/([0-9]+)/participants",
+      "dest": "/api/markets/[marketId]/participants.js?marketId=$1"
+    },
+    {
+      "src": "/api/activity/create",
+      "dest": "/api/activity/create.js"
     },
     {
       "src": "/api/(.*)",

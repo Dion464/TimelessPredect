@@ -19,6 +19,12 @@ const pendingMarketByIdHandler = require('./api/pending-markets/[id].js');
 const activityHandler = require('./api/activity/index.js');
 const createActivityHandler = require('./api/activity/create.js');
 
+// Import market participants handler
+const marketParticipantsHandler = require('./api/markets/[marketId]/participants.js');
+
+// Import notifications handler
+const notificationsHandler = require('./api/notifications/index.js');
+
 const app = express();
 const PORT = process.env.PORT || 8080;
 
@@ -168,6 +174,52 @@ app.post('/api/activity/create', async (req, res) => {
     await createActivityHandler(vercelReq, res);
   } catch (error) {
     console.error('Error in create activity handler:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Market participants route (for resolution notifications)
+app.get('/api/markets/:marketId/participants', async (req, res) => {
+  try {
+    const vercelReq = createVercelRequest(req);
+    vercelReq.query = { ...req.query, marketId: req.params.marketId };
+    await marketParticipantsHandler(vercelReq, res);
+  } catch (error) {
+    console.error('Error in market participants handler:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Notifications routes
+app.get('/api/notifications', async (req, res) => {
+  try {
+    const vercelReq = createVercelRequest(req);
+    vercelReq.query = req.query;
+    await notificationsHandler(vercelReq, res);
+  } catch (error) {
+    console.error('Error in notifications handler:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/notifications', async (req, res) => {
+  try {
+    const vercelReq = createVercelRequest(req);
+    vercelReq.body = req.body;
+    await notificationsHandler(vercelReq, res);
+  } catch (error) {
+    console.error('Error in notifications handler:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.patch('/api/notifications', async (req, res) => {
+  try {
+    const vercelReq = createVercelRequest(req);
+    vercelReq.body = req.body;
+    await notificationsHandler(vercelReq, res);
+  } catch (error) {
+    console.error('Error in notifications handler:', error);
     res.status(500).json({ error: error.message });
   }
 });
