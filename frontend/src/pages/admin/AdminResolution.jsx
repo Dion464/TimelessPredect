@@ -359,6 +359,26 @@ const AdminResolution = () => {
 
       console.log(`✅ Created ${notificationsCreated} notifications for market ${marketId} (out of ${participants.length} participants)`);
 
+      // Create activity event for market resolution
+      try {
+        await fetch(`${apiBaseUrl}/api/activity/create`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'MARKET_RESOLVED',
+            marketId: marketId.toString(),
+            outcome: outcome,
+            resolver: account,
+            txHash: receipt?.transactionHash || tx.hash || null,
+            blockNumber: receipt?.blockNumber?.toString() || null,
+            marketQuestion: market?.question || null,
+          })
+        });
+        console.log('✅ Activity event created for market resolution');
+      } catch (activityErr) {
+        console.error('⚠️ Failed to create activity event for resolution:', activityErr);
+      }
+
       showGlassToast({ 
         title: `Market resolved as ${outcomeName}. ${notificationsCreated} notifications sent.`, 
         icon: '✅' 

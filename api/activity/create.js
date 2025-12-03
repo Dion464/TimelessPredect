@@ -65,12 +65,6 @@ module.exports = async function handler(req, res) {
           where: { marketId: BigInt(marketId) },
         }).catch(() => null);
 
-        // If market question is passed from frontend and DB doesn't have it, use the passed value
-        if (marketQuestion && (!market || !market.question)) {
-          market = market || {};
-          market.question = marketQuestion;
-        }
-
         activityEvent = await createTradeActivity({
           marketId,
           userAddress,
@@ -83,6 +77,7 @@ module.exports = async function handler(req, res) {
           blockNumber: blockNumber ? BigInt(blockNumber) : null,
           blockTime: blockTime ? new Date(blockTime) : new Date(),
           market,
+          marketQuestion, // Pass marketQuestion directly from frontend
         });
         break;
       }
@@ -124,6 +119,7 @@ module.exports = async function handler(req, res) {
           txHash,
           blockNumber,
           blockTime,
+          marketQuestion, // Market question from frontend
         } = data;
 
         if (!marketId || !outcome || !resolver) {
@@ -132,8 +128,8 @@ module.exports = async function handler(req, res) {
           });
         }
 
-        // Get market info
-        const market = await prisma.market.findUnique({
+        // Get market info from DB
+        let market = await prisma.market.findUnique({
           where: { marketId: BigInt(marketId) },
         }).catch(() => null);
 
@@ -145,6 +141,7 @@ module.exports = async function handler(req, res) {
           blockNumber: blockNumber ? BigInt(blockNumber) : null,
           blockTime: blockTime ? new Date(blockTime) : new Date(),
           market,
+          marketQuestion, // Pass marketQuestion directly from frontend
         });
         break;
       }
