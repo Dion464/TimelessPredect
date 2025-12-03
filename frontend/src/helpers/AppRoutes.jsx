@@ -55,6 +55,10 @@ const AppRoutes = () => {
         <PolymarketStyleTrading />
       </Route>
       
+      <Route exact path='/market/:marketId'>
+        <PolymarketStyleTrading />
+      </Route>
+      
       <Route exact path='/markets' component={Markets} />
       
       <Route exact path='/user/:address' component={User} />

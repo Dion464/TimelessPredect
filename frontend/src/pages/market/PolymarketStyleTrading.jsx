@@ -132,6 +132,7 @@ const PolymarketStyleTrading = () => {
   const [yesPriceHistory, setYesPriceHistory] = useState([]);
   const [noPriceHistory, setNoPriceHistory] = useState([]);
   const [priceHistory, setPriceHistory] = useState([]);
+  const [trendingMarkets, setTrendingMarkets] = useState([]);
 
   const safeToNumber = (value) => {
     if (value === null || value === undefined) return 0;
@@ -640,6 +641,26 @@ const PolymarketStyleTrading = () => {
     return () => clearInterval(refreshInterval);
   }, [marketId]); // Only depend on marketId to prevent infinite loops
 
+  // Fetch trending markets
+  useEffect(() => {
+    const fetchTrendingMarkets = async () => {
+      try {
+        const response = await fetch(`${API_BASE}/api/markets?limit=3&sort=volume`);
+        if (response.ok) {
+          const data = await response.json();
+          // Filter out current market and take first 2
+          const filtered = (data.markets || [])
+            .filter(m => m.marketId?.toString() !== marketId?.toString())
+            .slice(0, 2);
+          setTrendingMarkets(filtered);
+        }
+      } catch (err) {
+        console.log('Could not fetch trending markets:', err);
+      }
+    };
+    fetchTrendingMarkets();
+  }, [marketId, API_BASE]);
+
   // Set up event listeners for real-time updates
   useEffect(() => {
     if (!contracts?.predictionMarket || !marketId || !isConnected) return;
@@ -896,66 +917,15 @@ const PolymarketStyleTrading = () => {
       <WormStyleNavbar />
       
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 sm:pt-24 pb-12">
-        {/* Market Header - Full Width */}
-        <div className="mb-6 sm:mb-8">
-          <div className="glass-card rounded-[24px] p-4 sm:p-6 lg:p-8 border border-white/20 bg-transparent shadow-lg relative overflow-hidden min-h-[200px] lg:min-h-[240px]">
-            {/* Image overlay for desktop */}
-            <div className="hidden sm:block absolute inset-y-0 right-0 w-1/2 max-w-[420px] min-w-[260px]">
-              <div className="relative h-full bg-white/5" style={{ borderRadius: '0px 24px 24px 0px' }}>
-                <img
-                  src={heroImageUrl}
-                  alt={market.questionTitle}
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    e.target.style.display = 'none';
-                    const parent = e.target.parentElement;
-                    if (parent) {
-                      parent.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
-                    }
-                  }}
-                />
-                <div className="absolute inset-0 pointer-events-none bg-gradient-to-r from-[#0E0E0E] via-[#0E0E0E]/60 to-transparent" />
-              </div>
-            </div>
-
-            <div className="relative z-10 sm:pr-[45%] lg:pr-[420px]">
-            {/* Creator badge */}
-            <div className="flex items-center gap-3 mb-4">
-              <div className="flex items-center gap-2 px-4 py-2 rounded-full border border-white/15 bg-white/5 backdrop-blur-md">
-                <span className="text-white/60 text-[11px] tracking-[0.35em] uppercase">Creator</span>
-                <span className="text-white text-sm font-semibold tracking-wide">{creatorHandle}</span>
-              </div>
-              <button
-                type="button"
-                onClick={handleShareClick}
-                className="w-9 h-9 rounded-full border border-white/15 bg-white/5 flex items-center justify-center text-white/70 hover:text-white hover:bg-white/10 transition-colors"
-                title="Share market"
-              >
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 12v7a1 1 0 001 1h14a1 1 0 001-1v-7" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M16 6l-4-4-4 4" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 2v14" />
-                </svg>
-              </button>
-            </div>
-
-            <div className="flex flex-col gap-4 sm:gap-6">
-              <h1
-                className="flex-1 text-white font-space-grotesk font-medium leading-[1.32]"
-                style={{
-                  fontWeight: 500,
-                  fontSize: '24px',
-                  lineHeight: '1.32',
-                  letterSpacing: '-0.01em'
-                }}
-              >
-                <span className="block text-[24px] sm:text-[32px] lg:text-[40px] max-w-[700px]">
-                  {market.questionTitle}
-                </span>
-              </h1>
-              {/* Mobile image */}
-              <div className="sm:hidden rounded-[20px] bg-white/5 overflow-hidden">
-                <div className="relative h-[180px]">
+        {/* Two Column Layout - Title and Trading Interface side by side */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 lg:gap-8">
+          {/* Left Side - Title + Chart + Tabs (wider) */}
+          <div className="lg:col-span-8 space-y-4 sm:space-y-6 order-2 lg:order-1">
+            {/* Market Header - Same width as chart */}
+            <div className="glass-card rounded-[24px] p-4 sm:p-6 lg:p-8 border border-white/10 bg-transparent shadow-lg relative overflow-hidden">
+              {/* Image overlay for desktop */}
+              <div className="hidden sm:block absolute inset-y-0 right-0 w-[45%]">
+                <div className="relative h-full bg-white/5" style={{ borderRadius: '0px 24px 24px 0px' }}>
                   <img
                     src={heroImageUrl}
                     alt={market.questionTitle}
@@ -968,28 +938,59 @@ const PolymarketStyleTrading = () => {
                       }
                     }}
                   />
-                  <div className="absolute inset-0 pointer-events-none bg-gradient-to-r from-[#0E0E0E] via-transparent to-transparent" />
+                  <div className="absolute inset-0 pointer-events-none bg-gradient-to-r from-[#0E0E0E] via-[#0E0E0E]/60 to-transparent" />
+                </div>
+              </div>
+
+              <div className="relative z-10 sm:pr-[40%]">
+                {/* Creator badge */}
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="flex items-center gap-2 px-4 py-2 rounded-full border border-white/15 bg-white/5 backdrop-blur-md">
+                    <span className="text-white/60 text-[11px] tracking-[0.35em] uppercase">Creator:</span>
+                    <span className="text-white text-sm font-semibold tracking-wide">{creatorHandle}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleShareClick}
+                    className="w-9 h-9 rounded-full border border-white/15 bg-white/5 flex items-center justify-center text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+                    title="Share market"
+                  >
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4 12v7a1 1 0 001 1h14a1 1 0 001-1v-7" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M16 6l-4-4-4 4" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 2v14" />
+                    </svg>
+                  </button>
+                </div>
+
+                <h1
+                  className="text-white font-space-grotesk font-medium leading-[1.32]"
+                  style={{ fontWeight: 500, lineHeight: '1.32', letterSpacing: '-0.01em' }}
+                >
+                  <span className="block text-[20px] sm:text-[26px] lg:text-[32px]">
+                    {market.questionTitle}
+                  </span>
+                </h1>
+
+                {/* Mobile image */}
+                <div className="sm:hidden rounded-[20px] bg-white/5 overflow-hidden mt-4">
+                  <div className="relative h-[180px]">
+                    <img
+                      src={heroImageUrl}
+                      alt={market.questionTitle}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                        const parent = e.target.parentElement;
+                        if (parent) {
+                          parent.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+                        }
+                      }}
+                    />
+                  </div>
                 </div>
               </div>
             </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Two Column Layout - Mobile: Stack vertically, Desktop: Side by side */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 lg:gap-8">
-          {/* Mobile: Trading Interface First, Desktop: Left Side (1/3 width) */}
-          <div className="lg:col-span-4 order-1 lg:order-1">
-            <Web3TradingInterface 
-              marketId={marketId}
-              market={market}
-              onTradeComplete={refreshAllData}
-            />
-          </div>
-
-          {/* Mobile: Market Info Second, Desktop: Right Side (2/3 width) */}
-          <div className="lg:col-span-8 space-y-4 sm:space-y-6 order-2 lg:order-2">
-            {/* Percentage Display */}
            
 
             {/* Price History Chart */}
@@ -1124,6 +1125,58 @@ const PolymarketStyleTrading = () => {
                     )}
                   </div>
                 )}
+              </div>
+            </div>
+          </div>
+
+          {/* Right Side - Trading Interface + Trending Markets */}
+          <div className="lg:col-span-4 order-1 lg:order-2 space-y-6">
+            <Web3TradingInterface 
+              marketId={marketId}
+              market={market}
+              onTradeComplete={refreshAllData}
+            />
+            
+            {/* Trending Markets */}
+            <div className="space-y-3 ml-4" style={{fontFamily: '"Clash Grotesk", "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'}}>
+              <h3 className="text-white font-semibold text-base">Trending Markets</h3>
+              <div className="flex items-center gap-3">
+                {trendingMarkets.length > 0 ? (
+                  trendingMarkets.map((tm, index) => (
+                    <button
+                      key={tm.marketId}
+                      onClick={() => history.push(`/markets/${tm.marketId}`)}
+                      className="w-[100px] h-[100px] rounded-[20px] bg-white/5 border border-white/10 overflow-hidden hover:border-white/20 transition-all relative"
+                    >
+                      <img 
+                        src={tm.imageUrl || getMarketImage(tm, tm.marketId)}
+                        alt={tm.question || 'Market'}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                        }}
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
+                      <div className="absolute bottom-2 left-3">
+                        <span className="text-white text-lg font-medium">
+                          {Math.round(tm.yesPrice || tm.lastYesPriceBps / 100 || 50)}
+                          <span className="text-sm">%</span>
+                        </span>
+                      </div>
+                    </button>
+                  ))
+                ) : (
+                  <>
+                    <div className="w-[100px] h-[100px] rounded-[20px] bg-white/5 border border-white/10 animate-pulse" />
+                    <div className="w-[100px] h-[100px] rounded-[20px] bg-white/5 border border-white/10 animate-pulse" />
+                  </>
+                )}
+                <button
+                  onClick={() => history.push('/')}
+                  className="w-[100px] h-[100px] rounded-[20px] border border-white/10 flex items-center justify-center hover:bg-white/5 transition-colors"
+                >
+                  <span className="text-white text-sm">See More</span>
+                </button>
               </div>
             </div>
           </div>
