@@ -81,7 +81,6 @@ const ActivityRow = ({ item, onClick }) => {
               '"Clash Grotesk", "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
           }}
         >
-          {item.timestampLabel}
         </span>
         <a
           href={item.txUrl}
