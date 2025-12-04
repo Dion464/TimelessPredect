@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import ReactDOM from 'react-dom';
+import '../../pages/market/MarketDetailGlass.css';
 
 const HowItWorksModal = ({ isOpen, onClose }) => {
   const [currentStep, setCurrentStep] = useState(0);
@@ -10,7 +12,7 @@ const HowItWorksModal = ({ isOpen, onClose }) => {
     }
   }, [isOpen]);
 
-  // Close on escape key
+  // Close on escape key and lock body scroll
   useEffect(() => {
     const handleEscape = (e) => {
       if (e.key === 'Escape') onClose();
@@ -32,7 +34,7 @@ const HowItWorksModal = ({ isOpen, onClose }) => {
       image: '/1.svg',
       number: '1',
       title: 'Pick a Market',
-      description: "Buy 'Yes' or 'No' shares depending on your prediction. Buying shares is like betting on the outcome. Odds shift in real time as other trader's bet."
+      description: "Buy 'Yes' or 'No' shares depending on your prediction. Buying shares is like betting on the outcome. Odds shift in real time as other traders bet."
     },
     {
       image: '/2.svg',
@@ -56,95 +58,165 @@ const HowItWorksModal = ({ isOpen, onClose }) => {
     }
   };
 
-  const handleBack = () => {
-    if (currentStep > 0) {
-      setCurrentStep(currentStep - 1);
-    }
-  };
-
   const step = steps[currentStep];
 
-  return (
+  const modalContent = (
     <div 
-      className="fixed inset-0 z-[9999] flex items-center justify-center"
       onClick={onClose}
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        width: '100vw',
+        height: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 99999,
+        padding: '20px',
+        boxSizing: 'border-box'
+      }}
     >
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
-      
-      {/* Modal */}
       <div 
-        className="relative w-full max-w-[420px] mx-4 bg-[#1A1A1A] rounded-2xl overflow-hidden shadow-2xl border border-white/10"
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'transparent',
+          backdropFilter: 'blur(10px)'
+        }}
+      />
+      
+      {/* Modal with glass effect */}
+      <div 
+        className="glass-card box-shadow"
         onClick={(e) => e.stopPropagation()}
+        style={{
+          position: 'relative',
+          width: '100%',
+          maxWidth: '450px',
+          background: 'black',
+          borderRadius: '20px',
+          overflow: 'hidden'
+        }}
       >
         {/* Close button */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 z-10 w-8 h-8 flex items-center justify-center text-white/60 hover:text-white transition-colors"
+          style={{
+            position: 'absolute',
+            top: '16px',
+            right: '16px',
+            zIndex: 10,
+            width: '36px',
+            height: '36px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'rgba(255,255,255,0.5)',
+            background: 'rgba(0,0,0,0.3)',
+            borderRadius: '50%',
+            border: 'none',
+            cursor: 'pointer',
+            transition: 'color 0.2s'
+          }}
+          onMouseEnter={(e) => e.target.style.color = 'white'}
+          onMouseLeave={(e) => e.target.style.color = 'rgba(255,255,255,0.5)'}
         >
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         </button>
 
         {/* Image container */}
-        <div className="relative w-full aspect-[4/3] bg-[#111] flex items-center justify-center overflow-hidden">
+        <div 
+          style={{
+            width: '100%',
+            height: '360px',
+            backgroundColor: '#0A0A0A',
+            overflow: 'hidden'
+          }}
+        >
           <img 
             src={step.image} 
             alt={step.title}
-            className="w-full h-full object-contain"
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              objectPosition: 'center'
+            }}
           />
         </div>
 
         {/* Content */}
-        <div className="p-6 pt-5">
-          {/* Step indicator dots */}
-          <div className="flex justify-center gap-2 mb-4">
-            {steps.map((_, index) => (
-              <button
-                key={index}
-                onClick={() => setCurrentStep(index)}
-                className={`w-2 h-2 rounded-full transition-all duration-300 ${
-                  index === currentStep 
-                    ? 'bg-[#FFE600] w-6' 
-                    : 'bg-white/20 hover:bg-white/40'
-                }`}
-              />
-            ))}
-          </div>
-
+        <div style={{ padding: '28px 24px 24px' }}>
           {/* Title */}
-          <h2 className="text-white text-2xl font-bold text-center mb-3">
+          <h2 
+            style={{
+              fontFamily: '"Clash Grotesk", "Space Grotesk", -apple-system, BlinkMacSystemFont, sans-serif',
+              color: 'white',
+              textAlign: 'center',
+              fontSize: '28px',
+              fontWeight: 600,
+              letterSpacing: '-0.5px',
+              margin: '0 0 16px 0'
+            }}
+          >
             {step.number}. {step.title}
           </h2>
 
           {/* Description */}
-          <p className="text-[#A0A0A0] text-center text-[15px] leading-relaxed mb-6 min-h-[72px]">
+          <p 
+            style={{
+              fontFamily: '"Clash Grotesk", "Space Grotesk", -apple-system, BlinkMacSystemFont, sans-serif',
+              color: '#999',
+              textAlign: 'center',
+              fontSize: '16px',
+              lineHeight: '1.6',
+              fontWeight: 400,
+              margin: '0 0 28px 0',
+              minHeight: '76px'
+            }}
+          >
             {step.description}
           </p>
 
-          {/* Navigation buttons */}
-          <div className="flex gap-3">
-            {currentStep > 0 && (
-              <button
-                onClick={handleBack}
-                className="flex-1 py-3.5 px-6 rounded-xl border border-white/20 text-white font-semibold text-base hover:bg-white/5 transition-colors"
-              >
-                Back
-              </button>
-            )}
-            <button
-              onClick={handleNext}
-              className="flex-1 py-3.5 px-6 rounded-xl bg-[#FFE600] text-black font-semibold text-base hover:bg-[#FFE600]/90 transition-colors"
-            >
-              {currentStep === steps.length - 1 ? 'Get Started' : 'Next'}
-            </button>
-          </div>
+          {/* Next button only */}
+          <button
+            onClick={handleNext}
+            className="glass-card"
+            style={{
+              width: '100%',
+              padding: '14px 24px',
+              borderRadius: '6px',
+              border: 'none',
+              backgroundColor: '#FCDB35',
+              color: 'black',
+              fontFamily: '"Clash Grotesk", "Space Grotesk", -apple-system, BlinkMacSystemFont, sans-serif',
+              fontSize: '16px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              boxShadow: 'inset 0 0 1px rgba(255, 255, 255, 0.6), inset 0 0 16px rgba(255, 255, 255, 0.06)'
+            }}
+            onMouseEnter={(e) => e.target.style.backgroundColor = '#f0d800'}
+            onMouseLeave={(e) => e.target.style.backgroundColor = '#FCDB35'}
+          >
+            {currentStep === steps.length - 1 ? 'Get Started' : 'Next'}
+          </button>
         </div>
       </div>
     </div>
   );
+
+  // Render to body using portal to escape any parent styling issues
+  return ReactDOM.createPortal(modalContent, document.body);
 };
 
 export default HowItWorksModal;
-
