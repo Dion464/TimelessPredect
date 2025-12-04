@@ -3,16 +3,46 @@ import { useHistory } from 'react-router-dom';
 import WormStyleNavbar from '../../components/modern/WormStyleNavbar';
 import { centsToTCENT } from '../../utils/priceFormatter';
 
+// Helper function to format timestamp as relative time
+const formatTimeAgo = (timestamp) => {
+  if (!timestamp) return '';
+  
+  const now = new Date();
+  const date = new Date(timestamp);
+  const diffMs = now - date;
+  const diffSeconds = Math.floor(diffMs / 1000);
+  const diffMinutes = Math.floor(diffSeconds / 60);
+  const diffHours = Math.floor(diffMinutes / 60);
+  const diffDays = Math.floor(diffHours / 24);
+  const diffWeeks = Math.floor(diffDays / 7);
+  const diffMonths = Math.floor(diffDays / 30);
+
+  if (diffSeconds < 60) {
+    return 'just now';
+  } else if (diffMinutes < 60) {
+    return `${diffMinutes}m ago`;
+  } else if (diffHours < 24) {
+    return `${diffHours}h ago`;
+  } else if (diffDays < 7) {
+    return `${diffDays}d ago`;
+  } else if (diffWeeks < 4) {
+    return `${diffWeeks}w ago`;
+  } else {
+    return `${diffMonths}mo ago`;
+  }
+};
+
 const ActivityRow = ({ item, onClick }) => {
+  const timeAgo = formatTimeAgo(item.createdAt || item.timestamp);
+  
   return (
     <div
       className="flex items-center border-b border-[#272727] cursor-pointer hover:bg-white/5 transition-colors"
-      style={{ minHeight: '60px' }}
       onClick={onClick}
     >
-      {/* Market thumbnail */}
-      <div className="flex items-center gap-2.5 sm:gap-4 flex-1 px-3 sm:px-4 py-2.5 sm:py-3">
-        <div className="relative w-10 h-10 sm:w-12 sm:h-12 rounded-md overflow-hidden flex-shrink-0">
+      {/* Market thumbnail + info */}
+      <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0 px-3 sm:px-4 py-3">
+        <div className="relative w-9 h-9 sm:w-11 sm:h-11 rounded-lg overflow-hidden flex-shrink-0">
           {item.marketImageUrl ? (
             <>
               <img
@@ -33,65 +63,58 @@ const ActivityRow = ({ item, onClick }) => {
             </>
           ) : (
             <div
-              className={`absolute inset-0 bg-gradient-to-br ${item.avatarGradient}`}
+              className={`absolute inset-0 bg-gradient-to-br ${item.avatarGradient || 'from-purple-500 to-blue-500'}`}
             />
           )}
         </div>
+        
+        {/* Content */}
         <div className="min-w-0 flex-1">
+          {/* Market title */}
           <p
-            className="text-xs sm:text-sm font-semibold text-white truncate"
+            className="text-[11px] sm:text-sm font-semibold text-white line-clamp-1"
             style={{
-              fontFamily:
-                '"Clash Grotesk", "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+              fontFamily: '"Clash Grotesk", "Space Grotesk", sans-serif',
             }}
           >
             {item.marketTitle}
           </p>
-          {/* Mobile-only description */}
+          
+          {/* Action description */}
           <p
-            className="md:hidden text-[10px] sm:text-xs text-[#BABABA] truncate mt-0.5"
+            className="text-[10px] sm:text-xs text-[#888] mt-0.5 line-clamp-1"
             style={{
-              fontFamily:
-                '"Clash Grotesk", "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+              fontFamily: '"Clash Grotesk", "Space Grotesk", sans-serif',
             }}
           >
-            {item.user} {item.action} {item.side && <span style={{ color: item.sideColor, fontWeight: 600 }}>{item.side}</span>}
+            <span className="text-[#AAA]">{item.user}</span>
+            {' '}{item.action}{' '}
+            {item.side && (
+              <span style={{ color: item.sideColor, fontWeight: 600 }}>{item.side}</span>
+            )}
           </p>
         </div>
       </div>
 
-      {/* Description - Desktop only */}
-      <div className="hidden md:flex items-center gap-2 px-4 py-3 flex-[2] text-xs text-[#BABABA]"
-        style={{
-          fontFamily:
-            '"Clash Grotesk", "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-        }}
-      >
-        <span className="text-[#F2F2F2] font-semibold">{item.user}</span>
-        <span>{item.action}</span>
-        {item.side && (
-          <span style={{ color: item.sideColor, fontWeight: 600 }}>{item.side}</span>
-        )}
-        {item.priceCents !== null && item.shares !== null && (
-          <>
-            <span>at</span>
-            <span>{centsToTCENT(item.priceCents)} TCENT</span>
-            <span>({typeof item.shares === 'number' ? item.shares.toFixed(4) : '0'} TCENT)</span>
-          </>
-        )}
-      </div>
-
-      {/* Time + link */}
-      <div className="flex items-center gap-2 sm:gap-3 px-2 sm:px-4 py-2.5 sm:py-3 flex-shrink-0">
+      {/* Time + link - always visible */}
+      <div className="flex items-center gap-2 px-2 sm:px-4 py-3 flex-shrink-0">
+        <span
+          className="text-[10px] sm:text-xs text-[#666] whitespace-nowrap"
+          style={{
+            fontFamily: '"Clash Grotesk", "Space Grotesk", sans-serif',
+          }}
+        >
+          {timeAgo}
+        </span>
         <a
           href={item.txUrl}
           target="_blank"
           rel="noopener noreferrer"
           onClick={(e) => e.stopPropagation()}
-          className="w-5 h-5 rounded-full border border-white/16 flex items-center justify-center hover:border-white/40 transition-colors"
+          className="w-5 h-5 sm:w-6 sm:h-6 rounded-full border border-white/10 flex items-center justify-center hover:border-white/30 hover:bg-white/5 transition-colors"
         >
           <svg
-            className="w-3 h-3 text-[#BABABA]"
+            className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-[#888]"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -99,8 +122,8 @@ const ActivityRow = ({ item, onClick }) => {
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
-              strokeWidth="1.5"
-              d="M9 15L15 9M10 9h5v5"
+              strokeWidth="2"
+              d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
             />
           </svg>
         </a>
@@ -160,11 +183,11 @@ const Activity = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#050505] overflow-x-hidden">
+    <div className="min-h-screen bg-[#050505]">
       <WormStyleNavbar />
 
-      <div className="pt-20 sm:pt-24 pb-16 sm:pb-24 px-3 sm:px-4 overflow-x-hidden">
-        <div className="max-w-5xl mx-auto w-full">
+      <div className="pt-20 sm:pt-24 pb-16 sm:pb-24 px-3 sm:px-4">
+        <div className="max-w-5xl mx-auto">
           {/* Header */}
           <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-6">
             <div>
