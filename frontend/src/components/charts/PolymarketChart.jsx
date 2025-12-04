@@ -11,17 +11,15 @@ const DEFAULT_RANGES = [
   { label: 'ALL', value: 'all' }
 ];
 
-const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
-
+// Normalize price to 0-1 range (NO artificial clamping)
 const normalizePrice = (raw) => {
   if (raw === undefined || raw === null) return null;
   const numeric = Number(raw);
-  if (!Number.isFinite(numeric)) {
-    return null;
-  }
-  if (numeric > 1.5) {
-    return clamp(numeric / 100, 0, 1);
-  }
+  if (!Number.isFinite(numeric)) return null;
+  
+  // If value is > 1.5, assume it's in percentage or basis points
+  if (numeric > 100) return numeric / 10000; // basis points
+  if (numeric > 1.5) return numeric / 100; // percentage
   if (numeric < 0) return 0;
   if (numeric > 1) return 1;
   return numeric;
@@ -36,15 +34,15 @@ const resolveTimestamp = (point = {}) => {
     (point.block_time ? Number(point.block_time) * 1000 : null) ||
     point.time;
 
-  if (!candidate) {
-    return NaN;
-  }
-
+  if (!candidate) return NaN;
   const ts = new Date(candidate).getTime();
   return Number.isFinite(ts) ? ts : NaN;
 };
 
 const resolvePrice = (point = {}) => {
+  // Handle yesPriceBps directly (from database)
+  if (point.yesPriceBps !== undefined) return point.yesPriceBps / 10000;
+  if (point.noPriceBps !== undefined) return point.noPriceBps / 10000;
   if (point.price !== undefined) return point.price;
   if (point.value !== undefined) return point.value;
   if (point.priceDecimal !== undefined) return point.priceDecimal;
@@ -54,14 +52,13 @@ const resolvePrice = (point = {}) => {
   return undefined;
 };
 
+// Only use REAL data from database - no interpolation
 const sanitizeHistory = (history = []) =>
   history
     .map((point) => {
       const timestamp = resolveTimestamp(point);
       const price = normalizePrice(resolvePrice(point));
-      if (!Number.isFinite(timestamp) || price === null) {
-        return null;
-      }
+      if (!Number.isFinite(timestamp) || price === null) return null;
       return [timestamp, price];
     })
     .filter(Boolean)
@@ -69,166 +66,28 @@ const sanitizeHistory = (history = []) =>
 
 const buildSeries = (history = [], fallbackPrice) => {
   const sanitized = sanitizeHistory(history);
-
+  
+  // Only use fallback if NO real data exists
   if (!sanitized.length && fallbackPrice !== undefined && fallbackPrice !== null) {
     const fallbackNormalized = normalizePrice(
       fallbackPrice > 1 ? fallbackPrice / 100 : fallbackPrice
     );
-
     if (fallbackNormalized !== null) {
       return [[Date.now(), fallbackNormalized]];
     }
   }
-
   return sanitized;
 };
 
 const parseRangeValue = (value = '') => {
   const lower = value.toLowerCase();
-  if (lower === 'all') {
-    return { type: 'all' };
-  }
+  if (lower === 'all') return { type: 'all' };
   const match = lower.match(/^(\d+)([hmwdmy])$/);
-  if (!match) {
-    return null;
-  }
+  if (!match) return null;
   const count = parseInt(match[1], 10);
   const unit = match[2];
-  const unitMap = {
-    h: 'hour',
-    d: 'day',
-    w: 'week',
-    m: 'month',
-    y: 'year'
-  };
+  const unitMap = { h: 'hour', d: 'day', w: 'week', m: 'month', y: 'year' };
   return { type: unitMap[unit] || 'day', count };
-};
-
-// Smooth easing function for natural heartbeat-like curves
-const easeInOutCubic = (t) => {
-  return t < 0.5
-    ? 4 * t * t * t  // Ease in (cubic acceleration)
-    : 1 - Math.pow(-2 * t + 2, 3) / 2;  // Ease out (cubic deceleration)
-};
-
-// Extra smoothing over values to avoid perfectly vertical jumps
-// Simple forward + backward exponential smoothing over the densified series
-const smoothSeries = (series = [], passes = 2, alpha = 0.4) => {
-  if (!Array.isArray(series) || series.length < 3) return series;
-
-  let smoothed = series.map(([ts, v]) => [ts, v]);
-
-  for (let p = 0; p < passes; p++) {
-    const forward = [];
-    let prevVal = smoothed[0][1];
-    for (let i = 0; i < smoothed.length; i++) {
-      const [ts, v] = smoothed[i];
-      const next = prevVal + (v - prevVal) * alpha;
-      forward.push([ts, next]);
-      prevVal = next;
-    }
-
-    const backward = [];
-    prevVal = forward[forward.length - 1][1];
-    for (let i = forward.length - 1; i >= 0; i--) {
-      const [ts, v] = forward[i];
-      const next = prevVal + (v - prevVal) * alpha;
-      backward.push([ts, next]);
-      prevVal = next;
-    }
-
-    smoothed = backward.reverse();
-  }
-
-  return smoothed;
-};
-
-const densifySeries = (series = [], targetPoints = 500) => {
-  if (!series || series.length === 0) {
-    return [];
-  }
-
-  // Safety limit: never create more than 10000 points total
-  const MAX_TOTAL_POINTS = 10000;
-  const MAX_POINTS_PER_SEGMENT = 60; // Increased for smoother curves
-
-  if (series.length === 1) {
-    // If only one point, create a simple horizontal segment
-    const [ts, val] = series[0];
-    const now = Date.now();
-    const segments = Math.min(25, MAX_POINTS_PER_SEGMENT); // Limit segments
-    const output = [];
-    for (let i = 0; i <= segments; i++) {
-      const ratio = i / segments;
-      const time = ts + (now - ts) * ratio;
-      output.push([time, val]);
-    }
-    return output;
-  }
-
-  const output = [];
-  const totalSegments = series.length - 1;
-  
-  // Calculate points per segment with safety limits
-  let pointsPerSegment = Math.ceil(targetPoints / Math.max(1, totalSegments));
-  pointsPerSegment = Math.min(pointsPerSegment, MAX_POINTS_PER_SEGMENT);
-  pointsPerSegment = Math.max(pointsPerSegment, 8); // Increased minimum for smoother curves
-  
-  // Safety check: if this would exceed MAX_TOTAL_POINTS, reduce points per segment
-  if (totalSegments * pointsPerSegment > MAX_TOTAL_POINTS) {
-    pointsPerSegment = Math.floor(MAX_TOTAL_POINTS / totalSegments);
-    pointsPerSegment = Math.max(pointsPerSegment, 3); // Minimum 3 points
-  }
-  
-  for (let i = 0; i < totalSegments; i++) {
-    const [t1, v1] = series[i];
-    const [t2, v2] = series[i + 1];
-    
-    // Safety check: skip invalid data points
-    if (!Number.isFinite(t1) || !Number.isFinite(v1) || !Number.isFinite(t2) || !Number.isFinite(v2)) {
-      continue;
-    }
-    
-    // Always include the first point
-    output.push([t1, v1]);
-
-    // Use smooth cubic easing for natural heartbeat-like curves
-    for (let j = 1; j < pointsPerSegment; j++) {
-      const ratio = j / pointsPerSegment;
-      
-      // Apply cubic ease-in-out for smooth acceleration/deceleration
-      const easedRatio = easeInOutCubic(ratio);
-      
-      const ts = t1 + (t2 - t1) * ratio;
-      const value = v1 + (v2 - v1) * easedRatio;
-      
-      // Safety check before adding
-      if (Number.isFinite(ts) && Number.isFinite(value)) {
-        output.push([ts, value]);
-      }
-      
-      // Safety: prevent infinite loops
-      if (output.length > MAX_TOTAL_POINTS) {
-        console.warn('Densification exceeded MAX_TOTAL_POINTS, truncating');
-        break;
-      }
-    }
-    
-    // Safety: prevent infinite loops
-    if (output.length > MAX_TOTAL_POINTS) {
-      break;
-    }
-  }
-
-  // Always include the last point if we have valid data
-  if (series.length > 0) {
-    const lastPoint = series[series.length - 1];
-    if (lastPoint && Number.isFinite(lastPoint[0]) && Number.isFinite(lastPoint[1])) {
-      output.push(lastPoint);
-    }
-  }
-  
-  return output;
 };
 
 const PolymarketChart = ({
@@ -237,16 +96,17 @@ const PolymarketChart = ({
   noPriceHistory = [],
   currentYesPrice = 0.5,
   currentNoPrice = 0.5,
-  accentYes = '#FFE600',
-  accentNo = '#7C3AED',
+  accentYes = '#4FC3F7', // Polymarket light blue
+  accentNo = '#90A4AE',  // Gray for NO
   height = 320,
   selectedRange = 'all',
   onRangeChange = () => {},
   ranges = DEFAULT_RANGES,
-  title = 'Dynamic Data & Time Axis'
+  title = 'Price History'
 }) => {
-  const [selectedSide, setSelectedSide] = useState('yes'); // 'yes' or 'no'
-  // Build YES and NO series independently - ensure they're always separate
+  const [selectedSide, setSelectedSide] = useState('yes');
+
+  // Build series from REAL data only - no interpolation
   const yesSeries = useMemo(
     () => buildSeries(yesPriceHistory, currentYesPrice),
     [yesPriceHistory, currentYesPrice]
@@ -257,43 +117,24 @@ const PolymarketChart = ({
     [noPriceHistory, currentNoPrice]
   );
 
-  // If we have aggregated price history, use it to build both YES and NO
-  // Otherwise, use the individual series
   const aggregatedSeries = useMemo(() => sanitizeHistory(priceHistory), [priceHistory]);
 
-  // Build YES and NO line data with synchronized timestamps
-  // This ensures lines are always aligned and never overlap
+  // Use ONLY real data - no densification or smoothing
   const { yesLineData, noLineData } = useMemo(() => {
-    let yesDataRaw = [];
-    let noDataRaw = [];
+    let yesData = [];
+    let noData = [];
 
-    // If we have separate YES and NO series, use them independently
-    // Increased target points for smoother curves (but still safe)
-    if (yesSeries.length > 0 && noSeries.length > 0) {
-      yesDataRaw = densifySeries(yesSeries, 400);
-      noDataRaw = densifySeries(noSeries, 400);
-    }
-    // If we only have aggregated data, derive both from it
-    else if (aggregatedSeries.length > 0) {
-      yesDataRaw = densifySeries(aggregatedSeries, 400);
-      noDataRaw = densifySeries(
-        aggregatedSeries.map(([ts, val]) => [ts, 1 - val]),
-        400
-      );
-    }
-    // Fallback: use individual series if available
-    else {
-      if (yesSeries.length > 0) {
-        yesDataRaw = densifySeries(yesSeries, 400);
-      }
-      if (noSeries.length > 0) {
-        noDataRaw = densifySeries(noSeries, 400);
-      }
+    if (yesSeries.length > 0) {
+      yesData = yesSeries;
+    } else if (aggregatedSeries.length > 0) {
+      yesData = aggregatedSeries;
     }
 
-    // Apply additional smoothing so transitions are rounded, not perfectly vertical
-    const yesData = smoothSeries(yesDataRaw, 2, 0.45);
-    const noData = smoothSeries(noDataRaw, 2, 0.45);
+    if (noSeries.length > 0) {
+      noData = noSeries;
+    } else if (aggregatedSeries.length > 0) {
+      noData = aggregatedSeries.map(([ts, val]) => [ts, 1 - val]);
+    }
 
     return { yesLineData: yesData, noLineData: noData };
   }, [yesSeries, noSeries, aggregatedSeries]);
@@ -328,21 +169,20 @@ const PolymarketChart = ({
   const chartOptions = useMemo(() => {
     if (!hasData) return null;
 
+    // Format data - NO clamping, show REAL values
     const formatSeriesData = (lineData) =>
       lineData.map(([ts, value]) => {
-        // Convert to percentage and keep some space from 0% and 100% for readability
         const rawPercent = Number(value || 0) * 100;
-        const numericValue = Math.max(5, Math.min(95, rawPercent)); // clamp to [5, 95]
         return {
-          value: [ts, numericValue],
-          actual: numericValue
+          value: [ts, rawPercent],
+          actual: rawPercent
         };
       });
 
     const yesData = formatSeriesData(yesLineData);
     const noData = formatSeriesData(noLineData);
 
-    // Calculate time range
+    // Calculate time range from real data
     const allTimestamps = [
       ...yesData.map((point) => point.value[0]),
       ...noData.map((point) => point.value[0])
@@ -353,80 +193,43 @@ const PolymarketChart = ({
     const latestYes = yesData.length ? yesData[yesData.length - 1].actual : 0;
     const latestNo = noData.length ? noData[noData.length - 1].actual : 0;
 
-    // Show only the selected side (YES or NO)
+    // Show only the selected side
     const activeSeries = selectedSide === 'yes' && yesData.length
-      ? {
-          key: 'YES',
-          color: accentYes,
-          data: yesData,
-          latest: latestYes
-        }
+      ? { key: 'YES', color: accentYes, data: yesData, latest: latestYes }
       : noData.length
-      ? {
-          key: 'NO',
-          color: accentNo,
-          data: noData,
-          latest: latestNo
-        }
+      ? { key: 'NO', color: accentNo, data: noData, latest: latestNo }
       : null;
 
-    if (!activeSeries) {
-      return null; // No data to show
-    }
+    if (!activeSeries) return null;
 
-    // Convert hex to rgba for area fill
-    const hexToRgba = (hex, alpha) => {
-      const r = parseInt(hex.slice(1, 3), 16);
-      const g = parseInt(hex.slice(3, 5), 16);
-      const b = parseInt(hex.slice(5, 7), 16);
-      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-    };
-
-    // Polymarket-style: area fills under line, smooth curves
+    // Polymarket-style: clean line, minimal styling
     const series = [
       {
         name: activeSeries.key,
         type: 'line',
-        smooth: 0.6, // Higher smooth value (0-1) for more pronounced, curvy lines
-        smoothMonotone: 'x', // Ensure smooth curves that follow the data direction naturally
+        smooth: 0.3, // Subtle smoothing like Polymarket
         symbol: 'none',
         showSymbol: false,
-        step: false,
-        sampling: false, // Disable sampling to use all densified points
-        connectNulls: false,
+        sampling: 'lttb', // Use LTTB sampling for performance
         lineStyle: {
-          width: 3, // Slightly thicker line for better visibility
+          width: 2,
           color: activeSeries.color,
-          type: 'solid',
-          shadowBlur: 8,
-          shadowColor: activeSeries.color,
-          shadowOffsetY: 2
+          type: 'solid'
         },
-        // Polymarket-style area fills
+        // Subtle area fill like Polymarket
         areaStyle: {
           color: {
             type: 'linear',
-            x: 0,
-            y: 0,
-            x2: 0,
-            y2: 1,
+            x: 0, y: 0, x2: 0, y2: 1,
             colorStops: [
-              { offset: 0, color: hexToRgba(activeSeries.color, 0.2) },
-              { offset: 0.5, color: hexToRgba(activeSeries.color, 0.12) },
-              { offset: 1, color: hexToRgba(activeSeries.color, 0.04) }
+              { offset: 0, color: 'rgba(79, 195, 247, 0.08)' },
+              { offset: 1, color: 'rgba(79, 195, 247, 0.01)' }
             ]
           }
         },
         emphasis: {
           focus: 'series',
-          lineStyle: {
-            width: 4,
-            shadowBlur: 15,
-            shadowColor: activeSeries.color
-          },
-          areaStyle: {
-            opacity: 0.5
-          }
+          lineStyle: { width: 2.5 }
         },
         data: activeSeries.data
       }
@@ -435,75 +238,66 @@ const PolymarketChart = ({
     return {
       backgroundColor: 'transparent',
       animation: true,
-      animationDuration: 600,
+      animationDuration: 400,
       grid: {
-        left: '6%',
-        right: '8%',
-        top: '6%',
-        bottom: '8%',
+        left: '3%',
+        right: '12%',
+        top: '5%',
+        bottom: '12%',
         containLabel: true
       },
       tooltip: {
         trigger: 'axis',
-        backgroundColor: 'rgba(0, 0, 0, 0.85)',
-        borderColor: 'rgba(255, 255, 255, 0.2)',
+        backgroundColor: 'rgba(30, 41, 59, 0.95)',
+        borderColor: 'rgba(79, 195, 247, 0.3)',
         borderWidth: 1,
+        padding: [8, 12],
         textStyle: {
           color: '#fff',
-          fontSize: 12
+          fontSize: 13
         },
         axisPointer: {
           type: 'line',
           lineStyle: {
-            color: 'rgba(255, 255, 255, 0.3)',
-            type: 'solid',
+            color: 'rgba(79, 195, 247, 0.4)',
+            type: 'dashed',
             width: 1
           }
         },
         formatter: function(params) {
           if (!params || params.length === 0) return '';
-          let result = `<div style="padding: 4px 0 6px 0; font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.1);">${params[0].axisValueLabel}</div>`;
-          params.forEach((item) => {
-            const value = Array.isArray(item.value) ? item.value[1] : item.value;
-            result += `<div style="display: flex; align-items: center; padding: 4px 0;">
-              <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: ${item.color}; margin-right: 8px;"></span>
-              <span style="color: #fff;">${item.seriesName}: <span style="color: ${item.color}; font-weight: 600;">${Number(value).toFixed(2)}%</span></span>
-            </div>`;
+          const date = new Date(params[0].value[0]);
+          const dateStr = date.toLocaleString('en-US', { 
+            month: 'short', day: 'numeric', year: 'numeric',
+            hour: 'numeric', minute: '2-digit', hour12: true 
           });
-          return result;
+          const value = params[0].value[1];
+          return `<div style="font-size: 12px; color: rgba(255,255,255,0.7); margin-bottom: 4px;">${dateStr}</div>
+                  <div style="display: inline-block; padding: 2px 8px; border-radius: 4px; background: ${activeSeries.color}; color: #000; font-weight: 600;">
+                    ${activeSeries.key} ${Number(value).toFixed(1)}%
+                  </div>`;
         }
       },
-      legend: {
-        show: false // Hide legend since we have toggle buttons
-      },
+      legend: { show: false },
       xAxis: {
         type: 'time',
         boundaryGap: false,
         axisLine: {
           show: true,
-          lineStyle: {
-            color: 'rgba(255, 255, 255, 0.15)',
-            width: 1
-          }
+          lineStyle: { color: 'rgba(255, 255, 255, 0.1)', width: 1 }
         },
         axisLabel: {
           show: true,
-          color: 'rgba(255, 255, 255, 0.6)',
+          color: 'rgba(255, 255, 255, 0.5)',
           fontSize: 11,
-          margin: 10, // Add margin for better spacing
+          margin: 12,
           formatter: function(value) {
             const date = new Date(value);
             const month = date.toLocaleString('default', { month: 'short' });
-            const day = date.getDate();
-            const hours = date.getHours().toString().padStart(2, '0');
-            const minutes = date.getMinutes().toString().padStart(2, '0');
-            return `${month} ${day} ${hours}:${minutes}`;
+            return `${month}`;
           }
         },
-        splitLine: {
-          show: false
-        },
-        boundaryGap: ['5%', '5%'], // Add padding at left and right for breathing room
+        splitLine: { show: false },
         min: minTime,
         max: maxTime
       },
@@ -511,32 +305,24 @@ const PolymarketChart = ({
         type: 'value',
         min: 0,
         max: 100,
-        interval: 20,
-        scale: false,
+        interval: 10,
         position: 'right',
-        axisLine: {
-          show: true,
-          lineStyle: {
-            color: 'rgba(255, 255, 255, 0.15)',
-            width: 1
-          }
-        },
+        axisLine: { show: false },
         axisLabel: {
           show: true,
-          color: 'rgba(255, 255, 255, 0.6)',
+          color: 'rgba(255, 255, 255, 0.5)',
           fontSize: 11,
-          margin: 12, // Add margin for better spacing
+          margin: 8,
           formatter: (val) => `${val}%`
         },
         splitLine: {
           show: true,
           lineStyle: {
-            color: 'rgba(255, 255, 255, 0.08)',
-            type: 'solid',
+            color: 'rgba(255, 255, 255, 0.05)',
+            type: 'dotted',
             width: 1
           }
-        },
-        boundaryGap: ['5%', '5%'] // Add padding at top and bottom for breathing room
+        }
       },
       series
     };
