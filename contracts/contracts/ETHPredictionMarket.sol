@@ -241,9 +241,7 @@ contract ETHPredictionMarket is ReentrancyGuard, Ownable {
             require(currentYesPrice > 0 && currentNoPrice > 0, "AMM price calculation failed");
             uint256 currentPrice = _isYes ? currentYesPrice : currentNoPrice;
             
-            // CRITICAL: Prevent trading when price is at extreme values
-            // Prices are clamped to 100-9900 basis points (1%-99%) but double-check here
-            require(currentPrice >= 100 && currentPrice <= 9900, "Price at extreme, trading disabled");
+            // AMM clamps prices to 100-9900 basis points (1%-99%), allow trading at any valid price
             require(currentPrice > 0, "Invalid price");
             
             // Calculate shares: investmentAmount / (currentPrice / 10000)
@@ -325,8 +323,7 @@ contract ETHPredictionMarket is ReentrancyGuard, Ownable {
         (uint256 currentYesPrice, uint256 currentNoPrice) = pricingAMM.calculatePrice(_marketId);
         uint256 currentPrice = _isYes ? currentYesPrice : currentNoPrice;
         
-        // CRITICAL: Prevent trading when price is at extreme values
-        require(currentPrice >= 100 && currentPrice <= 9900, "Price at extreme, trading disabled");
+        // AMM clamps prices to 100-9900 basis points (1%-99%), allow trading at any valid price
         require(currentPrice > 0, "Invalid price");
         
         // Calculate payout: shares * currentPrice / 10000 (convert from basis points)
