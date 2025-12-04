@@ -92,6 +92,12 @@ const ActivityRow = ({ item, onClick }) => {
             {item.side && (
               <span style={{ color: item.sideColor, fontWeight: 600 }}>{item.side}</span>
             )}
+            {item.priceCents != null && item.shares != null && (
+              <>
+                {' '}at <span className="text-[#AAA]">{centsToTCENT(item.priceCents)}</span>
+                {' '}(<span className="text-[#AAA]">{typeof item.shares === 'number' ? item.shares.toFixed(2) : '0'}</span> TCENT)
+              </>
+            )}
           </p>
         </div>
       </div>
@@ -198,7 +204,7 @@ const Activity = () => {
                   '"Clash Grotesk", "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                }}
               >
-                Activity
+               PolyDegen Activity
               </h1>
               <p
                 className="text-[12px] sm:text-[14px] text-[#BABABA] max-w-xl"
