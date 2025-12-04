@@ -891,20 +891,20 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
 
   if (!isConnected) {
     return (
-      <div className="glass-card rounded-[12px] sm:rounded-[16px] backdrop-blur-[32px] relative w-full px-3 sm:px-4" style={{ background: 'transparent', minHeight: '200px', paddingTop: '17px', paddingBottom: '17px' }}>
-        <div className="w-full h-full flex items-center justify-center py-6">
+      <div className="glass-card rounded-[12px] sm:rounded-[16px] backdrop-blur-[32px] relative w-full px-3 sm:px-4" style={{ background: 'transparent', minHeight: '100px', paddingTop: '12px', paddingBottom: '12px' }}>
+        <div className="w-full h-full flex items-center justify-center py-3 sm:py-6">
           <button
             onClick={connectWallet}
-            className="glass-card rounded-[10px] w-full max-w-[200px] sm:max-w-[280px]"
+            className="glass-card rounded-[8px] sm:rounded-[10px] w-full max-w-[160px] sm:max-w-[280px]"
             style={{ 
-              height: '44px',
+              height: '36px',
               background: 'transparent',
               border: '1px solid #FFE600',
               backdropFilter: 'blur(32px)',
               fontFamily: homePageFont,
               fontWeight: 600,
-              fontSize: '13px',
-              lineHeight: '18px',
+              fontSize: '12px',
+              lineHeight: '16px',
               color: '#FFFFFF'
             }}
           >
