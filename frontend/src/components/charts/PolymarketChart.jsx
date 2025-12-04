@@ -210,16 +210,16 @@ const PolymarketChart = ({
       return `rgba(${r}, ${g}, ${b}, ${alpha})`;
     };
 
-    // Smooth curved line with YES/NO colors
+    // Smooth curved line with YES/NO colors - high tension for rounded curves
     const series = [
       {
         name: activeSeries.key,
         type: 'line',
-        smooth: true,
-        smoothMonotone: 'x',
+        smooth: 0.6, // Higher value = more rounded curves
         symbol: 'none',
         showSymbol: false,
         sampling: 'lttb',
+        connectNulls: true,
         lineStyle: {
           width: 2.5,
           color: activeSeries.color,
@@ -252,8 +252,8 @@ const PolymarketChart = ({
       animationDuration: 400,
       grid: {
         left: '4%',
-        right: '14%',
-        top: '8%',
+        right: '16%',
+        top: '10%',
         bottom: '15%',
         containLabel: true
       },
@@ -268,8 +268,25 @@ const PolymarketChart = ({
           fontSize: 13
         },
         position: function (point, params, dom, rect, size) {
-          const x = point[0] < size.viewSize[0] / 2 ? point[0] + 20 : point[0] - size.contentSize[0] - 20;
-          const y = Math.max(10, Math.min(point[1] - 40, size.viewSize[1] - size.contentSize[1] - 10));
+          // Keep tooltip inside chart bounds
+          let x = point[0] + 15;
+          let y = point[1] - 50;
+          
+          // If tooltip would go off the right edge, move it to the left of cursor
+          if (x + size.contentSize[0] > size.viewSize[0] - 20) {
+            x = point[0] - size.contentSize[0] - 15;
+          }
+          // If tooltip would go off the left edge
+          if (x < 10) {
+            x = 10;
+          }
+          // Keep tooltip vertically in bounds
+          if (y < 10) {
+            y = 10;
+          }
+          if (y + size.contentSize[1] > size.viewSize[1] - 10) {
+            y = size.viewSize[1] - size.contentSize[1] - 10;
+          }
           return [x, y];
         },
         axisPointer: {
