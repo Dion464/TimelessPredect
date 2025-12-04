@@ -7,6 +7,7 @@ import toast from 'react-hot-toast';
 import WormStyleNavbar from '../../components/modern/WormStyleNavbar';
 import PolymarketChart from '../../components/charts/PolymarketChart';
 import Web3TradingInterface from '../../components/trading/Web3TradingInterface';
+import HowItWorksModal from '../../components/modal/HowItWorksModal';
 import { CONTRACT_ADDRESS, CONTRACT_ABI, RPC_URL } from '../../contracts/eth-config';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || window.location.origin;
@@ -95,6 +96,7 @@ const MarketDetailWormStyle = () => {
   const [noPriceHistory, setNoPriceHistory] = useState([]);
   const [timeframe, setTimeframe] = useState('1h');
   const [trendingMarkets, setTrendingMarkets] = useState([]);
+  const [howItWorksOpen, setHowItWorksOpen] = useState(false);
 
   // Fetch trending markets for sidebar
   useEffect(() => {
@@ -584,7 +586,10 @@ const MarketDetailWormStyle = () => {
               </button>
             </div>
             
-            <button className="text-[#FFE600] hover:text-[#FFE600]/80 transition-colors text-xl">
+            <button 
+              onClick={() => setHowItWorksOpen(true)}
+              className="text-[#FFE600] hover:text-[#FFE600]/80 transition-colors text-xl"
+            >
               How it Works?
             </button>
             
@@ -608,6 +613,12 @@ const MarketDetailWormStyle = () => {
           </div>
         </div>
       </footer>
+
+      {/* How It Works Modal */}
+      <HowItWorksModal 
+        isOpen={howItWorksOpen} 
+        onClose={() => setHowItWorksOpen(false)} 
+      />
     </div>
   );
 };

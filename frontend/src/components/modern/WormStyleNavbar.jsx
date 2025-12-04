@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useHistory } from 'react-router-dom';
 import { useWeb3 } from '../../hooks/useWeb3';
 import { showGlassToast } from '../../utils/toastUtils';
+import HowItWorksModal from '../modal/HowItWorksModal';
 
 const WormStyleNavbar = () => {
   const history = useHistory();
@@ -21,6 +22,7 @@ const WormStyleNavbar = () => {
   const [loadingNotifications, setLoadingNotifications] = useState(false);
   const [claimedMarkets, setClaimedMarkets] = useState(new Set());
   const [claimingMarket, setClaimingMarket] = useState(null);
+  const [howItWorksOpen, setHowItWorksOpen] = useState(false);
 
   const handleCreateClick = () => {
     history.push('/create');
@@ -422,6 +424,7 @@ const WormStyleNavbar = () => {
             <img src="/iicon.svg" alt="How it works" className="w-4 h-4" />
 
             <button
+              onClick={() => setHowItWorksOpen(true)}
               className="hidden md:inline-block text-[14px] font-medium text-[#FFE600] hover:text-[#FFE600] transition-colors"
             >
               How it works
@@ -573,6 +576,12 @@ const WormStyleNavbar = () => {
           </div>
         </div>
       </div>
+
+      {/* How It Works Modal */}
+      <HowItWorksModal 
+        isOpen={howItWorksOpen} 
+        onClose={() => setHowItWorksOpen(false)} 
+      />
     </nav>
   );
 };

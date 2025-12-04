@@ -6,6 +6,7 @@ import { ethers } from 'ethers';
 import WormStyleNavbar from '../../components/modern/WormStyleNavbar';
 import MarketCountdown from '../../components/common/MarketCountdown';
 import ModernMarketCard from '../../components/modern/ModernMarketCard';
+import HowItWorksModal from '../../components/modal/HowItWorksModal';
 import { CONTRACT_ADDRESS, CONTRACT_ABI, RPC_URL } from '../../contracts/eth-config';
 import '../market/MarketDetailGlass.css';
 
@@ -18,6 +19,7 @@ const HomeWormStyle = () => {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [trendingMarkets, setTrendingMarkets] = useState([]);
   const [sortBy, setSortBy] = useState('newest'); // 'newest', 'volume', 'popular'
+  const [howItWorksOpen, setHowItWorksOpen] = useState(false);
   
   const currencySymbol = getCurrencySymbol(chainId);
   const resolveApiBase = () => {
@@ -650,7 +652,10 @@ const HomeWormStyle = () => {
               </button>
             </div>
             
-            <button className="text-gray-400 hover:text-white transition-colors text-sm font-medium">
+            <button 
+              onClick={() => setHowItWorksOpen(true)}
+              className="text-[#FFE600] hover:text-[#FFE600]/80 transition-colors text-sm font-medium"
+            >
               How it Works?
             </button>
             
@@ -674,6 +679,12 @@ const HomeWormStyle = () => {
           </div>
         </div>
       </footer>
+
+      {/* How It Works Modal */}
+      <HowItWorksModal 
+        isOpen={howItWorksOpen} 
+        onClose={() => setHowItWorksOpen(false)} 
+      />
     </div>
   );
 };
