@@ -87,8 +87,8 @@ const HowItWorksModal = ({ isOpen, onClose }) => {
           left: 0,
           right: 0,
           bottom: 0,
-          backgroundColor: 'black',
-          backdropFilter: 'blur(10px)'
+          backgroundColor: 'transparent',
+          backdropFilter: 'blur(20px)'
         }}
       />
       
