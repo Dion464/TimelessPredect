@@ -160,11 +160,11 @@ const Activity = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#050505]">
+    <div className="min-h-screen bg-[#050505] overflow-x-hidden">
       <WormStyleNavbar />
 
-      <div className="pt-20 sm:pt-24 pb-16 sm:pb-24 px-3 sm:px-4">
-        <div className="max-w-5xl mx-auto">
+      <div className="pt-20 sm:pt-24 pb-16 sm:pb-24 px-3 sm:px-4 overflow-x-hidden">
+        <div className="max-w-5xl mx-auto w-full">
           {/* Header */}
           <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-6">
             <div>

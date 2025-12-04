@@ -87,7 +87,7 @@ const HowItWorksModal = ({ isOpen, onClose }) => {
           left: 0,
           right: 0,
           bottom: 0,
-          backgroundColor: 'transparent',
+          backgroundColor: 'black',
           backdropFilter: 'blur(10px)'
         }}
       />
@@ -100,7 +100,7 @@ const HowItWorksModal = ({ isOpen, onClose }) => {
           position: 'relative',
           width: '100%',
           maxWidth: '450px',
-          background: 'transparent',
+          background: 'black',
           borderRadius: '20px',
           overflow: 'hidden'
         }}
