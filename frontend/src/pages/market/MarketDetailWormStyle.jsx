@@ -337,73 +337,73 @@ const MarketDetailWormStyle = () => {
     <div className="min-h-screen bg-[#0E0E0E]" style={{ fontFamily: 'Clash Grotesk, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
       <WormStyleNavbar />
       
-      <div className="max-w-[1488px] mx-auto px-4 lg:px-[111px] pt-24 pb-12">
+      <div className="max-w-[1488px] mx-auto px-3 sm:px-4 lg:px-[111px] pt-20 sm:pt-24 pb-8 sm:pb-12">
         {/* Main Two-Column Layout */}
-        <div className="flex flex-col lg:flex-row gap-6">
+        <div className="flex flex-col lg:flex-row gap-4 sm:gap-6">
           
           {/* LEFT COLUMN - Market Info */}
           <div className="flex-1 space-y-6">
             
             {/* Market Hero Card with Image */}
-            <div className="relative rounded-[24px] overflow-hidden border border-white/10" style={{ minHeight: '240px' }}>
+            <div className="relative rounded-[16px] sm:rounded-[24px] overflow-hidden border border-white/10" style={{ minHeight: '180px' }}>
               {/* Background Image - positioned on the right */}
-              <div className="absolute right-0 top-0 bottom-0 w-[60%] lg:w-[45%]">
+              <div className="absolute right-0 top-0 bottom-0 w-[50%] sm:w-[60%] lg:w-[45%]">
                 <img
                   src={getMarketImage(market, id)}
                   alt={market.question}
                   className="w-full h-full object-cover"
                 />
                 {/* Left gradient overlay for text readability */}
-                <div className="absolute inset-0 bg-gradient-to-r from-[#0E0E0E] via-[#0E0E0E]/80 to-transparent"></div>
+                <div className="absolute inset-0 bg-gradient-to-r from-[#0E0E0E] via-[#0E0E0E]/90 to-transparent"></div>
               </div>
               
               {/* Content */}
-              <div className="relative z-10 p-6 lg:p-10">
+              <div className="relative z-10 p-4 sm:p-6 lg:p-10">
                 {/* Creator Badge */}
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="flex items-center gap-2 px-3 py-2 bg-[#2F2F2F]/80 backdrop-blur-md rounded-full">
-                    <span className="text-white/50 text-sm font-light">Creator:</span>
-                    <span className="text-white text-sm font-medium">@{market.creator?.slice(2, 8)}</span>
+                <div className="flex items-center gap-2 mb-3 sm:mb-4">
+                  <div className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 sm:py-2 bg-[#2F2F2F]/80 backdrop-blur-md rounded-full">
+                    <span className="text-white/50 text-xs sm:text-sm font-light">Creator:</span>
+                    <span className="text-white text-xs sm:text-sm font-medium">@{market.creator?.slice(2, 6)}</span>
                   </div>
-                  <button className="w-10 h-10 flex items-center justify-center bg-[#2F2F2F]/50 backdrop-blur-md rounded-full border border-white/10 hover:bg-[#2F2F2F]/70 transition-colors">
-                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <button className="w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center bg-[#2F2F2F]/50 backdrop-blur-md rounded-full border border-white/10 hover:bg-[#2F2F2F]/70 transition-colors">
+                    <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                     </svg>
                   </button>
                 </div>
                 
                 {/* Market Question */}
-                <h1 className="text-3xl lg:text-[40px] font-medium text-white leading-tight max-w-[700px]" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
+                <h1 className="text-xl sm:text-3xl lg:text-[40px] font-medium text-white leading-tight max-w-[700px]" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
                   {market.question}
                 </h1>
               </div>
             </div>
 
             {/* Probability + Chart Toggle Row */}
-            <div className="flex items-center justify-between px-2">
+            <div className="flex items-center justify-between px-1 sm:px-2">
               <div className="flex items-center gap-1">
-                <span className="text-[22px] font-medium text-white">{market.yesPrice}%</span>
-                <span className="text-base text-white/50 font-light">chance</span>
+                <span className="text-lg sm:text-[22px] font-medium text-white">{market.yesPrice}%</span>
+                <span className="text-sm sm:text-base text-white/50 font-light">chance</span>
               </div>
-              <button className="p-1.5 hover:bg-white/10 rounded transition-colors">
-                <svg className="w-5 h-5 text-[#D1D1D1]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <button className="p-1 sm:p-1.5 hover:bg-white/10 rounded transition-colors">
+                <svg className="w-4 h-4 sm:w-5 sm:h-5 text-[#D1D1D1]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
               </button>
             </div>
 
             {/* Tabs */}
-            <div className="rounded-[16px] border border-white/10 overflow-hidden">
+            <div className="rounded-[12px] sm:rounded-[16px] border border-white/10 overflow-hidden">
               <div className="flex">
                 {[
                   { key: 'market', label: 'Market' },
                   { key: 'rules', label: 'Rules' },
-                  { key: 'holders', label: 'Top Holders' }
+                  { key: 'holders', label: 'Holders' }
                 ].map((tab) => (
                   <button
                     key={tab.key}
                     onClick={() => setActiveTab(tab.key)}
-                    className={`flex-1 py-4 text-sm font-normal transition-all ${
+                    className={`flex-1 py-3 sm:py-4 text-xs sm:text-sm font-normal transition-all ${
                       activeTab === tab.key
                         ? 'text-white border-b border-[#FFE600]'
                         : 'text-[#A3A3A3] hover:text-white'
@@ -416,33 +416,33 @@ const MarketDetailWormStyle = () => {
             </div>
 
             {/* Tab Content */}
-            <div className="rounded-[16px] border border-white/10 p-4">
+            <div className="rounded-[12px] sm:rounded-[16px] border border-white/10 p-3 sm:p-4">
               {activeTab === 'market' && (
-                <div className="space-y-4">
+                <div className="space-y-3 sm:space-y-4">
                   {/* Comments Section */}
-                  <div className="flex items-center gap-2 px-4 py-3 bg-transparent border border-[#FFE600] rounded-xl">
+                  <div className="flex items-center gap-2 px-3 sm:px-4 py-2.5 sm:py-3 bg-transparent border border-[#FFE600] rounded-xl">
                     <input
                       type="text"
                       placeholder="Add a comment"
-                      className="flex-1 bg-transparent text-white placeholder:text-white/50 focus:outline-none text-sm"
+                      className="flex-1 bg-transparent text-white placeholder:text-white/50 focus:outline-none text-xs sm:text-sm"
                     />
-                    <button className="text-white/50 text-sm font-bold hover:text-white transition-colors">
+                    <button className="text-white/50 text-xs sm:text-sm font-bold hover:text-white transition-colors">
                       Post
                     </button>
                   </div>
-                  <div className="text-center py-4 text-white/50 text-sm">
+                  <div className="text-center py-3 sm:py-4 text-white/50 text-xs sm:text-sm">
                     Be the first to comment!
                   </div>
                 </div>
               )}
 
               {activeTab === 'rules' && (
-                <div className="space-y-4">
-                  <h3 className="text-lg font-medium text-white">Market Rules</h3>
-                  <p className="text-white/70 text-sm">This market will resolve based on verifiable information.</p>
+                <div className="space-y-3 sm:space-y-4">
+                  <h3 className="text-base sm:text-lg font-medium text-white">Market Rules</h3>
+                  <p className="text-white/70 text-xs sm:text-sm">This market will resolve based on verifiable information.</p>
                   <div>
-                    <h4 className="font-medium text-white mb-2 text-sm">Resolution Criteria:</h4>
-                    <ul className="list-disc list-inside space-y-1 text-white/70 text-sm">
+                    <h4 className="font-medium text-white mb-2 text-xs sm:text-sm">Resolution Criteria:</h4>
+                    <ul className="list-disc list-inside space-y-1 text-white/70 text-xs sm:text-sm">
                       <li>The outcome must be verifiable through official sources</li>
                       <li>Resolution will occur after the event date has passed</li>
                       <li>In case of ambiguity, the market creator's interpretation will be final</li>
@@ -452,7 +452,7 @@ const MarketDetailWormStyle = () => {
               )}
 
               {activeTab === 'holders' && (
-                <div className="text-center py-8 text-white/50 text-sm">
+                <div className="text-center py-6 sm:py-8 text-white/50 text-xs sm:text-sm">
                   No positions yet. Be the first to trade!
                 </div>
               )}
@@ -484,7 +484,7 @@ const MarketDetailWormStyle = () => {
           {/* RIGHT COLUMN - Trading Interface */}
           <div className="w-full lg:w-[384px] flex-shrink-0 space-y-4">
             {/* Trading Card */}
-            <div className="rounded-[16px] border border-white/10 p-4">
+            <div className="rounded-[12px] sm:rounded-[16px] border border-white/10 p-3 sm:p-4">
               {isMarketEnded ? (
                 <div className="text-center py-12">
                   <div className="mb-4">
@@ -529,15 +529,15 @@ const MarketDetailWormStyle = () => {
 
             {/* Trending Markets Section */}
             <div className="space-y-3">
-              <h3 className="text-white font-normal text-base">Trending Markets</h3>
-              <div className="flex items-center gap-3">
+              <h3 className="text-white font-normal text-sm sm:text-base">Trending Markets</h3>
+              <div className="flex items-center gap-2 sm:gap-3 overflow-x-auto pb-2 -mx-1 px-1">
                 {/* Trending market cards */}
                 {trendingMarkets.length > 0 ? (
                   trendingMarkets.map((tm, index) => (
                     <button
                       key={tm.marketId}
                       onClick={() => history.push(`/market/${tm.marketId}`)}
-                      className="relative w-[120px] h-[120px] rounded-[24px] overflow-hidden border border-white/10 hover:border-white/30 transition-all group"
+                      className="relative w-[90px] h-[90px] sm:w-[120px] sm:h-[120px] rounded-[16px] sm:rounded-[24px] overflow-hidden border border-white/10 hover:border-white/30 transition-all group flex-shrink-0"
                     >
                       <img
                         src={tm.imageUrl || getMarketImage(tm, tm.marketId)}
@@ -545,27 +545,27 @@ const MarketDetailWormStyle = () => {
                         className="w-full h-full object-cover"
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-[#171717] to-transparent"></div>
-                      <div className="absolute bottom-2 left-3 text-left">
+                      <div className="absolute bottom-1.5 sm:bottom-2 left-2 sm:left-3 text-left">
                         <div className="flex items-baseline">
-                          <span className="text-[23px] font-medium text-white">{Math.round(tm.yesPrice || 50)}</span>
-                          <span className="text-lg text-white">%</span>
+                          <span className="text-lg sm:text-[23px] font-medium text-white">{Math.round(tm.yesPrice || 50)}</span>
+                          <span className="text-sm sm:text-lg text-white">%</span>
                         </div>
                       </div>
                     </button>
                   ))
                 ) : (
                   <>
-                    <div className="w-[120px] h-[120px] rounded-[24px] bg-white/5 border border-white/10 animate-pulse"></div>
-                    <div className="w-[120px] h-[120px] rounded-[24px] bg-white/5 border border-white/10 animate-pulse"></div>
+                    <div className="w-[90px] h-[90px] sm:w-[120px] sm:h-[120px] rounded-[16px] sm:rounded-[24px] bg-white/5 border border-white/10 animate-pulse flex-shrink-0"></div>
+                    <div className="w-[90px] h-[90px] sm:w-[120px] sm:h-[120px] rounded-[16px] sm:rounded-[24px] bg-white/5 border border-white/10 animate-pulse flex-shrink-0"></div>
                   </>
                 )}
                 
                 {/* See More button */}
                 <button
                   onClick={() => history.push('/')}
-                  className="w-[120px] h-[120px] rounded-[24px] border border-white/10 flex items-center justify-center hover:bg-white/5 transition-colors"
+                  className="w-[90px] h-[90px] sm:w-[120px] sm:h-[120px] rounded-[16px] sm:rounded-[24px] border border-white/10 flex items-center justify-center hover:bg-white/5 transition-colors flex-shrink-0"
                 >
-                  <span className="text-white text-base">See More</span>
+                  <span className="text-white text-sm sm:text-base">See More</span>
                 </button>
               </div>
             </div>
@@ -574,38 +574,38 @@ const MarketDetailWormStyle = () => {
       </div>
 
       {/* Footer */}
-      <footer className="border-t border-white/10 mt-20 bg-[#171717]">
-        <div className="max-w-[1536px] mx-auto px-4 py-3">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-            <div className="flex gap-6 text-sm">
+      <footer className="border-t border-white/10 mt-12 sm:mt-20 bg-[#171717]">
+        <div className="max-w-[1536px] mx-auto px-3 sm:px-4 py-3">
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-3 sm:gap-4">
+            <div className="flex gap-4 sm:gap-6 text-xs sm:text-sm order-2 sm:order-1">
               <button className="text-[#747474] hover:text-white transition-colors">
-                Terms of Service
+                Terms
               </button>
               <button className="text-[#747474] hover:text-white transition-colors">
-                Privacy Policy
+                Privacy
               </button>
             </div>
             
             <button 
               onClick={() => setHowItWorksOpen(true)}
-              className="text-[#FFE600] hover:text-[#FFE600]/80 transition-colors text-xl"
+              className="text-[#FFE600] hover:text-[#FFE600]/80 transition-colors text-sm sm:text-xl order-1 sm:order-2"
             >
               How it Works?
             </button>
             
-            <div className="flex gap-1">
-              <a href="https://twitter.com" target="_blank" rel="noopener noreferrer" className="p-2 text-gray-400 hover:text-white transition-colors">
-                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+            <div className="flex gap-1 order-3">
+              <a href="https://twitter.com" target="_blank" rel="noopener noreferrer" className="p-1.5 sm:p-2 text-gray-400 hover:text-white transition-colors">
+                <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
                 </svg>
               </a>
-              <a href="https://discord.com" target="_blank" rel="noopener noreferrer" className="p-2 text-gray-400 hover:text-white transition-colors">
-                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+              <a href="https://discord.com" target="_blank" rel="noopener noreferrer" className="p-1.5 sm:p-2 text-gray-400 hover:text-white transition-colors">
+                <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515a.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0a12.64 12.64 0 0 0-.617-1.25a.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057a19.9 19.9 0 0 0 5.993 3.03a.078.078 0 0 0 .084-.028a14.09 14.09 0 0 0 1.226-1.994a.076.076 0 0 0-.041-.106a13.107 13.107 0 0 1-1.872-.892a.077.077 0 0 1-.008-.128a10.2 10.2 0 0 0 .372-.292a.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127a12.299 12.299 0 0 1-1.873.892a.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028a19.839 19.839 0 0 0 6.002-3.03a.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419c0-1.333.956-2.419 2.157-2.419c1.21 0 2.176 1.096 2.157 2.42c0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419c0-1.333.955-2.419 2.157-2.419c1.21 0 2.176 1.096 2.157 2.42c0 1.333-.946 2.418-2.157 2.418z"/>
                 </svg>
               </a>
-              <a href="https://telegram.org" target="_blank" rel="noopener noreferrer" className="p-2 text-gray-400 hover:text-white transition-colors">
-                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+              <a href="https://telegram.org" target="_blank" rel="noopener noreferrer" className="p-1.5 sm:p-2 text-gray-400 hover:text-white transition-colors">
+                <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12a12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472c-.18 1.898-.962 6.502-1.36 8.627c-.168.9-.499 1.201-.82 1.23c-.696.065-1.225-.46-1.9-.902c-1.056-.693-1.653-1.124-2.678-1.8c-1.185-.78-.417-1.21.258-1.91c.177-.184 3.247-2.977 3.307-3.23c.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345c-.48.33-.913.49-1.302.48c-.428-.008-1.252-.241-1.865-.44c-.752-.245-1.349-.374-1.297-.789c.027-.216.325-.437.893-.663c3.498-1.524 5.83-2.529 6.998-3.014c3.332-1.386 4.025-1.627 4.476-1.635z"/>
                 </svg>
               </a>

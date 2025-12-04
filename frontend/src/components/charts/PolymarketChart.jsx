@@ -364,23 +364,23 @@ const PolymarketChart = ({
   }, [accentNo, accentYes, hasData, noLineData, yesLineData, selectedSide]);
 
   if (!hasData || !chartOptions) {
-  return (
+    return (
       <div
-        className="glass-card flex items-center justify-center rounded-[24px] border border-white/20 backdrop-blur-xl text-sm text-white/60"
-        style={{ height, background: 'rgba(12,12,12,0.55)' }}
+        className="glass-card flex items-center justify-center rounded-[16px] sm:rounded-[24px] border border-white/20 backdrop-blur-xl text-xs sm:text-sm text-white/60 p-4"
+        style={{ height: typeof height === 'number' ? Math.max(150, height * 0.7) : height, background: 'rgba(12,12,12,0.55)' }}
       >
         No price data available yet
-          </div>
+      </div>
     );
   }
 
   const renderControls = () => (
-    <div className="mb-3 flex items-center justify-between">
+    <div className="mb-2 sm:mb-3 flex flex-wrap items-center justify-between gap-2">
       {/* YES/NO Toggle Buttons */}
-      <div className="flex items-center gap-2 bg-white/5 backdrop-blur-md rounded-full p-1 border border-white/10">
-              <button
+      <div className="flex items-center gap-1.5 sm:gap-2 bg-white/5 backdrop-blur-md rounded-full p-0.5 sm:p-1 border border-white/10">
+        <button
           onClick={() => setSelectedSide('yes')}
-          className={`px-4 py-1.5 rounded-full transition-all text-xs font-semibold ${
+          className={`px-3 sm:px-4 py-1 sm:py-1.5 rounded-full transition-all text-[10px] sm:text-xs font-semibold ${
             selectedSide === 'yes'
               ? 'bg-[#FFE600] text-black'
               : 'text-white/60 hover:text-white'
@@ -390,10 +390,10 @@ const PolymarketChart = ({
           }}
         >
           YES
-              </button>
-          <button
+        </button>
+        <button
           onClick={() => setSelectedSide('no')}
-          className={`px-4 py-1.5 rounded-full transition-all text-xs font-semibold ${
+          className={`px-3 sm:px-4 py-1 sm:py-1.5 rounded-full transition-all text-[10px] sm:text-xs font-semibold ${
             selectedSide === 'no'
               ? 'bg-[#7C3AED] text-white'
               : 'text-white/60 hover:text-white'
@@ -403,23 +403,23 @@ const PolymarketChart = ({
           }}
         >
           NO
-          </button>
+        </button>
       </div>
 
       {/* Zoom Buttons */}
-      <div className="flex items-center gap-2">
-        <span className="text-white/60 text-xs font-medium mr-1">Zoom</span>
+      <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto">
+        <span className="hidden sm:inline text-white/60 text-xs font-medium mr-1">Zoom</span>
         {rangeButtons.map((btn, index) => {
           const isActive = index === selectedRangeIndex;
           return (
             <button
               key={btn.text + btn.dataRangeValue}
               onClick={() => onRangeChange?.(btn.dataRangeValue)}
-              className={`px-3 py-1.5 rounded-full transition-all text-xs font-medium ${
+              className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-full transition-all text-[10px] sm:text-xs font-medium ${
                 isActive
                   ? 'bg-white/15 text-white border border-white/20'
                   : 'bg-white/5 text-white/60 hover:bg-white/10 border border-transparent'
-              } backdrop-blur-md`}
+              } backdrop-blur-md flex-shrink-0`}
               style={{
                 fontFamily: 'gilroy, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
               }}
@@ -428,16 +428,16 @@ const PolymarketChart = ({
             </button>
           );
         })}
-                  </div>
-                  </div>
+      </div>
+    </div>
   );
 
   return (
-    <div className="glass-card w-full rounded-[24px] border border-white/20 backdrop-blur-xl p-4" style={{ background: 'rgba(12,12,12,0.55)' }}>
+    <div className="glass-card w-full rounded-[16px] sm:rounded-[24px] border border-white/20 backdrop-blur-xl p-3 sm:p-4" style={{ background: 'rgba(12,12,12,0.55)' }}>
       {renderControls()}
-      <div className="overflow-hidden rounded-[16px]" style={{ height }}>
+      <div className="overflow-hidden rounded-[12px] sm:rounded-[16px]" style={{ height: typeof height === 'number' ? Math.max(180, height * 0.8) : height }}>
         <ReactECharts option={chartOptions} style={{ height: '100%', width: '100%' }} />
-        </div>
+      </div>
     </div>
   );
 };

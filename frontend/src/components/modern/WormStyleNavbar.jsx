@@ -358,10 +358,10 @@ const WormStyleNavbar = () => {
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-[#050505] border-b border-[#1E1E1E] backdrop-blur-md">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="py-3 min-h-[64px] flex items-center gap-4">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+        <div className="py-2 sm:py-3 min-h-[56px] sm:min-h-[64px] flex items-center gap-2 sm:gap-4">
           {/* Left: logo + primary nav */}
-          <div className="flex items-center gap-6 flex-shrink-0">
+          <div className="flex items-center gap-3 sm:gap-6 flex-shrink-0">
             <button
               onClick={() => history.push('/')}
               className="flex items-center gap-2 hover:opacity-90 transition-opacity"
@@ -369,7 +369,7 @@ const WormStyleNavbar = () => {
               <img
                 src="/poly.svg"
                 alt="PolyDegen"
-                className="h-7 w-auto"
+                className="h-6 sm:h-7 w-auto"
               />
             </button>
 
@@ -378,7 +378,7 @@ const WormStyleNavbar = () => {
               style={{ fontFamily: '"Clash Grotesk", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}
             >
               <button
-                className="text-[#FFFFFF] hover:text-[#FFE600]  font-medium mt-1 ml-8"
+                className="text-[#FFFFFF] hover:text-[#FFE600] font-medium mt-1 ml-8"
                 onClick={() => history.push('/activity')}
               >
                 Activity
@@ -387,13 +387,12 @@ const WormStyleNavbar = () => {
           </div>
 
           {/* Center: search */}
-          <div className="flex-1 hidden sm:flex rounded-xl justify-center ml-8">
+          <div className="flex-1 hidden md:flex rounded-xl justify-center ml-8">
             <div className="w-[500px] h-[40px] max-w-3xl">
               <div
                 className="glass-card background box-shadow relative flex items-center gap-3 px-4 py-2.5"
                 style={{
                   borderRadius: '14px',
-                 
                   backdropFilter: 'blur(10px)',
                   WebkitBackdropFilter: 'blur(10px)',
                   backgroundColor: 'rgba(58, 58, 58, 0.2)',
@@ -420,12 +419,18 @@ const WormStyleNavbar = () => {
           </div>
 
           {/* Right: actions */}
-          <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-            <img src="/iicon.svg" alt="How it works" className="w-4 h-4" />
+          <div className="flex items-center gap-1.5 sm:gap-3 flex-shrink-0 ml-auto">
+            {/* Info icon - clickable on mobile to open How It Works */}
+            <button
+              onClick={() => setHowItWorksOpen(true)}
+              className="p-1.5 sm:p-0"
+            >
+              <img src="/iicon.svg" alt="How it works" className="w-4 h-4" />
+            </button>
 
             <button
               onClick={() => setHowItWorksOpen(true)}
-              className="hidden md:inline-block text-[14px] font-medium text-[#FFE600] hover:text-[#FFE600] transition-colors"
+              className="hidden lg:inline-block text-[14px] font-medium text-[#FFE600] hover:text-[#FFE600] transition-colors"
             >
               How it works
             </button>
@@ -433,7 +438,7 @@ const WormStyleNavbar = () => {
             <button
               onClick={handleCreateClick}
               disabled={isConnecting}
-              className="hidden sm:inline-block px-4 py-2 text-[14px] font-medium text-[#FFE600] "
+              className="hidden sm:inline-block px-4 py-2 text-[14px] font-medium text-[#FFE600]"
             >
               Create
             </button>
@@ -442,11 +447,11 @@ const WormStyleNavbar = () => {
             <div className="relative">
               <button
                 onClick={() => setNotificationsOpen((prev) => !prev)}
-                className="px-2.5 py-2 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 flex items-center justify-center relative"
+                className="p-1.5 sm:px-2.5 sm:py-2 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 flex items-center justify-center relative"
               >
                 <span className="sr-only">Notifications</span>
                 <svg 
-                  className="w-4 h-4" 
+                  className="w-3.5 h-3.5 sm:w-4 sm:h-4" 
                   viewBox="0 0 24 24" 
                   fill="none" 
                   xmlns="http://www.w3.org/2000/svg"
@@ -460,7 +465,7 @@ const WormStyleNavbar = () => {
                   />
                 </svg>
                 {notificationCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-[#FFE600] text-black text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                  <span className="absolute -top-1 -right-1 bg-[#FFE600] text-black text-[8px] sm:text-[9px] font-bold rounded-full w-3.5 h-3.5 sm:w-4 sm:h-4 flex items-center justify-center">
                     {notificationCount > 9 ? '9+' : notificationCount}
                   </span>
                 )}
@@ -550,14 +555,14 @@ const WormStyleNavbar = () => {
             <button
               onClick={handleConnectClick}
               disabled={isConnecting}
-              className="px-4 sm:px-6 py-2 bg-[#FFE600] hover:bg-[#FFD700] text-black rounded-full transition-all font-space-grotesk font-semibold text-xs sm:text-sm shadow-[0_0_0_1px_rgba(0,0,0,0.4)] disabled:opacity-60 whitespace-nowrap"
+              className="px-3 sm:px-5 py-1.5 sm:py-2 bg-[#FFE600] hover:bg-[#FFD700] text-black rounded-full transition-all font-space-grotesk font-semibold text-[11px] sm:text-sm shadow-[0_0_0_1px_rgba(0,0,0,0.4)] disabled:opacity-60 whitespace-nowrap"
             >
               {isConnecting ? (
-                <span>Connecting...</span>
+                <span className="text-[10px] sm:text-sm">...</span>
               ) : isConnected && account ? (
                 <>
                   <span className="hidden sm:inline">{account.slice(0, 6)}...{account.slice(-4)}</span>
-                  <span className="sm:hidden">{account.slice(0, 4)}...{account.slice(-2)}</span>
+                  <span className="sm:hidden">{account.slice(0, 3)}..{account.slice(-2)}</span>
                 </>
               ) : (
                 'Connect'
@@ -565,12 +570,12 @@ const WormStyleNavbar = () => {
             </button>
 
             {/* Mobile menu icon */}
-            <button className="inline-flex sm:hidden items-center justify-center w-9 h-9 rounded-full border border-white/10 bg-white/5 hover:bg-white/10">
+            <button className="inline-flex md:hidden items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded-full border border-white/10 bg-white/5 hover:bg-white/10">
               <span className="sr-only">Open menu</span>
-              <div className="space-y-1.5">
-                <span className="block w-4 h-[1.5px] bg-white"></span>
-                <span className="block w-4 h-[1.5px] bg-white"></span>
-                <span className="block w-4 h-[1.5px] bg-white"></span>
+              <div className="space-y-1 sm:space-y-1.5">
+                <span className="block w-3.5 sm:w-4 h-[1.5px] bg-white"></span>
+                <span className="block w-3.5 sm:w-4 h-[1.5px] bg-white"></span>
+                <span className="block w-3.5 sm:w-4 h-[1.5px] bg-white"></span>
               </div>
             </button>
           </div>

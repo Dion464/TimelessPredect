@@ -234,42 +234,42 @@ const HomeWormStyle = () => {
       
       {/* Hero Section */}
       <div 
-        className="relative  w-full  overflow-visible"
+        className="relative w-full overflow-visible"
         style={{
           backgroundImage: 'url(/hero-background.png)',
           backgroundSize: 'cover',
           backgroundPosition: 'center',
-          minHeight: '500px',
-          paddingBottom: '200px'
+          minHeight: 'min(500px, 60vh)',
+          paddingBottom: 'clamp(100px, 25vw, 200px)'
         }}
       >
         {/* Dark overlay */}
         <div className="absolute inset-0 bg-black/70"></div>
         
         {/* Content */}
-        <div className="relative max-w-6xl mx-auto px-4 pt-32 pb-20 mt-10">
+        <div className="relative max-w-6xl mx-auto px-4 pt-20 sm:pt-32 pb-12 sm:pb-20 mt-4 sm:mt-10">
           <div className="text-center">
-            <h1 className="text-[33px] md:text-[33px] font-medium text-white leading-tight mb-8 font-space-grotesk">
-              Discover the latest Prediction Markets<br />
-              or Create your Own & Earn!
+            <h1 className="text-[22px] sm:text-[28px] md:text-[33px] font-medium text-white leading-tight mb-6 sm:mb-8 font-space-grotesk px-2">
+              Discover the latest Prediction Markets<br className="hidden sm:block" />
+              <span className="sm:hidden"> </span>or Create your Own & Earn!
             </h1>
             
             {/* Search Bar */}
-            <form onSubmit={handleSearch} className="max-w-2xl mx-auto">
+            <form onSubmit={handleSearch} className="max-w-2xl mx-auto px-2">
               <div className="relative">
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="e.g. When will Taylor Swift release a new album"
-                  className="w-full px-6 py-5 bg-white/10 backdrop-blur-md text-white rounded-[12px] border border-white/20 focus:border-white/40 focus:outline-none placeholder:text-gray-300 transition-all text-lg"
+                  placeholder="Search markets..."
+                  className="w-full px-4 sm:px-6 py-3 sm:py-5 bg-white/10 backdrop-blur-md text-white rounded-[12px] border border-white/20 focus:border-white/40 focus:outline-none placeholder:text-gray-300 transition-all text-sm sm:text-lg"
                 />
                 <button
                   type="submit"
-                  className="absolute right-3 top-1/2 -translate-y-1/2 bg-white/20 hover:bg-white/30 text-white p-3 rounded-full transition-colors backdrop-blur-md"
+                  className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 bg-white/20 hover:bg-white/30 text-white p-2 sm:p-3 rounded-full transition-colors backdrop-blur-md"
                   aria-label="Search markets"
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                   </svg>
                 </button>
@@ -280,29 +280,30 @@ const HomeWormStyle = () => {
       </div>
 
       {/* Main Content Section - Moved up with negative margin */}
-      <div className="max-w-6xl mx-auto px-4 -mt-40 relative z-10">
+      <div className="max-w-6xl mx-auto px-3 sm:px-4 -mt-20 sm:-mt-40 relative z-10">
 
         {/* Trending Section - Hide when searching */}
         {!searchQuery.trim() && (
-          <div className="mb-12">
-            <div className="flex items-center justify-between mb-6">
+          <div className="mb-8 sm:mb-12">
+            <div className="flex items-center justify-between mb-4 sm:mb-6">
               <h2
                 style={{
                   fontFamily: '"Clash Grotesk", "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                   fontWeight: 600,
-                  fontSize: '14px',
+                  fontSize: '12px',
                   letterSpacing: '0.12em',
                   textTransform: 'uppercase',
                   color: '#F2F2F2',
                   opacity: 0.9,
                 }}
+                className="text-[11px] sm:text-[14px]"
               >
                 Trending markets
               </h2>
             </div>
             
             {trendingMarkets.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-6 sm:mb-8">
               {trendingMarkets.map((market) => (
                 <div
                   key={market.id}
@@ -562,13 +563,13 @@ const HomeWormStyle = () => {
         )}
 
         {/* Category Filter */}
-        <div className="flex items-center justify-between mb-8 gap-4 flex-wrap">
-          <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 sm:mb-8 gap-3 sm:gap-4">
+          <div className="flex gap-2 sm:gap-3 overflow-x-auto pb-2 scrollbar-hide w-full sm:w-auto -mx-1 px-1">
             {categories.map((category) => (
               <button
                 key={category}
                 onClick={() => setSelectedCategory(category)}
-                className={`px-5 py-2.5 rounded-full font-medium font-space-grotesk whitespace-nowrap transition-all text-[15px] ${
+                className={`px-3 sm:px-5 py-2 sm:py-2.5 rounded-full font-medium font-space-grotesk whitespace-nowrap transition-all text-[13px] sm:text-[15px] ${
                   selectedCategory === category
                     ? 'bg-[#222222] text-white'
                     : 'bg-[#010101] text-white hover:bg-[#333333] border border-white/10'
@@ -579,17 +580,17 @@ const HomeWormStyle = () => {
             ))}
           </div>
           
-          <div className="relative">
+          <div className="relative w-full sm:w-auto">
             <select 
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
-              className="appearance-none flex items-center gap-2 px-5 py-2.5 bg-[#222222] text-white rounded-full hover:bg-[#333333] transition-all whitespace-nowrap border border-white/10 cursor-pointer text-[14px] font-medium font-space-grotesk pr-10"
+              className="appearance-none flex items-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 bg-[#222222] text-white rounded-full hover:bg-[#333333] transition-all whitespace-nowrap border border-white/10 cursor-pointer text-[12px] sm:text-[14px] font-medium font-space-grotesk pr-9 sm:pr-10 w-full sm:w-auto"
             >
-              <option value="newest">Sort by: Newest</option>
-              <option value="volume">Sort by: Volume</option>
-              <option value="popular">Sort by: Popular</option>
+              <option value="newest">Sort: Newest</option>
+              <option value="volume">Sort: Volume</option>
+              <option value="popular">Sort: Popular</option>
             </select>
-            <svg className="w-4 h-4 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 pointer-events-none text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
             </svg>
           </div>
@@ -618,7 +619,7 @@ const HomeWormStyle = () => {
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {sortedMarkets.map((market) => (
               <ModernMarketCard
                 key={market.id}
@@ -640,38 +641,38 @@ const HomeWormStyle = () => {
       </div>
 
       {/* Footer */}
-      <footer className="border-t border-white/10 mt-20">
-        <div className="max-w-6xl mx-auto px-4 py-8">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-            <div className="flex gap-6 text-sm">
+      <footer className="border-t border-white/10 mt-12 sm:mt-20">
+        <div className="max-w-6xl mx-auto px-4 py-6 sm:py-8">
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div className="flex gap-4 sm:gap-6 text-xs sm:text-sm order-2 sm:order-1">
               <button className="text-gray-400 hover:text-white transition-colors font-medium">
-                Terms of Service
+                Terms
               </button>
               <button className="text-gray-400 hover:text-white transition-colors font-medium">
-                Privacy Policy
+                Privacy
               </button>
             </div>
             
             <button 
               onClick={() => setHowItWorksOpen(true)}
-              className="text-[#FFE600] hover:text-[#FFE600]/80 transition-colors text-sm font-medium"
+              className="text-[#FFE600] hover:text-[#FFE600]/80 transition-colors text-xs sm:text-sm font-medium order-1 sm:order-2"
             >
               How it Works?
             </button>
             
-            <div className="flex gap-4">
+            <div className="flex gap-4 order-3">
               <a href="https://twitter.com" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition-colors">
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
                 </svg>
               </a>
               <a href="https://discord.com" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition-colors">
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515a.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0a12.64 12.64 0 0 0-.617-1.25a.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057a19.9 19.9 0 0 0 5.993 3.03a.078.078 0 0 0 .084-.028a14.09 14.09 0 0 0 1.226-1.994a.076.076 0 0 0-.041-.106a13.107 13.107 0 0 1-1.872-.892a.077.077 0 0 1-.008-.128a10.2 10.2 0 0 0 .372-.292a.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127a12.299 12.299 0 0 1-1.873.892a.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028a19.839 19.839 0 0 0 6.002-3.03a.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419c0-1.333.956-2.419 2.157-2.419c1.21 0 2.176 1.096 2.157 2.42c0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419c0-1.333.955-2.419 2.157-2.419c1.21 0 2.176 1.096 2.157 2.42c0 1.333-.946 2.418-2.157 2.418z"/>
                 </svg>
               </a>
               <a href="https://telegram.org" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition-colors">
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12a12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472c-.18 1.898-.962 6.502-1.36 8.627c-.168.9-.499 1.201-.82 1.23c-.696.065-1.225-.46-1.9-.902c-1.056-.693-1.653-1.124-2.678-1.8c-1.185-.78-.417-1.21.258-1.91c.177-.184 3.247-2.977 3.307-3.23c.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345c-.48.33-.913.49-1.302.48c-.428-.008-1.252-.241-1.865-.44c-.752-.245-1.349-.374-1.297-.789c.027-.216.325-.437.893-.663c3.498-1.524 5.83-2.529 6.998-3.014c3.332-1.386 4.025-1.627 4.476-1.635z"/>
                 </svg>
               </a>

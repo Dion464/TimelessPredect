@@ -7,12 +7,12 @@ const ActivityRow = ({ item, onClick }) => {
   return (
     <div
       className="flex items-center border-b border-[#272727] cursor-pointer hover:bg-white/5 transition-colors"
-      style={{ minHeight: '72px' }}
+      style={{ minHeight: '60px' }}
       onClick={onClick}
     >
       {/* Market thumbnail */}
-      <div className="flex items-center gap-4 flex-1 px-4 py-3">
-        <div className="relative w-12 h-12 rounded-md overflow-hidden flex-shrink-0">
+      <div className="flex items-center gap-2.5 sm:gap-4 flex-1 px-3 sm:px-4 py-2.5 sm:py-3">
+        <div className="relative w-10 h-10 sm:w-12 sm:h-12 rounded-md overflow-hidden flex-shrink-0">
           {item.marketImageUrl ? (
             <>
               <img
@@ -20,7 +20,6 @@ const ActivityRow = ({ item, onClick }) => {
                 alt={item.marketTitle}
                 className="w-full h-full object-cover"
                 onError={(e) => {
-                  // Fallback to gradient if image fails to load
                   e.target.style.display = 'none';
                   if (e.target.nextSibling) {
                     e.target.nextSibling.style.display = 'block';
@@ -38,9 +37,9 @@ const ActivityRow = ({ item, onClick }) => {
             />
           )}
         </div>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <p
-            className="text-sm font-semibold text-white truncate"
+            className="text-xs sm:text-sm font-semibold text-white truncate"
             style={{
               fontFamily:
                 '"Clash Grotesk", "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
@@ -48,10 +47,20 @@ const ActivityRow = ({ item, onClick }) => {
           >
             {item.marketTitle}
           </p>
+          {/* Mobile-only description */}
+          <p
+            className="md:hidden text-[10px] sm:text-xs text-[#BABABA] truncate mt-0.5"
+            style={{
+              fontFamily:
+                '"Clash Grotesk", "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+            }}
+          >
+            {item.user} {item.action} {item.side && <span style={{ color: item.sideColor, fontWeight: 600 }}>{item.side}</span>}
+          </p>
         </div>
       </div>
 
-      {/* Description */}
+      {/* Description - Desktop only */}
       <div className="hidden md:flex items-center gap-2 px-4 py-3 flex-[2] text-xs text-[#BABABA]"
         style={{
           fontFamily:
@@ -73,15 +82,7 @@ const ActivityRow = ({ item, onClick }) => {
       </div>
 
       {/* Time + link */}
-      <div className="flex items-center gap-3 px-4 py-3 flex-shrink-0">
-        <span
-          className="text-xs text-[#BABABA]"
-          style={{
-            fontFamily:
-              '"Clash Grotesk", "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-          }}
-        >
-        </span>
+      <div className="flex items-center gap-2 sm:gap-3 px-2 sm:px-4 py-2.5 sm:py-3 flex-shrink-0">
         <a
           href={item.txUrl}
           target="_blank"
@@ -162,35 +163,34 @@ const Activity = () => {
     <div className="min-h-screen bg-[#050505]">
       <WormStyleNavbar />
 
-      <div className="pt-24 pb-24 px-4">
+      <div className="pt-20 sm:pt-24 pb-16 sm:pb-24 px-3 sm:px-4">
         <div className="max-w-5xl mx-auto">
           {/* Header */}
-          <div className="mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+          <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-6">
             <div>
               <h1
-                className="text-[36px] sm:text-[48px] font-bold text-white mb-2"
+                className="text-[28px] sm:text-[48px] font-bold text-white mb-1 sm:mb-2"
                style={{
                 fontFamily:
                   '"Clash Grotesk", "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                }}
               >
-                Polydegen Activity
+                Activity
               </h1>
               <p
-                className="text-[14px] text-[#BABABA] max-w-xl"
+                className="text-[12px] sm:text-[14px] text-[#BABABA] max-w-xl"
                 style={{
                   fontFamily:
                     '"Clash Grotesk", "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                 }}
               >
-                Earn rewards by placing orders within the spread. Rewards are
-                distributed directly to wallets everyday at midnight UTC.
+                Earn rewards by placing orders within the spread.
               </p>
             </div>
 
             {/* Filter dropdown */}
             <div 
-              className="relative"
+              className="relative w-full sm:w-auto"
               style={{
                 fontFamily:
                   '"Clash Grotesk", "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
@@ -198,12 +198,12 @@ const Activity = () => {
             >
               <button
                 onClick={() => setDropdownOpen(!dropdownOpen)}
-                className="flex items-center gap-3 bg-transparent border-2 border-[#FFE600] text-[#FFE600] rounded-full px-6 py-3 text-base font-medium cursor-pointer hover:bg-[#FFE600]/10 transition-all focus:outline-none"
-                style={{ minWidth: '140px' }}
+                className="flex items-center justify-between sm:justify-start gap-3 bg-transparent border-2 border-[#FFE600] text-[#FFE600] rounded-full px-4 sm:px-6 py-2.5 sm:py-3 text-sm sm:text-base font-medium cursor-pointer hover:bg-[#FFE600]/10 transition-all focus:outline-none w-full sm:w-auto"
+                style={{ minWidth: '120px' }}
               >
                 <span>{filterOptions.find(o => o.key === filter)?.label || 'All'}</span>
                 <svg 
-                  className={`w-4 h-4 transition-transform duration-200 ${dropdownOpen ? 'rotate-180' : ''}`}
+                  className={`w-3.5 h-3.5 sm:w-4 sm:h-4 transition-transform duration-200 ${dropdownOpen ? 'rotate-180' : ''}`}
                   fill="none" 
                   stroke="currentColor" 
                   viewBox="0 0 24 24"
@@ -220,7 +220,7 @@ const Activity = () => {
                     className="fixed inset-0 z-40" 
                     onClick={() => setDropdownOpen(false)}
                   />
-                  <div className="absolute right-0 mt-2 w-48 bg-[#1A1A1A] border border-[#FFE600]/30 rounded-2xl shadow-xl z-50 overflow-hidden">
+                  <div className="absolute left-0 sm:left-auto sm:right-0 mt-2 w-full sm:w-48 bg-[#1A1A1A] border border-[#FFE600]/30 rounded-2xl shadow-xl z-50 overflow-hidden">
                     {filterOptions.map(({ key, label }) => (
                       <button
                         key={key}
@@ -228,7 +228,7 @@ const Activity = () => {
                           setFilter(key);
                           setDropdownOpen(false);
                         }}
-                        className={`w-full px-5 py-3 text-left text-sm font-medium transition-colors ${
+                        className={`w-full px-4 sm:px-5 py-2.5 sm:py-3 text-left text-xs sm:text-sm font-medium transition-colors ${
                           filter === key
                             ? 'bg-[#FFE600]/20 text-[#FFE600]'
                             : 'text-white hover:bg-white/5'

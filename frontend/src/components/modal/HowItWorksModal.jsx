@@ -100,7 +100,7 @@ const HowItWorksModal = ({ isOpen, onClose }) => {
           position: 'relative',
           width: '100%',
           maxWidth: '450px',
-          background: 'black',
+          background: 'transparent',
           borderRadius: '20px',
           overflow: 'hidden'
         }}
@@ -138,7 +138,6 @@ const HowItWorksModal = ({ isOpen, onClose }) => {
           style={{
             width: '100%',
             height: '360px',
-            backgroundColor: '#0A0A0A',
             overflow: 'hidden'
           }}
         >

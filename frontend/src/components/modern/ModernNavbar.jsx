@@ -120,7 +120,7 @@ const ModernNavbar = () => {
                 
                 {/* Profile Button - Modern Style */}
                 <button
-                  onClick={() => account && history.push(`/user/${account}`)}
+                
                   className="flex items-center space-x-2.5 px-4 py-2 bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 group"
                 >
                   <div className="w-8 h-8 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center border-2 border-white/30">
