@@ -96,8 +96,8 @@ const PolymarketChart = ({
   noPriceHistory = [],
   currentYesPrice = 0.5,
   currentNoPrice = 0.5,
-  accentYes = '#4FC3F7', // Polymarket light blue
-  accentNo = '#90A4AE',  // Gray for NO
+  accentYes = '#FFE600', // Yellow for YES
+  accentNo = '#7C3AED',  // Purple for NO
   height = 320,
   selectedRange = 'all',
   onRangeChange = () => {},
@@ -202,34 +202,45 @@ const PolymarketChart = ({
 
     if (!activeSeries) return null;
 
-    // Polymarket-style: clean line, minimal styling
+    // Convert hex to rgba for area fill
+    const hexToRgba = (hex, alpha) => {
+      const r = parseInt(hex.slice(1, 3), 16);
+      const g = parseInt(hex.slice(3, 5), 16);
+      const b = parseInt(hex.slice(5, 7), 16);
+      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    };
+
+    // Smooth curved line with YES/NO colors
     const series = [
       {
         name: activeSeries.key,
         type: 'line',
-        smooth: 0.3, // Subtle smoothing like Polymarket
+        smooth: true,
+        smoothMonotone: 'x',
         symbol: 'none',
         showSymbol: false,
-        sampling: 'lttb', // Use LTTB sampling for performance
+        sampling: 'lttb',
         lineStyle: {
-          width: 2,
+          width: 2.5,
           color: activeSeries.color,
-          type: 'solid'
+          type: 'solid',
+          cap: 'round',
+          join: 'round'
         },
-        // Subtle area fill like Polymarket
+        // Area fill matching line color
         areaStyle: {
           color: {
             type: 'linear',
             x: 0, y: 0, x2: 0, y2: 1,
             colorStops: [
-              { offset: 0, color: 'rgba(79, 195, 247, 0.08)' },
-              { offset: 1, color: 'rgba(79, 195, 247, 0.01)' }
+              { offset: 0, color: hexToRgba(activeSeries.color, 0.15) },
+              { offset: 1, color: hexToRgba(activeSeries.color, 0.02) }
             ]
           }
         },
         emphasis: {
           focus: 'series',
-          lineStyle: { width: 2.5 }
+          lineStyle: { width: 3 }
         },
         data: activeSeries.data
       }
@@ -240,26 +251,31 @@ const PolymarketChart = ({
       animation: true,
       animationDuration: 400,
       grid: {
-        left: '3%',
-        right: '12%',
-        top: '5%',
-        bottom: '12%',
+        left: '4%',
+        right: '14%',
+        top: '8%',
+        bottom: '15%',
         containLabel: true
       },
       tooltip: {
         trigger: 'axis',
-        backgroundColor: 'rgba(30, 41, 59, 0.95)',
-        borderColor: 'rgba(79, 195, 247, 0.3)',
+        backgroundColor: 'rgba(20, 20, 20, 0.95)',
+        borderColor: hexToRgba(activeSeries.color, 0.5),
         borderWidth: 1,
-        padding: [8, 12],
+        padding: [10, 14],
         textStyle: {
           color: '#fff',
           fontSize: 13
         },
+        position: function (point, params, dom, rect, size) {
+          const x = point[0] < size.viewSize[0] / 2 ? point[0] + 20 : point[0] - size.contentSize[0] - 20;
+          const y = Math.max(10, Math.min(point[1] - 40, size.viewSize[1] - size.contentSize[1] - 10));
+          return [x, y];
+        },
         axisPointer: {
           type: 'line',
           lineStyle: {
-            color: 'rgba(79, 195, 247, 0.4)',
+            color: hexToRgba(activeSeries.color, 0.5),
             type: 'dashed',
             width: 1
           }
@@ -272,8 +288,9 @@ const PolymarketChart = ({
             hour: 'numeric', minute: '2-digit', hour12: true 
           });
           const value = params[0].value[1];
-          return `<div style="font-size: 12px; color: rgba(255,255,255,0.7); margin-bottom: 4px;">${dateStr}</div>
-                  <div style="display: inline-block; padding: 2px 8px; border-radius: 4px; background: ${activeSeries.color}; color: #000; font-weight: 600;">
+          const textColor = activeSeries.key === 'YES' ? '#000' : '#fff';
+          return `<div style="font-size: 12px; color: rgba(255,255,255,0.7); margin-bottom: 6px;">${dateStr}</div>
+                  <div style="display: inline-block; padding: 4px 10px; border-radius: 4px; background: ${activeSeries.color}; color: ${textColor}; font-weight: 600; font-size: 14px;">
                     ${activeSeries.key} ${Number(value).toFixed(1)}%
                   </div>`;
         }
@@ -290,11 +307,12 @@ const PolymarketChart = ({
           show: true,
           color: 'rgba(255, 255, 255, 0.5)',
           fontSize: 11,
-          margin: 12,
+          margin: 14,
           formatter: function(value) {
             const date = new Date(value);
             const month = date.toLocaleString('default', { month: 'short' });
-            return `${month}`;
+            const day = date.getDate();
+            return `${month} ${day}`;
           }
         },
         splitLine: { show: false },
@@ -305,21 +323,21 @@ const PolymarketChart = ({
         type: 'value',
         min: 0,
         max: 100,
-        interval: 10,
+        interval: 20,
         position: 'right',
         axisLine: { show: false },
         axisLabel: {
           show: true,
           color: 'rgba(255, 255, 255, 0.5)',
           fontSize: 11,
-          margin: 8,
+          margin: 10,
           formatter: (val) => `${val}%`
         },
         splitLine: {
           show: true,
           lineStyle: {
-            color: 'rgba(255, 255, 255, 0.05)',
-            type: 'dotted',
+            color: 'rgba(255, 255, 255, 0.06)',
+            type: 'dashed',
             width: 1
           }
         }
