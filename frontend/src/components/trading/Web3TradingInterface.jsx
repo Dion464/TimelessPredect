@@ -417,6 +417,22 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
       return;
     }
 
+    // Check for extreme prices - contract blocks trades at 1% or 99%
+    if (orderType === 'market' && marketData) {
+      const currentPrice = tradeSide === 'yes' ? marketData.yesPrice : marketData.noPrice;
+      if (currentPrice !== undefined && currentPrice !== null) {
+        // Price is in cents (1-99), contract requires 1-99 range (blocks at exactly 1 or 99)
+        if (currentPrice <= 1) {
+          toast.error(`Cannot buy ${tradeSide.toUpperCase()} - price is at minimum (${currentPrice}%). Use limit orders or wait for price to change.`);
+          return;
+        }
+        if (currentPrice >= 99) {
+          toast.error(`Cannot buy ${tradeSide.toUpperCase()} - price is at maximum (${currentPrice}%). Use limit orders or wait for price to change.`);
+          return;
+        }
+      }
+    }
+
     setLoading(true);
 
     try {
@@ -645,6 +661,22 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
     if (parseFloat(tradeAmount) > parseFloat(availableShares)) {
       toast.error(`Insufficient ${tradeSide.toUpperCase()} TCENT balance`);
       return;
+    }
+
+    // Check for extreme prices - contract blocks trades at 1% or 99%
+    if (orderType === 'market' && marketData) {
+      const currentPrice = tradeSide === 'yes' ? marketData.yesPrice : marketData.noPrice;
+      if (currentPrice !== undefined && currentPrice !== null) {
+        // Price is in cents (1-99), contract requires 1-99 range (blocks at exactly 1 or 99)
+        if (currentPrice <= 1) {
+          toast.error(`Cannot sell ${tradeSide.toUpperCase()} - price is at minimum (${currentPrice}%). Use limit orders or wait for price to change.`);
+          return;
+        }
+        if (currentPrice >= 99) {
+          toast.error(`Cannot sell ${tradeSide.toUpperCase()} - price is at maximum (${currentPrice}%). Use limit orders or wait for price to change.`);
+          return;
+        }
+      }
     }
 
     setLoading(true);
