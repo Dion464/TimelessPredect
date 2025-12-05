@@ -20,6 +20,7 @@ const marketParticipantsHandler = require('./lib/api-handlers/market-participant
 const marketsHandler = require('./lib/api-handlers/markets.js');
 const notificationsHandler = require('./lib/api-handlers/notifications.js');
 const marketImagesHandler = require('./lib/api-handlers/market-images.js');
+const topHoldersHandler = require('./lib/api-handlers/top-holders.js');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -205,6 +206,18 @@ app.get('/api/markets/:marketId/participants', async (req, res) => {
     await marketParticipantsHandler(vercelReq, res);
   } catch (error) {
     console.error('Error in market participants handler:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Top holders route - get top 5 holders for a market
+app.get('/api/markets/:marketId/top-holders', async (req, res) => {
+  try {
+    const vercelReq = createVercelRequest(req);
+    vercelReq.query = { ...req.query, marketId: req.params.marketId };
+    await topHoldersHandler(vercelReq, res);
+  } catch (error) {
+    console.error('Error in top holders handler:', error);
     res.status(500).json({ error: error.message });
   }
 });

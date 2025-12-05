@@ -114,10 +114,10 @@ const PolymarketStyleTrading = () => {
   const API_BASE = resolveApiBase();
   const [market, setMarket] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('trades');
+  const [activeTab, setActiveTab] = useState('holders');
   const [selectedSide, setSelectedSide] = useState('yes');
   const [amount, setAmount] = useState('');
-  const [recentTrades, setRecentTrades] = useState([]);
+  const [topHolders, setTopHolders] = useState([]);
   const [orderBook, setOrderBook] = useState({
     yes: { bids: [], asks: [] },
     no: { bids: [], asks: [] }
@@ -267,174 +267,39 @@ const PolymarketStyleTrading = () => {
     };
   }, [getPredictionMarketContract, marketId]);
 
-  // These functions need to be defined before refreshAllData
-  const fetchRecentTrades = useCallback(async () => {
-    if (!contracts?.predictionMarket || !marketId) {
-        setRecentTrades([]);
-        setUniqueTraders(0);
+  // Fetch top holders from the database API
+  const fetchTopHolders = useCallback(async () => {
+    if (!marketId || !API_BASE) {
+      setTopHolders([]);
+      setUniqueTraders(0);
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_BASE}/api/markets/${marketId}/top-holders?limit=5`);
+      
+      if (!response.ok) {
+        console.warn('Failed to fetch top holders:', response.status);
+        setTopHolders([]);
         return;
       }
 
-    try {
-      let formattedTrades = [];
-
-      // Try to use getRecentTrades if available
-      if (typeof contracts.predictionMarket.getRecentTrades === 'function') {
-        try {
-          const trades = await contracts.predictionMarket.getRecentTrades(marketId, 1000);
-          
-          if (trades && trades.length > 0) {
-            formattedTrades = trades.map(trade => {
-        const priceBps = Number(trade.price?.toString?.() ?? trade.price ?? 0);
-        const timestampSeconds = Number(trade.timestamp?.toString?.() ?? trade.timestamp ?? 0);
-        const sharesWei = trade.shares?.toString?.() ?? trade.shares ?? '0';
-        let sharesFormatted = '0';
-
-        try {
-          sharesFormatted = ethers.utils.formatEther(sharesWei);
-        } catch (err) {
-          sharesFormatted = sharesWei.toString();
-        }
-
-        const timestamp = new Date(timestampSeconds * 1000);
-
-        return {
-          side: trade.isYes ? 'yes' : 'no',
-          amount: parseFloat(sharesFormatted).toFixed(4),
-          price: priceBps / 10000,
-          yesPrice: trade.isYes ? priceBps / 10000 : (10000 - priceBps) / 10000,
-          noPrice: trade.isYes ? (10000 - priceBps) / 10000 : priceBps / 10000,
-          timestamp: timestamp.toISOString(),
-          trader: trade.trader,
-          txHash: trade.txHash || trade.transactionHash || null
-        };
-      });
-          }
-        } catch (getRecentTradesError) {
-          console.warn('getRecentTrades() failed, trying blockchain events:', getRecentTradesError);
-        }
+      const data = await response.json();
+      
+      if (data.success && Array.isArray(data.topHolders)) {
+        setTopHolders(data.topHolders);
+        setUniqueTraders(data.totalHolders || 0);
+        console.log('✅ Loaded top holders:', data.topHolders.length);
+      } else {
+        setTopHolders([]);
+        setUniqueTraders(0);
       }
-
-      // Fallback: Query blockchain events if getRecentTrades not available or failed
-      if (formattedTrades.length === 0) {
-        try {
-          let provider = null;
-          let contractToQuery = null;
-
-          // Try to get provider from contract
-          if (contracts.predictionMarket) {
-            provider = contracts.predictionMarket.provider;
-            contractToQuery = contracts.predictionMarket;
-          }
-
-          // If no provider, try to create one - MetaMask only
-          if (!provider) {
-            // Helper to get MetaMask provider only
-            const getMetaMaskProvider = () => {
-              if (typeof window === 'undefined' || typeof window.ethereum === 'undefined') {
-                return null;
-              }
-              // If multiple providers exist, find MetaMask only
-              if (window.ethereum.providers && Array.isArray(window.ethereum.providers)) {
-                const metamaskProvider = window.ethereum.providers.find(
-                  (p) => p.isMetaMask && !p.isBraveWallet
-                );
-                return metamaskProvider || null;
-              }
-              // If it's MetaMask directly, use it
-              return window.ethereum.isMetaMask ? window.ethereum : null;
-            };
-            
-            const metamaskProvider = getMetaMaskProvider();
-            if (metamaskProvider) {
-              provider = new ethers.providers.Web3Provider(metamaskProvider);
-            } else if (RPC_URL) {
-              provider = new ethers.providers.JsonRpcProvider(RPC_URL);
-            }
-          }
-
-          if (provider && CONTRACT_ADDRESS) {
-            // Create contract instance if we don't have one
-            if (!contractToQuery) {
-              contractToQuery = new ethers.Contract(
-                CONTRACT_ADDRESS,
-                CONTRACT_ABI,
-                provider
-              );
-            }
-
-            // Get current block number
-            const currentBlock = await provider.getBlockNumber();
-            const fromBlock = Math.max(0, currentBlock - 10000); // Last ~10k blocks
-
-            // Query SharesPurchased events
-            const purchaseFilter = contractToQuery.filters.SharesPurchased(marketId, null);
-            const purchaseEvents = await contractToQuery.queryFilter(purchaseFilter, fromBlock);
-
-            // Query SharesSold events
-            const sellFilter = contractToQuery.filters.SharesSold(marketId, null);
-            const sellEvents = await contractToQuery.queryFilter(sellFilter, fromBlock);
-
-            const allEvents = [...purchaseEvents, ...sellEvents].sort((a, b) => {
-              if (a.blockNumber !== b.blockNumber) {
-                return b.blockNumber - a.blockNumber;
-              }
-              return b.logIndex - a.logIndex;
-            });
-
-            formattedTrades = await Promise.all(
-              allEvents.slice(0, 1000).map(async (event) => {
-                const args = event.args;
-                const isPurchase = event.event === 'SharesPurchased';
-                const isYes = args.isYes || args[2];
-                const shares = args.shares || args[3];
-                const newPrice = args.newPrice || args[5] || args[4];
-                const trader = args.buyer || args.seller || args[1];
-                
-                const block = await event.getBlock();
-                const priceBps = newPrice ? Number(newPrice.toString()) : 5000;
-                const sharesWei = shares?.toString?.() || shares || '0';
-                
-                let sharesFormatted = '0';
-                try {
-                  sharesFormatted = ethers.utils.formatEther(sharesWei);
-                } catch (err) {
-                  sharesFormatted = sharesWei.toString();
-                }
-
-                return {
-                  side: isYes ? 'yes' : 'no',
-                  amount: parseFloat(sharesFormatted).toFixed(4),
-                  price: priceBps / 10000,
-                  yesPrice: isYes ? priceBps / 10000 : (10000 - priceBps) / 10000,
-                  noPrice: isYes ? (10000 - priceBps) / 10000 : priceBps / 10000,
-                  timestamp: new Date(block.timestamp * 1000).toISOString(),
-                  trader: trader,
-                  txHash: event.transactionHash || null
-                };
-              })
-            );
-          }
-        } catch (eventError) {
-          console.error('Error querying blockchain events:', eventError);
-        }
-      }
-
-      // Sort newest first
-      formattedTrades.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-
-      setRecentTrades(formattedTrades);
-
-      const uniqueAddresses = new Set(formattedTrades.map(trade => (trade.trader || '').toLowerCase()));
-      setUniqueTraders(uniqueAddresses.size);
-
-      console.log('✅ Loaded trades:', formattedTrades.length);
     } catch (error) {
-      console.error('Error fetching recent trades:', error);
-      setRecentTrades([]);
+      console.error('Error fetching top holders:', error);
+      setTopHolders([]);
       setUniqueTraders(0);
     }
-  }, [contracts?.predictionMarket, marketId]);
+  }, [API_BASE, marketId]);
 
   const fetchOrderBook = useCallback(async () => {
     if (!marketId || !API_BASE) return;
@@ -598,7 +463,7 @@ const PolymarketStyleTrading = () => {
       // Fetch all data in parallel for better performance
       await Promise.all([
         fetchPriceHistoryFromDb(timeframe), // Pass timeframe explicitly
-        fetchRecentTrades(),
+        fetchTopHolders(),
         fetchOrderBook(),
         fetchLiquidity()
       ]);
@@ -610,7 +475,7 @@ const PolymarketStyleTrading = () => {
       setLoading(false);
       isFetchingRef.current = false;
     }
-  }, [contracts?.predictionMarket, fetchLiquidity, fetchOrderBook, fetchPriceHistoryFromDb, fetchRecentTrades, fetchMarketDataDirect, getMarketData, getStoredRules, isConnected, marketId, timeframe]);
+  }, [contracts?.predictionMarket, fetchLiquidity, fetchOrderBook, fetchPriceHistoryFromDb, fetchTopHolders, fetchMarketDataDirect, getMarketData, getStoredRules, isConnected, marketId, timeframe]);
 
   const handleTimeframeChange = useCallback(async (range) => {
     setTimeframe(range);
@@ -910,7 +775,7 @@ const PolymarketStyleTrading = () => {
     ? customRules
     : (Array.isArray(market?.rules) && market.rules.length > 0 ? market.rules : defaultRules);
 
-  const tradesToDisplay = Array.isArray(recentTrades) ? recentTrades : [];
+  const holdersToDisplay = Array.isArray(topHolders) ? topHolders : [];
   const creatorHandle = formatCreatorHandle(market?.creatorUsername || market?.creator);
   const heroImageUrl = getMarketImage(market, marketId);
 
@@ -1020,7 +885,7 @@ const PolymarketStyleTrading = () => {
             {/* Tabs */}
             <div className="space-y-4 sm:space-y-6">
               <div className="flex items-center justify-between border border-white/25 rounded-[18px] sm:rounded-[22px] px-1 sm:px-2 py-1">
-                {['trades', 'market', 'rules'].map((tab) => {
+                {['holders', 'market', 'rules'].map((tab) => {
                   const isActive = activeTab === tab;
                   return (
                     <button
@@ -1038,7 +903,7 @@ const PolymarketStyleTrading = () => {
                         background: isActive ? 'rgba(255,255,255,0.04)' : 'transparent'
                       }}
                     >
-                      {tab === 'trades' ? 'Trades' : tab.charAt(0).toUpperCase() + tab.slice(1)}
+                      {tab === 'holders' ? 'Top Holders' : tab.charAt(0).toUpperCase() + tab.slice(1)}
                     </button>
                   );
                 })}
@@ -1077,52 +942,83 @@ const PolymarketStyleTrading = () => {
                   </div>
                 )}
 
-                {activeTab === 'trades' && (
+                {activeTab === 'holders' && (
                   <div className="space-y-4" style={{ fontFamily: 'gilroy, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
-                    {tradesToDisplay.length === 0 ? (
+                    <p className="text-sm text-white/45 tracking-[0.2em] uppercase mb-4">Top 5 Holders</p>
+                    {holdersToDisplay.length === 0 ? (
                       <div className="text-white/50 text-sm text-center py-16">
-                        No trades yet. Activity will appear here once trading begins.
+                        No holders yet. Be the first to take a position!
                       </div>
                     ) : (
                       <div className="space-y-3">
-                        {tradesToDisplay.map((trade, index) => (
+                        {holdersToDisplay.map((holder, index) => (
                           <div
-                            key={`${trade.timestamp}-${index}`}
-                            className="glass-card border border-white/12 rounded-[20px] px-5 py-4 bg-transparent flex flex-col gap-2"
+                            key={`holder-${holder.address}-${index}`}
+                            className="glass-card border border-white/12 rounded-[20px] px-5 py-4 bg-transparent"
                           >
-                            <div className="flex items-center justify-between text-sm">
-                              <span className={`uppercase tracking-[0.28em] ${trade.side === 'yes' ? 'text-[#FFE600]' : 'text-white/60'}`}>
-                                {trade.side === 'yes' ? 'Yes' : 'No'}
-                              </span>
-                              <span className="text-white/70">{(trade.price * 100).toFixed(1)}%</span>
-                            </div>
-                            <div className="flex items-center justify-between text-xs text-white/50">
-                              <span>{parseFloat(trade.amount).toFixed(2)} shares</span>
-                              <span>{new Date(trade.timestamp).toLocaleString()}</span>
-                            </div>
-                            <div className="flex items-center justify-between gap-2">
-                              {trade.trader && (
-                                <span className="text-white/30 text-[11px] tracking-[0.3em] uppercase">
-                                  {trade.trader.slice(0, 6)}…{trade.trader.slice(-4)}
-                                </span>
-                              )}
-                              {trade.txHash && (
-                                <a
-                                  href={getBlockExplorerUrl(trade.txHash)}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-[#FFE600] hover:text-[#FFD700] text-[11px] tracking-[0.1em] uppercase transition-colors flex items-center gap-1"
-                                  title="View on block explorer"
+                            <div className="flex items-center justify-between mb-3">
+                              <div className="flex items-center gap-3">
+                                {/* Rank Badge */}
+                                <div 
+                                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                                    index === 0 ? 'bg-[#FFE600] text-black' : 
+                                    index === 1 ? 'bg-gray-300 text-black' : 
+                                    index === 2 ? 'bg-amber-600 text-white' : 
+                                    'bg-white/10 text-white/70'
+                                  }`}
                                 >
-                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                                  </svg>
-                                  TX
-                                </a>
-                              )}
+                                  {holder.rank || index + 1}
+                                </div>
+                                {/* Address */}
+                                <span className="text-white/80 text-sm font-medium tracking-wide">
+                                  {holder.address.slice(0, 6)}…{holder.address.slice(-4)}
+                                </span>
+                              </div>
+                              {/* Percentage */}
+                              <span className="text-[#FFE600] text-sm font-semibold">
+                                {holder.percentage}%
+                              </span>
+                            </div>
+                            
+                            <div className="flex items-center justify-between text-xs">
+                              {/* Position indicator */}
+                              <div className="flex items-center gap-2">
+                                <span className={`uppercase tracking-[0.2em] font-medium ${
+                                  holder.position === 'yes' ? 'text-[#22C55E]' : 
+                                  holder.position === 'no' ? 'text-[#EF4444]' : 
+                                  'text-white/50'
+                                }`}>
+                                  {holder.position === 'yes' ? 'YES' : holder.position === 'no' ? 'NO' : 'BOTH'}
+                                </span>
+                              </div>
+                              
+                              {/* Shares breakdown */}
+                              <div className="flex items-center gap-4 text-white/50">
+                                {parseFloat(holder.yesShares) > 0 && (
+                                  <span className="flex items-center gap-1">
+                                    <span className="w-2 h-2 rounded-full bg-[#22C55E]"></span>
+                                    {parseFloat(holder.yesShares).toFixed(2)} YES
+                                  </span>
+                                )}
+                                {parseFloat(holder.noShares) > 0 && (
+                                  <span className="flex items-center gap-1">
+                                    <span className="w-2 h-2 rounded-full bg-[#EF4444]"></span>
+                                    {parseFloat(holder.noShares).toFixed(2)} NO
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </div>
                         ))}
+                      </div>
+                    )}
+                    
+                    {/* Total holders count */}
+                    {uniqueTraders > 0 && (
+                      <div className="text-center pt-4 border-t border-white/10">
+                        <span className="text-white/40 text-xs tracking-wider">
+                          {uniqueTraders} total holder{uniqueTraders !== 1 ? 's' : ''} in this market
+                        </span>
                       </div>
                     )}
                   </div>
