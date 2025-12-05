@@ -314,7 +314,28 @@ const MarketCreation = () => {
 
       const txHash = receipt?.transactionHash;
 
+      // Create activity event for market creation
       if (marketId) {
+        try {
+          await fetch(`${API_BASE}/api/activity/create`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'MARKET_CREATED',
+              marketId: marketId,
+              creator: account,
+              question: formData.question,
+              category: formData.category,
+              txHash: txHash,
+              blockNumber: receipt.blockNumber?.toString() || null,
+              blockTime: new Date().toISOString()
+            })
+          });
+          console.log('✅ Market created activity event recorded');
+        } catch (activityErr) {
+          console.error('⚠️ Failed to create activity event:', activityErr);
+        }
+
         if (formData.imageUrl) {
           try {
             const response = await fetch(`${API_BASE}/api/market-images`, {

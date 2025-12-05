@@ -254,6 +254,27 @@ const PendingMarkets = () => {
       // Get API base URL for saving image and updating status
       const apiBaseUrl = resolveApiBase();
 
+      // Create activity event for market creation
+      try {
+        await fetch(`${apiBaseUrl}/api/activity/create`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'MARKET_CREATED',
+            marketId: marketId,
+            creator: account,
+            question: pendingMarket.question,
+            category: pendingMarket.category,
+            txHash: receipt.transactionHash,
+            blockNumber: receipt.blockNumber?.toString() || null,
+            blockTime: new Date().toISOString()
+          })
+        });
+        console.log('✅ Market created activity event recorded');
+      } catch (activityErr) {
+        console.error('⚠️ Failed to create activity event:', activityErr);
+      }
+
       // Save image if exists
       if (pendingMarket.imageUrl) {
         try {
