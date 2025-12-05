@@ -552,7 +552,38 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
 
         setTradeAmount('');
         
-        // Immediately fetch fresh prices from chain and update UI
+        // Calculate cost and shares for position update
+        const costWei = ethers.utils.parseUnits(normalizedAmount, 18).toString();
+        const sharesWei = costWei; // Approximate - AMM calculates actual shares
+        
+        // Update position in database IMMEDIATELY after successful trade
+        try {
+          console.log('📝 Updating position...', { marketId: marketId.toString(), account, tradeSide, sharesWei });
+          const posResponse = await fetch(`${API_BASE}/api/update-position`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              marketId: marketId.toString(),
+              userAddress: account,
+              isYes: tradeSide === 'yes',
+              isBuy: true,
+              sharesWei: sharesWei,
+              costWei: costWei,
+              txHash: receipt?.transactionHash || receipt?.hash || null,
+              blockNumber: receipt?.blockNumber?.toString() || null
+            })
+          });
+          const posResult = await posResponse.json();
+          if (posResponse.ok && posResult.success) {
+            console.log('✅ Position updated in database:', posResult.position);
+          } else {
+            console.error('⚠️ Position update failed:', posResult);
+          }
+        } catch (positionErr) {
+          console.error('⚠️ Failed to update position:', positionErr);
+        }
+        
+        // Fetch fresh prices from chain and update UI
         if (contracts?.predictionMarket && marketId) {
           try {
             // Wait a moment for blockchain state to update after transaction
@@ -584,8 +615,6 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
 
               // Create activity event for the buy
               const priceBps = tradeSide === 'yes' ? yesPriceBps : noPriceBps;
-              const costWei = ethers.utils.parseUnits(normalizedAmount, 18).toString();
-              const sharesWei = costWei; // Approximate - AMM calculates actual shares
               
               try {
                 await fetch(`${API_BASE}/api/activity/create`, {
@@ -596,40 +625,19 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
                     marketId: marketId.toString(),
                     userAddress: account,
                     isYes: tradeSide === 'yes',
-                    isBuy: true, // This is a buy transaction
+                    isBuy: true,
                     sharesWei: sharesWei,
                     priceBps: priceBps,
                     costWei: costWei,
                     txHash: receipt?.transactionHash || receipt?.hash || null,
                     blockNumber: receipt?.blockNumber?.toString() || null,
                     blockTime: receipt?.blockNumber ? new Date().toISOString() : new Date().toISOString(),
-                    marketQuestion: market?.questionTitle || market?.question || null, // Pass the market question
+                    marketQuestion: market?.questionTitle || market?.question || null,
                   })
                 });
                 console.log('✅ Activity event created for buy');
               } catch (activityErr) {
                 console.error('⚠️ Failed to create activity event:', activityErr);
-              }
-
-              // Update position in database for top holders
-              try {
-                await fetch(`${API_BASE}/api/update-position`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    marketId: marketId.toString(),
-                    userAddress: account,
-                    isYes: tradeSide === 'yes',
-                    isBuy: true,
-                    sharesWei: sharesWei,
-                    costWei: costWei,
-                    txHash: receipt?.transactionHash || receipt?.hash || null,
-                    blockNumber: receipt?.blockNumber?.toString() || null
-                  })
-                });
-                console.log('✅ Position updated in database');
-              } catch (positionErr) {
-                console.error('⚠️ Failed to update position:', positionErr);
               }
             }
           } catch (priceErr) {
@@ -801,9 +809,40 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
           txHash: receipt?.transactionHash || receipt?.hash
         });
 
+        // Calculate shares for position update (use tradeAmount before clearing)
+        const sharesWei = ethers.utils.parseUnits(tradeAmount, 18).toString();
+        const costWei = sharesWei;
+        
         setTradeAmount('');
         
-        // Immediately fetch fresh prices from chain and update UI
+        // Update position in database IMMEDIATELY after successful sell
+        try {
+          console.log('📝 Updating position (sell)...', { marketId: marketId.toString(), account, tradeSide, sharesWei });
+          const posResponse = await fetch(`${API_BASE}/api/update-position`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              marketId: marketId.toString(),
+              userAddress: account,
+              isYes: tradeSide === 'yes',
+              isBuy: false,
+              sharesWei: sharesWei,
+              costWei: costWei,
+              txHash: receipt?.transactionHash || receipt?.hash || null,
+              blockNumber: receipt?.blockNumber?.toString() || null
+            })
+          });
+          const posResult = await posResponse.json();
+          if (posResponse.ok && posResult.success) {
+            console.log('✅ Position updated in database (sell):', posResult.position);
+          } else {
+            console.error('⚠️ Position update failed:', posResult);
+          }
+        } catch (positionErr) {
+          console.error('⚠️ Failed to update position:', positionErr);
+        }
+        
+        // Fetch fresh prices from chain and update UI
         if (contracts?.predictionMarket && marketId) {
           try {
             // Wait a moment for blockchain state to update after transaction
@@ -835,8 +874,6 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
 
               // Create activity event for the sell
               const priceBps = tradeSide === 'yes' ? yesPriceBps : noPriceBps;
-              const sharesWei = ethers.utils.parseUnits(tradeAmount, 18).toString();
-              const costWei = sharesWei; // Approximate - AMM calculates actual payout
               
               try {
                 await fetch(`${API_BASE}/api/activity/create`, {
@@ -847,40 +884,19 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
                     marketId: marketId.toString(),
                     userAddress: account,
                     isYes: tradeSide === 'yes',
-                    isBuy: false, // This is a sell transaction
+                    isBuy: false,
                     sharesWei: sharesWei,
                     priceBps: priceBps,
                     costWei: costWei,
                     txHash: receipt?.transactionHash || receipt?.hash || null,
                     blockNumber: receipt?.blockNumber?.toString() || null,
                     blockTime: receipt?.blockNumber ? new Date().toISOString() : new Date().toISOString(),
-                    marketQuestion: market?.questionTitle || market?.question || null, // Pass the market question
+                    marketQuestion: market?.questionTitle || market?.question || null,
                   })
                 });
                 console.log('✅ Activity event created for sell');
               } catch (activityErr) {
                 console.error('⚠️ Failed to create activity event:', activityErr);
-              }
-
-              // Update position in database for top holders (sell = decrease)
-              try {
-                await fetch(`${API_BASE}/api/update-position`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    marketId: marketId.toString(),
-                    userAddress: account,
-                    isYes: tradeSide === 'yes',
-                    isBuy: false, // This is a sell
-                    sharesWei: sharesWei,
-                    costWei: costWei,
-                    txHash: receipt?.transactionHash || receipt?.hash || null,
-                    blockNumber: receipt?.blockNumber?.toString() || null
-                  })
-                });
-                console.log('✅ Position updated in database (sell)');
-              } catch (positionErr) {
-                console.error('⚠️ Failed to update position:', positionErr);
               }
             }
           } catch (priceErr) {
