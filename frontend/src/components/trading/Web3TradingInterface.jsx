@@ -404,6 +404,22 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
       return;
     }
 
+    // Check if market has ended
+    const endTime = market?.endTime || market?.resolutionTime || marketData?.endTime;
+    if (endTime) {
+      const endDate = new Date(typeof endTime === 'number' ? endTime * 1000 : endTime);
+      if (endDate < new Date()) {
+        toast.error('This market has ended. Trading is no longer available.');
+        return;
+      }
+    }
+
+    // Check if market is resolved
+    if (market?.resolved || marketData?.resolved) {
+      toast.error('This market has been resolved. Trading is closed.');
+      return;
+    }
+
     let normalizedAmount;
     try {
       normalizedAmount = normalizeDecimal(tradeAmount);
@@ -658,7 +674,35 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
       }, 800);
     } catch (err) {
       console.error(orderType === 'limit' ? 'Limit order failed:' : 'Buy failed:', err);
-      toast.error(`${orderType === 'limit' ? 'Limit order' : 'Buy'} failed: ${err.message}`);
+      
+      // Parse error message for user-friendly display
+      let errorMessage = 'Transaction failed';
+      const errStr = err.message?.toLowerCase() || '';
+      
+      if (errStr.includes('call_exception') || errStr.includes('status":0') || errStr.includes('transaction failed')) {
+        // Check for specific contract revert reasons
+        if (errStr.includes('market has ended') || errStr.includes('market closed')) {
+          errorMessage = 'This market has ended. Trading is no longer available.';
+        } else if (errStr.includes('market not active') || errStr.includes('not active')) {
+          errorMessage = 'This market is not active. It may have been resolved or paused.';
+        } else if (errStr.includes('amm') || errStr.includes('not initialized')) {
+          errorMessage = 'Market is not ready for trading yet. Please try again later.';
+        } else if (errStr.includes('insufficient')) {
+          errorMessage = 'Insufficient balance or liquidity for this trade.';
+        } else {
+          errorMessage = 'Transaction failed. The market may have ended or is temporarily unavailable.';
+        }
+      } else if (errStr.includes('user rejected') || errStr.includes('user denied')) {
+        errorMessage = 'Transaction was cancelled.';
+      } else if (errStr.includes('insufficient funds')) {
+        errorMessage = 'Insufficient balance to complete this transaction.';
+      } else if (errStr.includes('nonce')) {
+        errorMessage = 'Transaction error. Please refresh and try again.';
+      } else if (err.message) {
+        errorMessage = err.message.length > 100 ? err.message.substring(0, 100) + '...' : err.message;
+      }
+      
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -667,6 +711,22 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
   const handleSell = async () => {
     if (!tradeAmount || parseFloat(tradeAmount) <= 0) {
       toast.error('Please enter a valid amount');
+      return;
+    }
+
+    // Check if market has ended
+    const endTime = market?.endTime || market?.resolutionTime || marketData?.endTime;
+    if (endTime) {
+      const endDate = new Date(typeof endTime === 'number' ? endTime * 1000 : endTime);
+      if (endDate < new Date()) {
+        toast.error('This market has ended. Trading is no longer available.');
+        return;
+      }
+    }
+
+    // Check if market is resolved
+    if (market?.resolved || marketData?.resolved) {
+      toast.error('This market has been resolved. Trading is closed.');
       return;
     }
 
@@ -917,7 +977,30 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
       }, 800);
     } catch (err) {
       console.error(orderType === 'limit' ? 'Limit order failed:' : 'Sell failed:', err);
-      toast.error(`${orderType === 'limit' ? 'Limit order' : 'Sell'} failed: ${err.message}`);
+      
+      
+      let errorMessage = 'Transaction failed';
+      const errStr = err.message?.toLowerCase() || '';
+      
+      if (errStr.includes('call_exception') || errStr.includes('status":0') || errStr.includes('transaction failed')) {
+        if (errStr.includes('market has ended') || errStr.includes('market closed')) {
+          errorMessage = 'This market has ended. Trading is no longer available.';
+        } else if (errStr.includes('market not active') || errStr.includes('not active')) {
+          errorMessage = 'This market is not active. It may have been resolved or paused.';
+        } else if (errStr.includes('insufficient shares') || errStr.includes('not enough')) {
+          errorMessage = 'Insufficient shares to sell.';
+        } else {
+          errorMessage = 'Transaction failed. The market may have ended or is temporarily unavailable.';
+        }
+      } else if (errStr.includes('user rejected') || errStr.includes('user denied')) {
+        errorMessage = 'Transaction was cancelled.';
+      } else if (errStr.includes('insufficient funds')) {
+        errorMessage = 'Insufficient balance to complete this transaction.';
+      } else if (err.message) {
+        errorMessage = err.message.length > 100 ? err.message.substring(0, 100) + '...' : err.message;
+      }
+      
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }

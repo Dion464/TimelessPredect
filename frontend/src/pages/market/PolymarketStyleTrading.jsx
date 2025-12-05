@@ -1056,10 +1056,8 @@ const PolymarketStyleTrading = () => {
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
                       <div className="absolute bottom-2 left-3">
-                        <span className="text-white text-lg font-medium">
-                          {Math.round(tm.yesPrice || tm.lastYesPriceBps / 100 || 50)}
-                          <span className="text-sm">%</span>
-                        </span>
+                      
+                       
                       </div>
                     </button>
                   ))
