@@ -15,6 +15,7 @@ const pendingMarketByIdHandler = require('../lib/api-handlers/pending-market-by-
 const priceHistoryHandler = require('../lib/api-handlers/price-history.js');
 const recordPriceHandler = require('../lib/api-handlers/record-price.js');
 const userStatsHandler = require('../lib/api-handlers/user-stats.js');
+const topHoldersHandler = require('../lib/api-handlers/top-holders.js');
 
 module.exports = async (req, res) => {
   // Set CORS headers
@@ -59,6 +60,14 @@ module.exports = async (req, res) => {
       req.query.marketId = marketParticipantsMatch[1];
       return await marketParticipantsHandler(req, res);
     }
+    
+    // Top holders route
+    const topHoldersMatch = path.match(/^\/api\/markets\/(\d+)\/top-holders$/);
+    if (topHoldersMatch) {
+      req.query.marketId = topHoldersMatch[1];
+      return await topHoldersHandler(req, res);
+    }
+    
     if (path === '/api/markets') {
       return await marketsHandler(req, res);
     }
