@@ -1,7 +1,7 @@
 // Consolidated API handler to stay within Vercel's 12 function limit
 // All routes go through this single serverless function
 
-// Import handlers from lib folder (not counted as serverless functions)
+// Import handlers from lib folder 
 const activityHandler = require('../lib/api-handlers/activity.js');
 const createActivityHandler = require('../lib/api-handlers/activity-create.js');
 const marketImagesHandler = require('../lib/api-handlers/market-images.js');
@@ -16,6 +16,7 @@ const priceHistoryHandler = require('../lib/api-handlers/price-history.js');
 const recordPriceHandler = require('../lib/api-handlers/record-price.js');
 const userStatsHandler = require('../lib/api-handlers/user-stats.js');
 const topHoldersHandler = require('../lib/api-handlers/top-holders.js');
+const updatePositionHandler = require('../lib/api-handlers/update-position.js');
 
 module.exports = async (req, res) => {
   // Set CORS headers
@@ -66,6 +67,11 @@ module.exports = async (req, res) => {
     if (topHoldersMatch) {
       req.query.marketId = topHoldersMatch[1];
       return await topHoldersHandler(req, res);
+    }
+    
+    // Update position route (called after trades)
+    if (path === '/api/update-position') {
+      return await updatePositionHandler(req, res);
     }
     
     if (path === '/api/markets') {

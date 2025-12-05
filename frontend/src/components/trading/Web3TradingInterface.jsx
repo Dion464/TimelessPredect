@@ -610,6 +610,27 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
               } catch (activityErr) {
                 console.error('⚠️ Failed to create activity event:', activityErr);
               }
+
+              // Update position in database for top holders
+              try {
+                await fetch(`${API_BASE}/api/update-position`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    marketId: marketId.toString(),
+                    userAddress: account,
+                    isYes: tradeSide === 'yes',
+                    isBuy: true,
+                    sharesWei: sharesWei,
+                    costWei: costWei,
+                    txHash: receipt?.transactionHash || receipt?.hash || null,
+                    blockNumber: receipt?.blockNumber?.toString() || null
+                  })
+                });
+                console.log('✅ Position updated in database');
+              } catch (positionErr) {
+                console.error('⚠️ Failed to update position:', positionErr);
+              }
             }
           } catch (priceErr) {
             console.error('⚠️ Failed to record price after trade:', priceErr);
@@ -839,6 +860,27 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
                 console.log('✅ Activity event created for sell');
               } catch (activityErr) {
                 console.error('⚠️ Failed to create activity event:', activityErr);
+              }
+
+              // Update position in database for top holders (sell = decrease)
+              try {
+                await fetch(`${API_BASE}/api/update-position`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    marketId: marketId.toString(),
+                    userAddress: account,
+                    isYes: tradeSide === 'yes',
+                    isBuy: false, // This is a sell
+                    sharesWei: sharesWei,
+                    costWei: costWei,
+                    txHash: receipt?.transactionHash || receipt?.hash || null,
+                    blockNumber: receipt?.blockNumber?.toString() || null
+                  })
+                });
+                console.log('✅ Position updated in database (sell)');
+              } catch (positionErr) {
+                console.error('⚠️ Failed to update position:', positionErr);
               }
             }
           } catch (priceErr) {
