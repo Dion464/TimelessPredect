@@ -169,26 +169,60 @@ const PolymarketChart = ({
   const chartOptions = useMemo(() => {
     if (!hasData) return null;
 
-    // Format data - NO clamping, show REAL values
-    const formatSeriesData = (lineData) =>
-      lineData.map(([ts, value]) => {
-        const rawPercent = Number(value || 0) * 100;
-        return {
-          value: [ts, rawPercent],
-          actual: rawPercent
+    // Calculate time cutoff based on selected range
+    const now = Date.now();
+    let timeCutoff = 0;
+    const rangeValue = selectedRange?.toLowerCase() || 'all';
+    
+    if (rangeValue !== 'all') {
+      const match = rangeValue.match(/^(\d+)([hmwdmy])$/);
+      if (match) {
+        const count = parseInt(match[1], 10);
+        const unit = match[2];
+        const msPerUnit = {
+          h: 60 * 60 * 1000,           // hour
+          d: 24 * 60 * 60 * 1000,      // day
+          w: 7 * 24 * 60 * 60 * 1000,  // week
+          m: 30 * 24 * 60 * 60 * 1000, // month
+          y: 365 * 24 * 60 * 60 * 1000 // year
         };
-      });
+        timeCutoff = now - (count * (msPerUnit[unit] || msPerUnit.d));
+      }
+    }
+
+    // Format data and filter by time range
+    const formatSeriesData = (lineData) =>
+      lineData
+        .filter(([ts]) => timeCutoff === 0 || ts >= timeCutoff)
+        .map(([ts, value]) => {
+          const rawPercent = Number(value || 0) * 100;
+          return {
+            value: [ts, rawPercent],
+            actual: rawPercent
+          };
+        });
 
     const yesData = formatSeriesData(yesLineData);
     const noData = formatSeriesData(noLineData);
 
-    // Calculate time range from real data
+    // If no data in selected range, show empty state
+    if (yesData.length === 0 && noData.length === 0) {
+      return null;
+    }
+
+    // Calculate time range from filtered data
     const allTimestamps = [
       ...yesData.map((point) => point.value[0]),
       ...noData.map((point) => point.value[0])
     ].filter(Number.isFinite);
-    const minTime = allTimestamps.length > 0 ? Math.min(...allTimestamps) : Date.now() - 86400000;
-    const maxTime = allTimestamps.length > 0 ? Math.max(...allTimestamps) : Date.now();
+    
+    // Set min/max based on selection or data
+    const dataMinTime = allTimestamps.length > 0 ? Math.min(...allTimestamps) : now - 86400000;
+    const dataMaxTime = allTimestamps.length > 0 ? Math.max(...allTimestamps) : now;
+    
+    // For time ranges, use cutoff as min if it's larger than data min
+    const minTime = timeCutoff > 0 ? Math.max(timeCutoff, dataMinTime) : dataMinTime;
+    const maxTime = dataMaxTime;
 
     const latestYes = yesData.length ? yesData[yesData.length - 1].actual : 0;
     const latestNo = noData.length ? noData[noData.length - 1].actual : 0;
@@ -251,10 +285,10 @@ const PolymarketChart = ({
       animation: true,
       animationDuration: 400,
       grid: {
-        left: '4%',
-        right: '16%',
-        top: '10%',
-        bottom: '15%',
+        left: '3%',
+        right: '12%',
+        top: '8%',
+        bottom: '12%',
         containLabel: true
       },
       tooltip: {
@@ -436,7 +470,19 @@ const PolymarketChart = ({
     <div className="glass-card w-full rounded-[16px] sm:rounded-[24px] border border-white/20 backdrop-blur-xl p-3 sm:p-4" style={{ background: 'rgba(12,12,12,0.55)' }}>
       {renderControls()}
       <div className="overflow-hidden rounded-[12px] sm:rounded-[16px]" style={{ height: typeof height === 'number' ? Math.max(180, height * 0.8) : height }}>
-        <ReactECharts option={chartOptions} style={{ height: '100%', width: '100%' }} />
+        {chartOptions ? (
+          <ReactECharts option={chartOptions} style={{ height: '100%', width: '100%' }} />
+        ) : (
+          <div className="h-full flex items-center justify-center text-white/40 text-sm" style={{ fontFamily: 'gilroy, sans-serif' }}>
+            <div className="text-center">
+              <svg className="w-10 h-10 mx-auto mb-3 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              <p>No trading activity in this time period</p>
+              <p className="text-xs text-white/25 mt-1">Try selecting a longer time range</p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
