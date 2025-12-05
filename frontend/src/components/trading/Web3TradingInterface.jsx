@@ -569,8 +569,15 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
         setTradeAmount('');
         
         // Calculate cost and shares for position update
+        // Shares = Cost / Price (price is in cents, e.g., 73 = $0.73)
         const costWei = ethers.utils.parseUnits(normalizedAmount, 18).toString();
-        const sharesWei = costWei; // Approximate - AMM calculates actual shares
+        const currentPricePercent = tradeSide === 'yes' 
+          ? (marketData?.yesPrice || market?.yesPrice || 50) / 100
+          : (marketData?.noPrice || market?.noPrice || 50) / 100;
+        // Calculate actual shares: cost / price
+        // If cost = 4 and price = 0.73, shares = 4 / 0.73 = 5.48
+        const sharesAmount = parseFloat(normalizedAmount) / Math.max(currentPricePercent, 0.01);
+        const sharesWei = ethers.utils.parseUnits(sharesAmount.toFixed(18), 18).toString();
         
         // Update position in database IMMEDIATELY after successful trade
         try {
@@ -869,9 +876,14 @@ const Web3TradingInterface = ({ marketId, market, onTradeComplete }) => {
           txHash: receipt?.transactionHash || receipt?.hash
         });
 
-        // Calculate shares for position update (use tradeAmount before clearing)
+        // Calculate shares and cost for position update (use tradeAmount before clearing)
+        // For selling: tradeAmount = shares being sold, cost = shares * price
         const sharesWei = ethers.utils.parseUnits(tradeAmount, 18).toString();
-        const costWei = sharesWei;
+        const currentPricePercent = tradeSide === 'yes' 
+          ? (marketData?.yesPrice || market?.yesPrice || 50) / 100
+          : (marketData?.noPrice || market?.noPrice || 50) / 100;
+        const costAmount = parseFloat(tradeAmount) * currentPricePercent;
+        const costWei = ethers.utils.parseUnits(costAmount.toFixed(18), 18).toString();
         
         setTradeAmount('');
         
